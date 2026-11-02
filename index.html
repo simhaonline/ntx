@@ -1175,6 +1175,7 @@
       <ul class="nav-links">
         <li><a href="#live-flow">Live Flow</a></li>
         <li><a href="#features">Architecture</a></li>
+        <li><a href="#providers">AI Providers</a></li>
         <li><a href="#bots">Bot Store</a></li>
         <li><a href="#workflows">Workflows</a></li>
         <li><a href="#memory">Memory Stack</a></li>
@@ -1403,11 +1404,12 @@
         </div>
         <div class="terminal-tabs">
           <button class="term-tab active" onclick="setTerminalOutput('status')">ntx status</button>
+          <button class="term-tab" onclick="setTerminalOutput('providers')">ntx provider list</button>
+          <button class="term-tab" onclick="setTerminalOutput('oauth')">ntx auth status</button>
           <button class="term-tab" onclick="setTerminalOutput('bots')">ntx bot list</button>
           <button class="term-tab" onclick="setTerminalOutput('workflow')">ntx workflow run</button>
           <button class="term-tab" onclick="setTerminalOutput('skills')">ntx skill list</button>
           <button class="term-tab" onclick="setTerminalOutput('doctor')">ntx doctor</button>
-          <button class="term-tab" onclick="setTerminalOutput('harness')">ntx harness status</button>
         </div>
       </div>
       <div class="terminal-body" id="term-display">
@@ -1498,6 +1500,75 @@
         </div>
         <h3>Hot-Swappable Multi-Provider Adapters</h3>
         <p>Standardized tool call and inference interfaces. Seamlessly switch between OpenAI, Anthropic, Gemini, DeepSeek, and local Ollama/LMStudio engines without changing execution code.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI Providers & Multi-Model Gateway Section -->
+  <section class="container" id="providers">
+    <div class="section-title">
+      <h2>Preconfigured Multi-Provider AI Gateway & Google OAuth</h2>
+      <p>Instant out-of-the-box connectivity across 21+ global providers, specialized LPUs, local runtimes, and native Google OAuth 2.0 authentication for Gemini.</p>
+    </div>
+
+    <!-- Google OAuth Showcase Card -->
+    <div style="background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 12px; padding: 2rem; margin-bottom: 2.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem; box-shadow: var(--shadow-sm);">
+      <div style="max-width: 720px;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="font-size: 1.75rem;">✨</span>
+          <h3 style="font-size: 1.35rem; font-weight: 800; color: var(--text-heading);">Google Gemini Native OAuth 2.0 Integration</h3>
+          <span class="pillar-tag" style="background: rgba(16, 185, 129, 0.12); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">ZERO API KEYS NEEDED</span>
+        </div>
+        <p style="color: var(--text-body); font-size: 0.95rem; line-height: 1.6;">
+          Authenticate directly with your Google Account using standard OAuth2 PKCE or Google Cloud Application Default Credentials (ADC). Features automated background token refresh, token vault encryption (0600), and sub-millisecond dispatch to Gemini 2.0 Flash and 1.5 Pro with 2M token context.
+        </p>
+        <div style="margin-top: 1rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">
+          Run in terminal: <code style="background: var(--bg-canvas); padding: 0.25rem 0.6rem; border-radius: 4px; color: var(--color-brand-accent); font-weight: 700;">ntx auth login google</code> or authenticate with 1 click in the WebUI.
+        </div>
+      </div>
+      <div>
+        <a href="/app" class="btn-primary-hero" style="font-size: 0.9rem; padding: 0.7rem 1.4rem;">
+          Sign In with Google in WebUI
+        </a>
+      </div>
+    </div>
+
+    <!-- Provider Grid Categories -->
+    <div class="pillar-grid">
+      <div class="pillar-card">
+        <div class="pillar-tag">AGENT NATIVE</div>
+        <h3>Nous Portal & Hermes Ecosystem</h3>
+        <p>Preconfigured subscription gateway with integrated Hermes 3 (405B, 70B, 8B) models, native web search, code interpreter, and reasoning tools.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-tag">FRONTIER COMMERCIAL</div>
+        <h3>Gemini, OpenAI, Anthropic, DeepSeek</h3>
+        <p>Direct native adapters for Google Gemini 2.0 Flash, Claude 3.7 Sonnet, OpenAI GPT-4o/o3-mini, and DeepSeek V3/R1 with structured JSON handshaking.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-tag">HIGH-SPEED LPUS</div>
+        <h3>Groq, Cerebras, SambaNova, Together</h3>
+        <p>High-throughput hardware acceleration delivering 500+ to 2,000+ tokens/second for ultra-low latency interactive concierge loops and real-time agents.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-tag">LOCAL & AIR-GAPPED</div>
+        <h3>Ollama, LM Studio, vLLM Clusters</h3>
+        <p>Zero external network calls, zero data leakage, and 100% data sovereignty. Runs quantized GGUF and AWQ models on consumer hardware or private VPCs.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-tag">ROUTERS & SPECIALIZED</div>
+        <h3>OpenRouter, Perplexity, Mistral, Cohere</h3>
+        <p>Unified balance multi-model routing with OpenRouter, real-time live citation search via Perplexity Sonar, and enterprise Command R+ RAG grounding.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-tag">ENTERPRISE CLOUD</div>
+        <h3>AWS Bedrock, Vertex AI, Azure OpenAI</h3>
+        <p>Corporate cloud compliance, IAM role delegation, VPC private endpoints, and SOC2/HIPAA enterprise isolation directly managed at the harness layer.</p>
       </div>
     </div>
   </section>
@@ -2004,6 +2075,48 @@ Registered Bots    : 7 Pre-Configured Personas [App Store Active]
 Active Workflows   : 4 Directed Acyclic Graphs (DAGs) [0 Cycles Verified]
 Loop Breakers      : Enforced (Hard stop after 25 iterations)
 HITL Gate Policy   : Strict Interception on Destructive Actions`,
+      providers: `=================================================================================================================
+              NITYAKSHA AI PROVIDER GATEWAY (21 Preconfigured Commercial, Local & Cloud Providers)              
+=================================================================================================================
+  ID             STATUS       CATEGORY          DEFAULT MODEL                  AUTH METHOD
+-----------------------------------------------------------------------------------------------------------------
+  *gemini        ACTIVE       Commercial       gemini-2.0-flash               Google OAuth (user@gmail.com)
+   nous          READY        Agent Native     hermes-3-llama-3.1-405b        Configured ($NOUS_API_KEY)
+   openai        READY        Commercial       gpt-4o                         Configured ($OPENAI_API_KEY)
+   anthropic     READY        Commercial       claude-3-7-sonnet-20250219     Configured ($ANTHROPIC_API_KEY)
+   deepseek      READY        Commercial       deepseek-chat                  Configured ($DEEPSEEK_API_KEY)
+   groq          READY        Specialized      llama-3.3-70b-versatile        Configured ($GROQ_API_KEY)
+   openrouter    READY        Aggregator       auto                           Configured ($OPENROUTER_API_KEY)
+   together      READY        Specialized      meta-llama/Llama-3.3-70B-In... Configured ($TOGETHER_API_KEY)
+   mistral       READY        Commercial       mistral-large-latest           Configured ($MISTRAL_API_KEY)
+   cohere        READY        Commercial       command-r-plus-08-2024         Configured ($COHERE_API_KEY)
+   perplexity    READY        Specialized      sonar-pro                      Configured ($PERPLEXITY_API_KEY)
+   xai           READY        Commercial       grok-2-1212                    Configured ($XAI_API_KEY)
+   fireworks     READY        Specialized      accounts/fireworks/models/d... Configured ($FIREWORKS_API_KEY)
+   cerebras      READY        Specialized      llama3.3-70b                   Configured ($CEREBRAS_API_KEY)
+   sambanova     READY        Specialized      Meta-Llama-3.3-70B-Instruct    Configured ($SAMBANOVA_API_KEY)
+   ollama        READY        Local / Sovereign llama3.3:latest                Local / Zero Credentials
+   lmstudio      READY        Local / Sovereign local-model                    Local / Zero Credentials
+   vllm          READY        Local / Sovereign default                        Local / Zero Credentials
+   bedrock       READY        Cloud Infra      anthropic.claude-3-5-sonnet... Configured (AWS IAM)
+   vertex        READY        Cloud Infra      gemini-1.5-pro                 Configured (GCP ADC)
+   azure         READY        Cloud Infra      gpt-4o                         Configured (Azure Key)
+-----------------------------------------------------------------------------------------------------------------
+Active Provider: Google Gemini (gemini-2.0-flash) via Google OAuth 2.0`,
+      oauth: `=================================================================================================================
+                     NITYAKSHA AI AUTHENTICATION STATUS (Google Gemini OAuth 2.0)
+=================================================================================================================
+  Google Gemini OAuth : AUTHENTICATED
+    Account           : user@gmail.com
+    Expires In        : ~58 minutes (Auto-Refresh Background Worker Active)
+    Auth Source       : oauth2_flow (PKCE Protected)
+    Scopes            : generative-language, cloud-platform, email, profile
+    Token Vault       : /etc/nityaksha/auth/google_oauth.json (0600 Secure)
+
+  Live Handshake Check:
+    Endpoint          : https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+    Latency           : 114ms
+    Verification      : PASS (Zero manual API keys required)`,
       bots: `=================================================================================================================
           Nityaksha Sovereign Bot Catalog & App Store (7 pre-configured personas)
 =================================================================================================================

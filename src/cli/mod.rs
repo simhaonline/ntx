@@ -178,6 +178,8 @@ impl CliHandler {
             "ring" => self.cmd_ring(),
             "harness" => self.cmd_harness(&sub_args),
             "scrape" => self.cmd_scrape(&sub_args),
+            "provider" | "providers" => self.cmd_provider(&sub_args),
+            "auth" => self.cmd_auth(&sub_args),
             "install" => self.cmd_install(&sub_args),
             "update" | "upgrade" => self.cmd_update(),
             "repl" => self.interactive_repl(options.session_id.clone()),
@@ -1749,6 +1751,187 @@ complete -F _ntx_completions ntx"#);
             }
             Err(e) => {
                 eprintln!("[ERROR] Failed to synthesize skill: {}", e);
+            }
+        }
+    }
+
+    pub fn cmd_provider(&self, args: &[String]) {
+        use crate::provider::ProviderRegistry;
+
+        if args.is_empty() || args[0] == "list" {
+            let providers = ProviderRegistry::list_all();
+            let active = ProviderRegistry::active();
+
+            println!("=================================================================================================================");
+            println!("              NITYAKSHA AI PROVIDER GATEWAY (21 Preconfigured Commercial, Local & Cloud Providers)              ");
+            println!("=================================================================================================================");
+            println!("  ID             STATUS       CATEGORY          DEFAULT MODEL                  AUTH METHOD");
+            println!("-----------------------------------------------------------------------------------------------------------------");
+            for p in &providers {
+                let mark = if p.is_active { "*" } else { " " };
+                let status_str = if p.is_active {
+                    "\x1b[32mACTIVE\x1b[0m      "
+                } else if p.is_configured {
+                    "\x1b[36mREADY\x1b[0m       "
+                } else {
+                    "\x1b[90mUNCONFIGURED\x1b[0m"
+                };
+                let id_fmt = format!("{}{:<13}", mark, p.id);
+                let cat_fmt = format!("{:<16}", p.category);
+                let model_fmt = format!("{:<30}", clean_terminal_text(&p.default_model, 30));
+                let auth_fmt = clean_terminal_text(&p.auth_summary, 32);
+
+                println!("  {} {} {} {} {}", id_fmt, status_str, cat_fmt, model_fmt, auth_fmt);
+            }
+            println!("-----------------------------------------------------------------------------------------------------------------");
+            println!("Active Provider: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
+            println!("Commands:");
+            println!("  ntx provider select <id>        - Switch active default provider");
+            println!("  ntx provider inspect <id>       - View available models, base URL, and configuration");
+            println!("  ntx provider set-key <id> <key> - Set provider API key");
+            println!("  ntx provider set-url <id> <url> - Set custom base URL (e.g. self-hosted Ollama/vLLM)");
+            println!("  ntx provider test <id>          - Test connectivity and latency ping");
+            println!("  ntx auth login google           - Authenticate with Google OAuth for Gemini");
+            return;
+        }
+
+        match args[0].as_str() {
+            "inspect" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx provider inspect <id>");
+                    return;
+                }
+                let id = &args[1];
+                if let Some(p) = ProviderRegistry::get(id) {
+                    println!("================================================================================");
+                    println!("Provider Details: {} ({})", p.name, p.id);
+                    println!("================================================================================");
+                    println!("  Category        : {}", p.category);
+                    println!("  Base URL        : {}", p.base_url);
+                    println!("  Default Model   : {}", p.default_model);
+                    println!("  API Format      : {}", p.api_format);
+                    println!("  Auth Type       : {}", p.auth_type);
+                    println!("  Environment Var : {}", p.env_var);
+                    println!("  Active State    : {}", if p.is_active { "ACTIVE" } else { "Inactive" });
+                    println!("  Auth Status     : {}", p.auth_summary);
+                    println!("  Description     : {}", p.description);
+                    println!("  Available Models: {}", p.available_models.join(", "));
+                } else {
+                    eprintln!("[ERROR] Provider '{}' not found. Run 'ntx provider list' to view available.", id);
+                }
+            }
+            "select" | "use" | "set-active" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx provider select <id>");
+                    return;
+                }
+                let id = &args[1];
+                match ProviderRegistry::set_active(id) {
+                    Ok(()) => {
+                        let active = ProviderRegistry::active();
+                        println!("[SUCCESS] Active provider switched to: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
+                    }
+                    Err(e) => eprintln!("[ERROR] Failed to switch provider: {}", e),
+                }
+            }
+            "set-key" => {
+                if args.len() < 3 {
+                    eprintln!("Usage: ntx provider set-key <id> <api_key>");
+                    return;
+                }
+                let id = &args[1];
+                let key = &args[2];
+                match ProviderRegistry::set_key(id, key) {
+                    Ok(()) => println!("[SUCCESS] API key for '{}' saved successfully.", id),
+                    Err(e) => eprintln!("[ERROR] {}", e),
+                }
+            }
+            "set-url" => {
+                if args.len() < 3 {
+                    eprintln!("Usage: ntx provider set-url <id> <base_url>");
+                    return;
+                }
+                let id = &args[1];
+                let url = &args[2];
+                match ProviderRegistry::set_base_url(id, url) {
+                    Ok(()) => println!("[SUCCESS] Base URL for '{}' updated to: {}", id, url),
+                    Err(e) => eprintln!("[ERROR] {}", e),
+                }
+            }
+            "test" | "ping" => {
+                let id = if args.len() > 1 { args[1].as_str() } else { "gemini" };
+                println!("[INFO] Testing connectivity for provider '{}'...", id);
+                match ProviderRegistry::test_connectivity(id) {
+                    Ok(msg) => println!("\x1b[32m[PASS]\x1b[0m {}", msg),
+                    Err(e) => eprintln!("\x1b[31m[FAIL]\x1b[0m {}", e),
+                }
+            }
+            _ => {
+                eprintln!("Unknown provider subcommand '{}'. Available: list, inspect, select, set-key, set-url, test", args[0]);
+            }
+        }
+    }
+
+    pub fn cmd_auth(&self, args: &[String]) {
+        use crate::provider::GoogleOAuthEngine;
+
+        if args.is_empty() || args[0] == "status" {
+            println!("================================================================================");
+            println!("                     NITYAKSHA AI AUTHENTICATION STATUS                         ");
+            println!("================================================================================");
+            if let Some(creds) = GoogleOAuthEngine::load_credentials() {
+                let email = creds.email.as_deref().unwrap_or("Connected Account");
+                let remaining_secs = creds.expires_at - chrono::Utc::now().timestamp();
+                println!("  Google Gemini OAuth : \x1b[32mAUTHENTICATED\x1b[0m");
+                println!("    Account           : {}", email);
+                println!("    Expires In        : ~{} minutes (Auto-Refresh Enabled)", remaining_secs / 60);
+                println!("    Auth Source       : {}", creds.auth_source);
+                println!("    Scopes            : {}", creds.scopes.join(", "));
+                println!("    Token Vault       : {}", GoogleOAuthEngine::credential_path().display());
+            } else {
+                println!("  Google Gemini OAuth : \x1b[33mNOT AUTHENTICATED\x1b[0m (Run 'ntx auth login google')");
+            }
+
+            println!("\n  Available Auth Commands:");
+            println!("    ntx auth login google             - Authenticate Gemini with Google Account");
+            println!("    ntx auth logout google            - Revoke and clear Google OAuth tokens");
+            println!("    ntx auth status                   - View active OAuth sessions and expiry");
+            return;
+        }
+
+        match args[0].as_str() {
+            "login" => {
+                let target = if args.len() > 1 { args[1].as_str() } else { "google" };
+                if target == "google" || target == "gemini" {
+                    let client_id = if args.len() > 2 { Some(args[2].as_str()) } else { None };
+                    let client_secret = if args.len() > 3 { Some(args[3].as_str()) } else { None };
+                    match GoogleOAuthEngine::interactive_login(client_id, client_secret) {
+                        Ok(_) => {
+                            let _ = crate::provider::ProviderRegistry::set_active("gemini");
+                            println!("[SUCCESS] Google Gemini is now configured and active as your default AI provider.");
+                        }
+                        Err(e) => eprintln!("[ERROR] Authentication failed: {}", e),
+                    }
+                } else {
+                    eprintln!("Unknown auth provider '{}'. Supported: google, gemini", target);
+                }
+            }
+            "logout" => {
+                let target = if args.len() > 1 { args[1].as_str() } else { "google" };
+                if target == "google" || target == "gemini" {
+                    match GoogleOAuthEngine::clear_credentials() {
+                        Ok(()) => println!("[SUCCESS] Cleared Google OAuth credentials."),
+                        Err(e) => eprintln!("[ERROR] {}", e),
+                    }
+                }
+            }
+            "gemini" => {
+                let client_id = if args.len() > 1 { Some(args[1].as_str()) } else { None };
+                let client_secret = if args.len() > 2 { Some(args[2].as_str()) } else { None };
+                let _ = GoogleOAuthEngine::interactive_login(client_id, client_secret);
+            }
+            _ => {
+                eprintln!("Unknown auth command '{}'. Try 'ntx auth status' or 'ntx auth login google'", args[0]);
             }
         }
     }

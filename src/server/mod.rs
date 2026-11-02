@@ -6,6 +6,7 @@ pub mod webui;
 use crate::anti_slop::AntiSlopFilter;
 use crate::bot::DynamicPromptWrapper;
 use crate::db::MemoryEngine;
+use crate::provider::{GoogleOAuthEngine, ProviderRegistry};
 use crate::sandbox::SandboxManager;
 use crate::workflow::{GraphRunner, MultiModelGateway};
 use std::collections::HashMap;
@@ -477,6 +478,160 @@ fn handle_connection(
             let payload = serde_json::json!({ "error": format!("Execution '{}' not found", exec_id) });
             send_json(&mut stream, 404, &payload)?;
             return Ok(());
+        }
+    }
+
+    // --- AI Providers Gateway API ---
+    if method == "GET" && uri.starts_with("/api/providers") {
+        let providers = ProviderRegistry::list_all();
+        let payload = serde_json::to_value(providers).unwrap_or_default();
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/providers/select" {
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let provider_id = req_val["id"].as_str().or_else(|| req_val["provider"].as_str()).unwrap_or("gemini");
+        match ProviderRegistry::set_active(provider_id) {
+            Ok(()) => {
+                let active = ProviderRegistry::active();
+                let payload = serde_json::json!({
+                    "status": "success",
+                    "active_provider": active.id,
+                    "name": active.name,
+                    "default_model": active.default_model
+                });
+                send_json(&mut stream, 200, &payload)?;
+                return Ok(());
+            }
+            Err(e) => {
+                let payload = serde_json::json!({ "error": e });
+                send_json(&mut stream, 400, &payload)?;
+                return Ok(());
+            }
+        }
+    }
+
+    if method == "POST" && uri == "/api/providers/config" {
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let provider_id = req_val["id"].as_str().or_else(|| req_val["provider"].as_str()).unwrap_or("");
+        let key_opt = req_val["api_key"].as_str();
+        let url_opt = req_val["base_url"].as_str();
+
+        if let Some(key) = key_opt {
+            let _ = ProviderRegistry::set_key(provider_id, key);
+        }
+        if let Some(url) = url_opt {
+            let _ = ProviderRegistry::set_base_url(provider_id, url);
+        }
+
+        let updated = ProviderRegistry::get(provider_id);
+        let payload = serde_json::json!({ "status": "success", "provider": updated });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/providers/test" {
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let provider_id = req_val["id"].as_str().or_else(|| req_val["provider"].as_str()).unwrap_or("gemini");
+        match ProviderRegistry::test_connectivity(provider_id) {
+            Ok(msg) => {
+                let payload = serde_json::json!({ "status": "ok", "message": msg });
+                send_json(&mut stream, 200, &payload)?;
+                return Ok(());
+            }
+            Err(e) => {
+                let payload = serde_json::json!({ "status": "error", "message": e });
+                send_json(&mut stream, 400, &payload)?;
+                return Ok(());
+            }
+        }
+    }
+
+    // --- Google OAuth & Auth Status API ---
+    if method == "GET" && uri == "/api/auth/status" {
+        let google_creds = GoogleOAuthEngine::load_credentials();
+        let active_p = ProviderRegistry::active();
+
+        let payload = serde_json::json!({
+            "google_oauth": {
+                "authenticated": google_creds.is_some(),
+                "email": google_creds.as_ref().and_then(|c| c.email.clone()),
+                "expires_at": google_creds.as_ref().map(|c| c.expires_at),
+                "auth_source": google_creds.as_ref().map(|c| c.auth_source.clone()),
+            },
+            "active_provider": active_p.id,
+            "provider_name": active_p.name,
+            "auth_summary": active_p.auth_summary
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "GET" && uri.starts_with("/api/auth/google/url") {
+        let client_id = GoogleOAuthEngine::get_client_id(None);
+        let redirect_uri = "http://127.0.0.1:8080/api/auth/google/callback";
+        let auth_url = GoogleOAuthEngine::build_authorization_url(&client_id, redirect_uri);
+        let payload = serde_json::json!({
+            "url": auth_url,
+            "client_id": client_id,
+            "redirect_uri": redirect_uri
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "GET" && uri.starts_with("/api/auth/google/callback") {
+        let code_opt = if let Some(idx) = uri.find("code=") {
+            let sub = &uri[idx + 5..];
+            Some(sub.split('&').next().unwrap_or("").to_string())
+        } else {
+            None
+        };
+
+        if let Some(code) = code_opt {
+            let client_id = GoogleOAuthEngine::get_client_id(None);
+            let client_secret = GoogleOAuthEngine::get_client_secret(None);
+            let redirect_uri = "http://127.0.0.1:8080/api/auth/google/callback";
+
+            match GoogleOAuthEngine::exchange_authorization_code(&code, &client_id, &client_secret, redirect_uri) {
+                Ok(creds) => {
+                    let _ = ProviderRegistry::set_active("gemini");
+                    let email = creds.email.unwrap_or_else(|| "Google User".to_string());
+                    let html = format!(
+                        "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Google OAuth Success</title>\
+                        <meta http-equiv='refresh' content='2;url=/app'>\
+                        <style>body{{background:#0D2340;color:#FFFFFF;font-family:sans-serif;text-align:center;padding:60px;}} \
+                        h2{{color:#C05A28;}} a{{color:#0EA5E9;}}</style></head><body>\
+                        <h2>✓ Google OAuth Successful</h2>\
+                        <p>Authenticated as <strong>{}</strong>. Gemini Provider Activated.</p>\
+                        <p>Redirecting to Nityaksha Workstation in 2 seconds... <a href='/app'>Click here to return</a></p>\
+                        </body></html>",
+                        email
+                    );
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{}",
+                        html.len(),
+                        html
+                    );
+                    stream.write_all(resp.as_bytes())?;
+                    return Ok(());
+                }
+                Err(err) => {
+                    let html = format!(
+                        "<!DOCTYPE html><html><body style='background:#0D2340;color:#FF6B6B;font-family:sans-serif;text-align:center;padding:50px;'>\
+                        <h2>Authentication Failed</h2><p>{}</p><p><a href='/app' style='color:#FFFFFF;'>Return to Workstation</a></p></body></html>",
+                        err
+                    );
+                    let resp = format!(
+                        "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
+                        html.len(),
+                        html
+                    );
+                    stream.write_all(resp.as_bytes())?;
+                    return Ok(());
+                }
+            }
         }
     }
 

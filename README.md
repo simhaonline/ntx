@@ -232,7 +232,38 @@ All capabilities are engineered natively under `[nityaksha/core]`:
 
 ## 8. CLI Command Reference
 
-### 8.1 Autonomous AI Harness
+### 8.1 Multi-Provider AI Gateway & Google OAuth 2.0
+```bash
+# List all 21 preconfigured providers (commercial, local, aggregators, specialized LPUs)
+ntx provider list
+
+# Inspect provider details, available models, and endpoints
+ntx provider inspect gemini
+ntx provider inspect nous
+
+# Switch active default provider
+ntx provider select gemini
+ntx provider select nous
+ntx provider select ollama
+
+# Configure provider API key or custom base URL
+ntx provider set-key openai "sk-proj-..."
+ntx provider set-url ollama "http://127.0.0.1:11434"
+
+# Test latency ping and connection handshake
+ntx provider test gemini
+
+# Authenticate Google Gemini via Native Google OAuth 2.0 (Zero API Key Management)
+ntx auth login google
+
+# Check Google OAuth token vault, expiry countdown, and active provider session
+ntx auth status
+
+# Revoke and clear Google OAuth credentials
+ntx auth logout google
+```
+
+### 8.2 Autonomous AI Harness
 ```bash
 # Display AI Harness status across all safety and memory subsystems
 ntx harness status
@@ -406,6 +437,13 @@ Nityaksha includes a self-contained, responsive single-page landing page (`index
 | `GET` | `/install.ps1` | Serves Windows PowerShell installer script |
 | `GET` | `/install-ios.sh` | Serves iOS terminal installer script |
 | `GET` | `/api/status` | System health, runtime mode, and capability counts |
+| `GET` | `/api/providers` | Lists all 21 preconfigured providers, active state, and model limits |
+| `POST` | `/api/providers/select` | Sets active default provider |
+| `POST` | `/api/providers/config` | Configures API key or custom endpoint URL |
+| `POST` | `/api/providers/test` | Performs real-time connectivity and latency ping |
+| `GET` | `/api/auth/status` | Displays Google OAuth session, account email, and token expiry |
+| `GET` | `/api/auth/google/url` | Generates 1-click Google OAuth 2.0 authorization URL |
+| `GET` | `/api/auth/google/callback` | Exchanges authorization code for tokens and activates Gemini |
 | `GET` | `/api/catalog?q=<query>` | Searches capability catalog by name or kind |
 | `POST` | `/api/memory/query` | Executes hybrid RAG retrieval over dense vectors and BM25 |
 | `POST` | `/api/sandbox/run` | Executes command inside confined POSIX sandbox with cgroup quotas |

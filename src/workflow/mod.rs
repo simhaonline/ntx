@@ -232,6 +232,14 @@ impl MultiModelGateway {
 
         let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
 
+        // Check if an AI provider is active in the ProviderRegistry
+        let active_p = crate::provider::ProviderRegistry::active();
+        if active_p.is_configured {
+            if let Ok(res) = crate::provider::ProviderRegistry::dispatch_prompt(&hydrated_prompt, Some(sys), temperature) {
+                return res;
+            }
+        }
+
         // Pure Rust Deterministic Model Dispatch
         match tier {
             "FastFlash" => {

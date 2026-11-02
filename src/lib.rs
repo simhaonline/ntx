@@ -16,6 +16,7 @@ pub mod harness;
 pub mod scraper;
 pub mod bot;
 pub mod workflow;
+pub mod provider;
 
 pub use ring_buffer::LockFreeRingBuffer;
 pub use anti_slop::AntiSlopFilter;
@@ -32,3 +33,4 @@ pub use harness::AiHarness;
 pub use scraper::ScraperEngine;
 pub use bot::{BotDefinition, BotRegistry, DynamicPromptWrapper};
 pub use workflow::{DagOrchestrator, ExecutionStatus, GraphRunner, NodeExecutionState, NodeKind, NodeStatus, WorkflowDefinition, WorkflowEdge, WorkflowExecution, WorkflowNode, WorkflowRegistry};
+pub use provider::{GoogleOAuthCredentials, GoogleOAuthEngine, ProviderDefinition, ProviderRegistry};

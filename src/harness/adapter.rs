@@ -10,6 +10,22 @@ pub enum ProviderType {
     Gemini,
     Ollama,
     DeepSeek,
+    Nous,
+    Groq,
+    OpenRouter,
+    Together,
+    Mistral,
+    Cohere,
+    Perplexity,
+    XAI,
+    Fireworks,
+    Cerebras,
+    SambaNova,
+    LMStudio,
+    VLLM,
+    Bedrock,
+    Vertex,
+    Azure,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,7 +61,23 @@ impl SharedAdapter {
     /// Format request payload for target LLM provider handshaking
     pub fn build_provider_payload(req: &StandardLlmRequest) -> serde_json::Value {
         match req.provider {
-            ProviderType::OpenAI | ProviderType::DeepSeek | ProviderType::Ollama => {
+            ProviderType::OpenAI
+            | ProviderType::DeepSeek
+            | ProviderType::Ollama
+            | ProviderType::Nous
+            | ProviderType::Groq
+            | ProviderType::OpenRouter
+            | ProviderType::Together
+            | ProviderType::Mistral
+            | ProviderType::Cohere
+            | ProviderType::Perplexity
+            | ProviderType::XAI
+            | ProviderType::Fireworks
+            | ProviderType::Cerebras
+            | ProviderType::SambaNova
+            | ProviderType::LMStudio
+            | ProviderType::VLLM
+            | ProviderType::Azure => {
                 serde_json::json!({
                     "model": req.model,
                     "messages": [
@@ -57,7 +89,7 @@ impl SharedAdapter {
                     "tools": req.tools
                 })
             }
-            ProviderType::Anthropic => {
+            ProviderType::Anthropic | ProviderType::Bedrock => {
                 serde_json::json!({
                     "model": req.model,
                     "system": req.system_prompt,
@@ -69,7 +101,7 @@ impl SharedAdapter {
                     "tools": req.tools
                 })
             }
-            ProviderType::Gemini => {
+            ProviderType::Gemini | ProviderType::Vertex => {
                 serde_json::json!({
                     "contents": [
                         { "role": "user", "parts": [{ "text": req.user_prompt }] }

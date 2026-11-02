@@ -2,7 +2,7 @@
 //! Brand Kit Compliant: Deep Navy (#0D2340), Rust Orange (#C05A28), Default Light Mode with Dark Mode Toggle.
 //! Features Bot App Store, Workflow DAG Graph Engine, Memory RAG, Sandbox, and Governance.
 
-pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
+pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -131,6 +131,7 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
     </a>
     <ul class="nav">
       <li class="active" onclick="showTab('dashboard')">📊 Dashboard & Runtimes</li>
+      <li onclick="showTab('providers')">🌐 AI Providers & Gateway</li>
       <li onclick="showTab('bots')">🤖 Bot App Store</li>
       <li onclick="showTab('workflows')">⚡ Workflow DAG Engine</li>
       <li onclick="showTab('catalog')">📦 Capability Catalog</li>
@@ -258,6 +259,57 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- AI Providers & Gateway Tab -->
+    <div id="tab-providers" class="tab-content" style="display: none;">
+      <!-- Google Gemini OAuth 2.0 Card -->
+      <div class="card" style="border: 1px solid rgba(192, 90, 40, 0.4); background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(192, 90, 40, 0.04) 100%);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+              <span style="font-size: 1.5rem;">✨</span>
+              <div class="card-title" style="margin-bottom: 0;">Google Gemini — Native OAuth 2.0 Integration</div>
+              <span id="google-auth-badge" class="badge">Checking Auth...</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.35rem;">
+              Direct authentication with your Google account. Zero manual API key management, automated token refresh, and full access to Gemini 2.0 Flash and 1.5 Pro.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button class="btn-primary" onclick="startGoogleOAuth()" style="display: flex; align-items: center; gap: 0.5rem;">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#FFF" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#FFF" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FFF" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#FFF" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+              Sign In with Google
+            </button>
+            <button class="btn-secondary" onclick="toggleManualCodeBox()">Paste Auth Code</button>
+          </div>
+        </div>
+
+        <div id="google-manual-box" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">For remote/headless environments without local browser redirects, paste the authorization code below:</div>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="manual-google-code" placeholder="Paste Google authorization code (4/0A...)..." style="flex: 1;">
+            <button class="btn-primary" onclick="submitManualGoogleCode()">Exchange Code</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preconfigured Providers Grid -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <div class="card-title" style="margin-bottom: 0.25rem;">🌐 Multi-Provider AI Gateway & App Store</div>
+            <p style="color: var(--text-muted); font-size: 0.88rem;">21 preconfigured providers across frontier labs, open-source clusters, and specialized LPUs.</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="provider-search" placeholder="Search providers or models..." onkeyup="filterProviders()" style="width: 240px;">
+          </div>
+        </div>
+
+        <div id="providers-container" class="bot-grid">
+          <!-- Dynamically Loaded via loadProviders() -->
+        </div>
+      </div>
+    </div>
+
     <!-- Catalog Tab -->
     <div id="tab-catalog" class="tab-content" style="display: none;">
       <div class="card">
@@ -365,8 +417,184 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
         window.event.currentTarget.classList.add('active');
       }
 
+      if (tab === 'providers') loadProviders();
       if (tab === 'bots') loadBots();
       if (tab === 'workflows') loadWorkflows();
+    }
+
+    // --- AI Providers Gateway Functions ---
+    let activeProviders = [];
+
+    function loadProviders() {
+      fetch('/api/auth/status')
+        .then(r => r.json())
+        .then(auth => {
+          const badge = document.getElementById('google-auth-badge');
+          if (badge && auth.google_oauth && auth.google_oauth.authenticated) {
+            badge.className = 'badge badge-green';
+            badge.textContent = `✓ Authenticated (${auth.google_oauth.email || 'Active Account'})`;
+          } else if (badge) {
+            badge.className = 'badge badge-amber';
+            badge.textContent = 'Not Authenticated (Click Sign In)';
+          }
+        })
+        .catch(err => console.error("Error checking auth status:", err));
+
+      fetch('/api/providers')
+        .then(r => r.json())
+        .then(providers => {
+          activeProviders = providers;
+          renderProviders(providers);
+        })
+        .catch(err => console.error("Error loading providers:", err));
+    }
+
+    function renderProviders(providers) {
+      const c = document.getElementById('providers-container');
+      if (!c) return;
+      c.innerHTML = '';
+      providers.forEach(p => {
+        const isActive = p.is_active;
+        const statusBadge = isActive
+          ? '<span class="badge badge-green">ACTIVE DEFAULT</span>'
+          : p.is_configured
+            ? '<span class="badge badge-blue">READY</span>'
+            : '<span class="badge">UNCONFIGURED</span>';
+
+        const categoryBadge = `<span class="badge" style="font-size: 0.7rem;">${escapeHtml(p.category)}</span>`;
+
+        const card = document.createElement('div');
+        card.className = 'bot-card' + (isActive ? ' active-provider' : '');
+        if (isActive) {
+          card.style.borderColor = 'var(--color-brand-accent)';
+          card.style.boxShadow = '0 4px 16px rgba(192, 90, 40, 0.15)';
+        }
+
+        const modelsList = (p.available_models || []).slice(0, 3).map(m =>
+          `<span class="badge" style="font-size: 0.65rem; background: var(--bg-canvas);">${escapeHtml(m)}</span>`
+        ).join(' ');
+
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+              <div>
+                <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text-heading);">${escapeHtml(p.name)}</h3>
+                <span style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--color-brand-accent);">${escapeHtml(p.id)}</span>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
+                ${statusBadge}
+                ${categoryBadge}
+              </div>
+            </div>
+
+            <p style="font-size: 0.85rem; color: var(--text-body); margin-bottom: 0.85rem; line-height: 1.4;">${escapeHtml(p.description)}</p>
+
+            <div style="background: var(--bg-canvas); padding: 0.65rem; border-radius: 6px; border: 1px solid var(--border-subtle); margin-bottom: 0.85rem; font-size: 0.78rem;">
+              <div><strong>Default Model:</strong> <span style="color: var(--color-brand-accent); font-family: var(--font-mono);">${escapeHtml(p.default_model)}</span></div>
+              <div style="margin-top: 0.2rem;"><strong>Auth:</strong> ${escapeHtml(p.auth_summary)}</div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 1rem;">
+              ${modelsList}
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 0.85rem;">
+            ${isActive 
+              ? `<button class="btn-primary" style="flex: 1; opacity: 0.8; cursor: default;">✓ Current Active</button>`
+              : `<button class="btn-primary" style="flex: 1;" onclick="selectProvider('${p.id}')">Set Active</button>`
+            }
+            <button class="btn-secondary" onclick="testProvider('${p.id}', this)">Ping</button>
+            <button class="btn-secondary" onclick="configPrompt('${p.id}')">Config</button>
+          </div>
+        `;
+        c.appendChild(card);
+      });
+    }
+
+    function filterProviders() {
+      const q = (document.getElementById('provider-search').value || '').toLowerCase();
+      const filtered = activeProviders.filter(p => 
+        p.name.toLowerCase().includes(q) || 
+        p.id.toLowerCase().includes(q) || 
+        p.category.toLowerCase().includes(q) ||
+        p.default_model.toLowerCase().includes(q)
+      );
+      renderProviders(filtered);
+    }
+
+    function selectProvider(id) {
+      fetch('/api/providers/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      })
+      .then(r => r.json())
+      .then(() => loadProviders())
+      .catch(err => alert("Error selecting provider: " + err));
+    }
+
+    function testProvider(id, btn) {
+      const origText = btn.textContent;
+      btn.textContent = '...';
+      fetch('/api/providers/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      })
+      .then(r => r.json())
+      .then(res => {
+        btn.textContent = origText;
+        if (res.status === 'ok') {
+          alert(`[TEST PASSED]\n${res.message}`);
+        } else {
+          alert(`[TEST FAILED]\n${res.message}`);
+        }
+      })
+      .catch(err => {
+        btn.textContent = origText;
+        alert("Ping error: " + err);
+      });
+    }
+
+    function configPrompt(id) {
+      const p = activeProviders.find(x => x.id === id);
+      const key = prompt(`Enter API Key for ${p ? p.name : id} (or leave empty to keep current):`);
+      if (key !== null) {
+        fetch('/api/providers/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: id, api_key: key })
+        })
+        .then(r => r.json())
+        .then(() => loadProviders())
+        .catch(err => alert("Error saving config: " + err));
+      }
+    }
+
+    function startGoogleOAuth() {
+      fetch('/api/auth/google/url')
+        .then(r => r.json())
+        .then(res => {
+          if (res.url) {
+            window.location.href = res.url;
+          }
+        })
+        .catch(err => alert("Failed to start Google OAuth: " + err));
+    }
+
+    function toggleManualCodeBox() {
+      const box = document.getElementById('google-manual-box');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function submitManualGoogleCode() {
+      const code = document.getElementById('manual-google-code').value.trim();
+      if (!code) {
+        alert("Please enter a valid authorization code.");
+        return;
+      }
+      window.location.href = `/api/auth/google/callback?code=${encodeURIComponent(code)}`;
     }
 
     // --- Bot App Store Functions ---
@@ -696,4 +924,4 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
   </script>
 </body>
 </html>
-"#;
+"##;
