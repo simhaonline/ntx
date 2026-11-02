@@ -158,6 +158,21 @@ All capabilities are engineered natively under `[nityaksha/core]`:
 
 | Kind | Name | Version | Description |
 | :--- | :--- | :--- | :--- |
+| `skill` | `ntx-multi-agent-translator` | 1.0.0 | Multi-agent translation pipelines with terminology verification and chunk scaling |
+| `skill` | `ntx-skill-scaffolder` | 1.0.0 | Scaffolds, structures, and validates new autonomous skills with test assertions |
+| `skill` | `ntx-folio-translator` | 1.0.0 | Translates complete technical books, EPUBs, and long-form folios across languages |
+| `skill` | `ntx-corpus-to-skill` | 1.0.0 | Distills dense technical textbooks and engineering specs into executable skills |
+| `skill` | `ntx-pdf-deep-inspector` | 1.0.0 | High-accuracy structural PDF extraction, table decomposition, and citation graphs |
+| `skill` | `ntx-data-visualizer` | 1.0.0 | Publication-ready SVG charts, Mermaid diagrams, and quantitative dashboards |
+| `skill` | `ntx-document-authoring` | 1.0.0 | Authors formal engineering whitepapers and executive briefings with citations |
+| `skill` | `ntx-vision-ocr-engine` | 1.0.0 | Local vision-language OCR for technical papers and schematics via stdio |
+| `skill` | `ntx-terminal-workflow-hooks` | 1.0.0 | Developer terminal routines, pre-commit validation, and refactoring hooks |
+| `skill` | `ntx-office-automation` | 1.0.0 | Spreadsheet calculation models, slide decks, and tabular data cleanup |
+| `skill` | `ntx-tool-chain-orchestrator` | 1.0.0 | Multi-step tool execution sequences with automated dependency resolution |
+| `skill` | `ntx-ui-prototype-synth` | 1.0.0 | Local-first UI prototype generation, state machines, and component layouts |
+| `skill` | `ntx-daemon-lifecycle` | 1.0.0 | Background agent daemons, systemd unit generation, and heartbeat monitoring |
+| `skill` | `ntx-design-to-code` | 1.0.0 | Transpiles visual layouts and design tokens into responsive frontend components |
+| `skill` | `ntx-design-system-compiler` | 1.0.0 | Compiles design tokens (CSS, Swift, Kotlin), validating WCAG contrast ratios |
 | `skill` | `ntx-hitl-merge-gate` | 1.0.0 | Intercepts destructive actions with mandatory interactive human approval tokens |
 | `skill` | `ntx-hard-loop-breaker` | 1.0.0 | Enforces physical loop counter and file mutation oscillation halting |
 | `skill` | `ntx-ast-pruner` | 1.0.0 | Syntax tree mapping and intent-based context range pruning |
@@ -179,19 +194,33 @@ All capabilities are engineered natively under `[nityaksha/core]`:
 | `skill` | `ntx-redteam-shield` | 1.0.0 | Inspects prompts for delimiters, overrides, and jailbreak attempts |
 | `skill` | `ntx-version-tracker` | 1.0.0 | Parent-hash snapshotting enabling memory time-travel and rollbacks |
 | `skill` | `ntx-validate-zero-copy` | 1.0.0 | Validates memory alignment, slice bounds, and byte buffers |
+| `agent` | `ntx-knowledge-specialist` | 1.0.0 | Enterprise knowledge work, contract reviews, and cross-document synthesis |
+| `agent` | `ntx-paper-ocr-agent` | 1.0.0 | Multi-stage nested agent for paper OCR, LaTeX formulas, and note distillation |
+| `agent` | `ntx-design-collaborator` | 1.0.0 | Collaborative UI/UX design agent iterating on wireframes and prototypes |
+| `agent` | `ntx-canvas-orchestrator` | 1.0.0 | Multiplayer design canvas orchestrator synchronizing spatial layouts |
 | `agent` | `ntx-kernel-supervisor` | 1.0.0 | Supervises isolated containers, cgroups, and runtime budgets |
 | `agent` | `ntx-code-architect` | 1.0.0 | Codebase discovery, AST dependency mapping, and multi-file synthesis |
 | `agent` | `ntx-security-auditor` | 1.0.0 | Codebase security scanning, injection detection, and socket mounting audit |
 | `agent` | `ntx-eval-judge` | 1.0.0 | Live production verifier and CI regression guard scoring trajectories |
 | `agent` | `ntx-swarm-orchestrator`| 1.0.0 | Multi-agent DAG coordinator with blackboard messaging and file locks |
-| `plugin`| `ntx-plugin-token-budgeter` | 1.0.0 | Context window optimization, token burn rates, and sliding caches |
-| `plugin`| `ntx-plugin-leakage-sanitizer` | 1.0.0 | Automatic credential stripping from tool inputs and outputs |
-| `plugin`| `ntx-plugin-negative-cache` | 1.0.0 | Active register of failed code patterns and compiler errors |
-| `plugin`| `ntx-plugin-hitl-gate` | 1.0.0 | Modal approval gates for destructive commands and production merges |
+| `mcp` | `ntx-mcp-workspace-bridge` | 1.0.0 | Sandboxed MCP endpoints for developer workspace sync and issue tracking |
+| `mcp` | `ntx-mcp-hermes-adapter` | 1.0.0 | FastMCP adapter exposing tool suites and memory providers to agents |
+| `mcp` | `ntx-mcp-canvas-sync` | 1.0.0 | Real-time canvas node geometries and component layout synchronization |
 | `mcp` | `ntx-mcp-fs-sandbox` | 1.0.0 | Read-only codebase browsing and scoped file mutation under IBAC |
 | `mcp` | `ntx-mcp-ast-inspector`| 1.0.0 | Exposes AST symbol trees and function signatures directly to LLM tools |
 | `mcp` | `ntx-mcp-cgroup-monitor`| 1.0.0 | Real-time CPU consumption, memory headroom, and jail status telemetry |
 | `mcp` | `ntx-mcp-db-reader` | 1.0.0 | Parameterized read-only queries against relational and vector memory |
+| `plugin`| `ntx-plugin-knowledge-worker` | 1.0.0 | Document comparison, financial spreadsheet modeling, and research synthesis |
+| `plugin`| `ntx-plugin-office-suite` | 1.0.0 | High-performance manipulation and validation for XLSX, DOCX, and PPTX |
+| `plugin`| `ntx-plugin-multimodel-codesign` | 1.0.0 | Visual UI layout generation and frontend component transpilation |
+| `plugin`| `ntx-plugin-token-budgeter` | 1.0.0 | Context window optimization, token burn rates, and sliding caches |
+| `plugin`| `ntx-plugin-leakage-sanitizer` | 1.0.0 | Automatic credential stripping from tool inputs and outputs |
+| `plugin`| `ntx-plugin-negative-cache` | 1.0.0 | Active register of failed code patterns and compiler errors |
+| `plugin`| `ntx-plugin-hitl-gate` | 1.0.0 | Modal approval gates for destructive commands and production merges |
+| `prompt`| `ntx-prompt-copilot-accelerator` | 1.0.0 | Terse, highly accurate code synthesis with zero conversational fluff |
+| `prompt`| `ntx-prompt-commit-synthesizer` | 1.0.0 | Conventional commit messages and PR descriptions from git diffs |
+| `prompt`| `ntx-prompt-ocr-structurer` | 1.0.0 | Publication-grade Markdown notes with exact LaTeX formulas and citations |
+| `prompt`| `ntx-prompt-design-tokens` | 1.0.0 | Extracts semantic color schemes and typography from wireframes |
 | `prompt`| `ntx-prompt-system-prime` | 1.0.0 | Objective Technical Execution Mode, zero-fluff invariants, IBAC rules |
 | `prompt`| `ntx-prompt-judge-rubric` | 1.0.0 | Structured evaluation rubric for correctness, safety, and efficiency |
 | `prompt`| `ntx-prompt-test-synth` | 1.0.0 | Directs models to generate executable unit tests before functional code |
