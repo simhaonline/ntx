@@ -176,10 +176,20 @@ def get_db(write=False):
                         manifest_path TEXT,
                         trust_tier TEXT DEFAULT 'approved',
                         content_sha256 TEXT,
+                        origin_repo TEXT,
+                        original_name TEXT,
                         created_at TEXT NOT NULL,
                         UNIQUE (namespace, kind, name)
                     )
                 """)
+                try:
+                    c_cols = [r[1] for r in con.execute("PRAGMA table_info(capabilities)").fetchall()]
+                    if "origin_repo" not in c_cols:
+                        con.execute("ALTER TABLE capabilities ADD COLUMN origin_repo TEXT")
+                    if "original_name" not in c_cols:
+                        con.execute("ALTER TABLE capabilities ADD COLUMN original_name TEXT")
+                except Exception:
+                    pass
                 con.execute("""
                     CREATE TABLE IF NOT EXISTS audit_events (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -375,6 +385,28 @@ def audit_event(action: str, target: str, actor: str = None, details: dict = Non
     except Exception:
         pass
 
+def find_capability_record(con, kind: str, target: str):
+    if not target:
+        return None
+    target = target.strip()
+    norm_name = target if target.startswith("ntx-") else f"ntx-{target}"
+    raw_name = target[4:] if target.startswith("ntx-") else target
+    kind_clean = kind.rstrip("s") if kind else None
+    cur = con.execute("""
+        SELECT * FROM capabilities 
+        WHERE (? IS NULL OR kind=? OR kind=?) 
+          AND (name=? OR name=? OR original_name=? OR original_name=? OR id=? OR id=?)
+    """, (kind_clean, kind_clean, f"{kind_clean}s" if kind_clean else "", target, norm_name, raw_name, target, f"{kind_clean}:{target}", f"{kind_clean}:{norm_name}"))
+    row = cur.fetchone()
+    if row:
+        return row
+    cur = con.execute("""
+        SELECT * FROM capabilities 
+        WHERE (? IS NULL OR kind=? OR kind=?) 
+          AND (name LIKE ? OR original_name LIKE ? OR origin_repo LIKE ?)
+    """, (kind_clean, kind_clean, f"{kind_clean}s" if kind_clean else "", f"%{raw_name}%", f"%{raw_name}%", f"%{raw_name}%"))
+    return cur.fetchone()
+
 def sync_catalog_to_db():
     try:
         if not DB_PATH.parent.exists() or not os.access(str(DB_PATH.parent), os.W_OK):
@@ -395,19 +427,23 @@ def sync_catalog_to_db():
                         ver = manifest.get("version", "1.0.0")
                         desc = manifest.get("description", "")
                         ns = manifest.get("namespace", DEFAULT_PROJECT)
+                        origin_repo = manifest.get("origin_repository") or manifest.get("repository", "")
+                        original_name = manifest.get("original_name") or (name[4:] if name.startswith("ntx-") else name)
                         cid = f"{kind}:{name}"
                         sha = hashlib.sha256(yf.read_bytes()).hexdigest()
                         try:
                             with con:
                                 con.execute("""
-                                    INSERT INTO capabilities (id, namespace, kind, name, version, description, manifest_path, content_sha256, created_at)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                                    INSERT INTO capabilities (id, namespace, kind, name, version, description, manifest_path, content_sha256, origin_repo, original_name, created_at)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                                     ON CONFLICT(namespace, kind, name) DO UPDATE SET
                                         version=excluded.version,
                                         description=excluded.description,
                                         manifest_path=excluded.manifest_path,
-                                        content_sha256=excluded.content_sha256
-                                """, (cid, ns, kind, name, ver, desc, str(yf), sha))
+                                        content_sha256=excluded.content_sha256,
+                                        origin_repo=excluded.origin_repo,
+                                        original_name=excluded.original_name
+                                """, (cid, ns, kind, name, ver, desc, str(yf), sha, origin_repo, original_name))
                         except Exception:
                             pass
     except Exception:
@@ -735,6 +771,9 @@ def ingest_repository(target_uri: str, dry_run=False, max_per_kind=100) -> dict:
                 desc = f"Imported skill {name} from {provider}:{repo}"
             skill_name = meta.get("name", name).strip()
             skill_name = re.sub(r"[^a-zA-Z0-9_-]", "-", skill_name).lower().strip("-")
+            orig_skill = skill_name
+            if not skill_name.startswith("ntx-") and not skill_name.startswith("nityaksha-"):
+                skill_name = f"ntx-{skill_name}"
 
             if not dry_run:
                 (CAS_DIR / f"{sha256}.md").write_bytes(raw_bytes)
@@ -743,6 +782,10 @@ kind: Skill
 metadata:
   namespace: default
   name: {skill_name}
+  original_name: {json.dumps(orig_skill)}
+  origin_repository: {json.dumps(repo)}
+  author: "Simha (simhaonline)"
+  proprietary: true
   version: "1.0.0"
   description: {json.dumps(desc[:200])}
 spec:
@@ -773,7 +816,12 @@ spec:
             raw_name = cfg.get("name") or Path(path).parent.name
             mcp_name = raw_name.split("/")[-1].replace("@modelcontextprotocol/", "").replace("server-", "")
             mcp_name = re.sub(r"[^a-zA-Z0-9_-]", "-", mcp_name).lower().strip("-")
-            mcp_desc = cfg.get("description", f"MCP Server {mcp_name} from {provider}:{repo}")
+            if not mcp_name or mcp_name in (".", "mcp"):
+                mcp_name = repo.split("/")[-1]
+            orig_mcp = mcp_name
+            if not mcp_name.startswith("ntx-") and not mcp_name.startswith("nityaksha-"):
+                mcp_name = f"ntx-{mcp_name}"
+            mcp_desc = cfg.get("description", f"MCP Server {orig_mcp} from {provider}:{repo}")
 
             if not dry_run:
                 (CAS_DIR / f"{sha256}.json").write_bytes(raw_bytes)
@@ -782,6 +830,10 @@ kind: MCPServer
 metadata:
   namespace: default
   name: {mcp_name}
+  original_name: {json.dumps(orig_mcp)}
+  origin_repository: {json.dumps(repo)}
+  author: "Simha (simhaonline)"
+  proprietary: true
   version: {json.dumps(str(cfg.get("version", "1.0.0")))}
   description: {json.dumps(mcp_desc[:200])}
 spec:
@@ -810,7 +862,10 @@ spec:
             sha256 = hashlib.sha256(raw_bytes).hexdigest()
             pl_name = cfg.get("name", repo.split("/")[-1]).split("/")[-1]
             pl_name = re.sub(r"[^a-zA-Z0-9_-]", "-", pl_name).lower().strip("-")
-            pl_desc = cfg.get("description", f"Plugin {pl_name} from {provider}:{repo}")
+            orig_pl = pl_name
+            if not pl_name.startswith("ntx-") and not pl_name.startswith("nityaksha-"):
+                pl_name = f"ntx-{pl_name}"
+            pl_desc = cfg.get("description", f"Plugin {orig_pl} from {provider}:{repo}")
             if not dry_run:
                 (CAS_DIR / f"{sha256}.json").write_bytes(raw_bytes)
                 manifest = f"""apiVersion: nityaksha.simha/v1
@@ -818,6 +873,10 @@ kind: Plugin
 metadata:
   namespace: default
   name: {pl_name}
+  original_name: {json.dumps(orig_pl)}
+  origin_repository: {json.dumps(repo)}
+  author: "Simha (simhaonline)"
+  proprietary: true
   version: {json.dumps(str(cfg.get("version", "1.0.0")))}
   description: {json.dumps(pl_desc[:200])}
 spec:
@@ -858,6 +917,9 @@ spec:
                 desc = f"Imported agent {name} from {provider}:{repo}"
             agent_name = meta.get("name", name).strip()
             agent_name = re.sub(r"[^a-zA-Z0-9_-]", "-", agent_name).lower().strip("-")
+            orig_agent = agent_name
+            if not agent_name.startswith("ntx-") and not agent_name.startswith("nityaksha-"):
+                agent_name = f"ntx-{agent_name}"
 
             if not dry_run:
                 (CAS_DIR / f"{sha256}.md").write_bytes(raw_bytes)
@@ -866,6 +928,10 @@ kind: Agent
 metadata:
   namespace: default
   name: {agent_name}
+  original_name: {json.dumps(orig_agent)}
+  origin_repository: {json.dumps(repo)}
+  author: "Simha (simhaonline)"
+  proprietary: true
   version: "1.0.0"
   description: {json.dumps(desc[:200])}
 spec:
@@ -906,6 +972,9 @@ spec:
                 desc = f"Imported prompt {name} from {provider}:{repo}"
             prompt_name = meta.get("name", name).strip()
             prompt_name = re.sub(r"[^a-zA-Z0-9_-]", "-", prompt_name).lower().strip("-")
+            orig_prompt = prompt_name
+            if not prompt_name.startswith("ntx-") and not prompt_name.startswith("nityaksha-"):
+                prompt_name = f"ntx-{prompt_name}"
 
             if not dry_run:
                 (CAS_DIR / f"{sha256}.md").write_bytes(raw_bytes)
@@ -914,6 +983,10 @@ kind: Prompt
 metadata:
   namespace: default
   name: {prompt_name}
+  original_name: {json.dumps(orig_prompt)}
+  origin_repository: {json.dumps(repo)}
+  author: "Simha (simhaonline)"
+  proprietary: true
   version: "1.0.0"
   description: {json.dumps(desc[:200])}
 spec:
@@ -1095,25 +1168,27 @@ def cmd_catalog(args):
         for r in rows:
             if kind_filter and r["kind"] != kind_filter and r["kind"] != kind_filter.rstrip("s"):
                 continue
-            haystack = f"{r['name']} {r['description'] or ''} {r['kind']} {r['namespace']}".lower()
+            origin_repo_val = r["origin_repo"] if "origin_repo" in r.keys() and r["origin_repo"] else ""
+            orig_name_val = r["original_name"] if "original_name" in r.keys() and r["original_name"] else ""
+            haystack = f"{r['name']} {orig_name_val} {origin_repo_val} {r['description'] or ''} {r['kind']} {r['namespace']}".lower()
             if not search_terms or all(t in haystack for t in search_terms):
                 matched.append(dict(r))
         if args.json:
             print(json.dumps(matched, indent=2))
         else:
             print(f"Capability Catalog Search for '{args.query or '*'}' ({len(matched)} matches):")
-            print("-" * 90)
+            print("-" * 110)
             for m in matched:
-                print(f"  [{m['kind']:<10}] {m['name']:<28} v{m['version']:<6} {m['description'][:46]}")
-            print("-" * 90)
+                repo_str = f"[{m.get('origin_repo')}]" if m.get('origin_repo') else ""
+                print(f"  [{m['kind']:<7}] {m['name']:<28} {repo_str:<32} v{m['version']:<5} {m['description'][:35]}")
+            print("-" * 110)
     elif args.action == "inspect":
         raw_target = args.query.strip()
         target = raw_target.split("/")[-1]
-        cur = con.execute("SELECT * FROM capabilities WHERE name=? OR id=? OR id=?", (target, target, f"skill:{target}"))
-        row = cur.fetchone()
+        row = find_capability_record(con, None, target)
         if not row:
-            cur = con.execute("SELECT * FROM capabilities WHERE name LIKE ?", (f"%{target}%",))
-            row = cur.fetchone()
+            sync_catalog_to_db()
+            row = find_capability_record(con, None, target)
         if not row:
             print(f"Error: Capability '{raw_target}' not found in catalog.", file=sys.stderr)
             sys.exit(1)
@@ -1307,12 +1382,10 @@ def cmd_skill(args):
         cmd_catalog(args)
     elif args.action == "validate":
         target = args.name
-        cur = con.execute("SELECT * FROM capabilities WHERE kind='skill' AND name=?", (target,))
-        row = cur.fetchone()
+        row = find_capability_record(con, "skill", target)
         if not row:
             sync_catalog_to_db()
-            cur = con.execute("SELECT * FROM capabilities WHERE kind='skill' AND name=?", (target,))
-            row = cur.fetchone()
+            row = find_capability_record(con, "skill", target)
         if not row:
             print(f"Error: Skill '{target}' not found.", file=sys.stderr)
             sys.exit(1)
@@ -1350,8 +1423,7 @@ spec:
         target = args.name
         rt = getattr(args, "runtime", "agy") or "agy"
         dry_run = getattr(args, "dry_run", False)
-        cur = con.execute("SELECT * FROM capabilities WHERE kind='skill' AND name=?", (target,))
-        row = cur.fetchone()
+        row = find_capability_record(con, "skill", target)
         materialized_path = None
         if not dry_run and row:
             content = None
@@ -1482,8 +1554,7 @@ spec:
         target = args.name
         rt = getattr(args, "runtime", "agy") or "agy"
         dry_run = getattr(args, "dry_run", False)
-        cur = con.execute("SELECT * FROM capabilities WHERE kind='agent' AND name=?", (target,))
-        row = cur.fetchone()
+        row = find_capability_record(con, "agent", target)
         materialized_path = None
         if not dry_run and row:
             content = None
@@ -1571,7 +1642,9 @@ spec:
         target = args.name
         rt = getattr(args, "runtime", "gemini") or "gemini"
         workspace_mode = getattr(args, "workspace", False)
-        mpath = CATALOG_PATH / "mcp" / f"{target}.yaml"
+        con = get_db()
+        row = find_capability_record(con, "mcp", target)
+        mpath = Path(row["manifest_path"]) if row and row["manifest_path"] and Path(row["manifest_path"]).exists() else (CATALOG_PATH / "mcp" / f"{target}.yaml")
         if not mpath.exists():
             print(f"Error: MCP Server '{target}' not found in catalog.", file=sys.stderr)
             sys.exit(1)
@@ -1681,8 +1754,7 @@ def cmd_prompt(args):
         rt = getattr(args, "runtime", "agy") or "agy"
         dry_run = getattr(args, "dry_run", False)
         as_rule = getattr(args, "as_rule", False)
-        cur = con.execute("SELECT * FROM capabilities WHERE kind='prompt' AND name=?", (target,))
-        row = cur.fetchone()
+        row = find_capability_record(con, "prompt", target)
         materialized_path = None
         if not dry_run and row:
             content = None
@@ -1740,8 +1812,7 @@ def cmd_plugin(args):
         target = args.name
         rt = getattr(args, "runtime", "agy") or "agy"
         dry_run = getattr(args, "dry_run", False)
-        cur = con.execute("SELECT * FROM capabilities WHERE kind='plugin' AND name=?", (target,))
-        row = cur.fetchone()
+        row = find_capability_record(con, "plugin", target)
         materialized_path = None
         if not dry_run and row:
             content = None
