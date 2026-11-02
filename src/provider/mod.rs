@@ -9,6 +9,7 @@ pub use google_oauth::{GoogleOAuthCredentials, GoogleOAuthEngine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Instant;
@@ -887,6 +888,273 @@ impl ProviderRegistry {
         }
 
         Ok(resp_str.to_string())
+    }
+
+    pub fn normalize_id(input: &str) -> Option<&'static str> {
+        match input.to_ascii_lowercase().as_str() {
+            "google" | "gemini" => Some("gemini"),
+            "claude" | "anthropic" => Some("anthropic"),
+            "openai" | "codex" | "chatgpt" => Some("openai"),
+            "nous" | "hermes" => Some("nous"),
+            "deepseek" => Some("deepseek"),
+            "groq" => Some("groq"),
+            "openrouter" => Some("openrouter"),
+            "together" => Some("together"),
+            "mistral" => Some("mistral"),
+            "cohere" => Some("cohere"),
+            "perplexity" => Some("perplexity"),
+            "xai" | "grok" => Some("xai"),
+            "fireworks" => Some("fireworks"),
+            "cerebras" => Some("cerebras"),
+            "sambanova" => Some("sambanova"),
+            "ollama" => Some("ollama"),
+            "lmstudio" => Some("lmstudio"),
+            "vllm" => Some("vllm"),
+            "bedrock" | "aws" => Some("bedrock"),
+            "vertex" | "gcp" => Some("vertex"),
+            "azure" => Some("azure"),
+            _ => None,
+        }
+    }
+
+    pub fn portal_url(id: &str) -> &'static str {
+        match id {
+            "gemini" => "https://aistudio.google.com/app/apikey",
+            "anthropic" => "https://console.anthropic.com/settings/keys",
+            "openai" => "https://platform.openai.com/api-keys",
+            "nous" => "https://portal.nousresearch.com",
+            "deepseek" => "https://platform.deepseek.com/api_keys",
+            "groq" => "https://console.groq.com/keys",
+            "openrouter" => "https://openrouter.ai/keys",
+            "together" => "https://api.together.ai/settings/api-keys",
+            "mistral" => "https://console.mistral.ai/api-keys",
+            "cohere" => "https://dashboard.cohere.com/api-keys",
+            "perplexity" => "https://www.perplexity.ai/settings/api",
+            "xai" => "https://console.x.ai",
+            "fireworks" => "https://fireworks.ai/api-keys",
+            "cerebras" => "https://cloud.cerebras.ai",
+            "sambanova" => "https://cloud.sambanova.ai/apis",
+            "bedrock" => "https://aws.amazon.com/bedrock",
+            "vertex" => "https://console.cloud.google.com/vertex-ai",
+            "azure" => "https://portal.azure.com",
+            _ => "https://simhaonline.ai",
+        }
+    }
+
+    pub fn print_auth_status() {
+        let all = Self::list_all();
+        let google_creds = GoogleOAuthEngine::load_credentials();
+
+        println!("==================================================================================");
+        println!("               NITYAKSHA AI PROVIDER AUTHENTICATION STATUS                       ");
+        println!("==================================================================================");
+        println!("  ID             STATUS       AUTH METHOD                   DEFAULT MODEL");
+        println!("----------------------------------------------------------------------------------");
+
+        for p in &all {
+            let marker = if p.is_active { "*" } else { " " };
+            let status_badge = if p.is_configured {
+                "\x1b[32mCONFIGURED\x1b[0m"
+            } else {
+                "\x1b[33mUNCONFIGURED\x1b[0m"
+            };
+
+            println!(
+                "  {}{:<12} {:<21} {:<29} {}",
+                marker, p.id, status_badge, p.auth_summary, p.default_model
+            );
+        }
+
+        println!("----------------------------------------------------------------------------------");
+        if let Some(creds) = google_creds {
+            let email = creds.email.as_deref().unwrap_or("Connected Account");
+            let remaining_secs = creds.expires_at - chrono::Utc::now().timestamp();
+            println!("  [Google OAuth Session]");
+            println!("    Account     : {}", email);
+            println!("    Expiry      : ~{} minutes remaining (Auto-Refresh Active)", remaining_secs / 60);
+            println!("    Token Vault : {}", GoogleOAuthEngine::credential_path().display());
+        }
+
+        println!("\n  Authentication Shortcuts:");
+        println!("    ntx auth login [provider]      - Authenticate specific provider (gemini, claude, openai, etc.)");
+        println!("    ntx auth logout [provider]     - Revoke credentials or clear API keys");
+        println!("    ntx provider list              - View all 21 available models and endpoints");
+    }
+
+    pub fn login_provider(provider_arg: Option<&str>, key_arg: Option<&str>) -> Result<(), String> {
+        let all = Self::list_all();
+
+        // 1. Resolve target provider
+        let target_id = if let Some(arg) = provider_arg {
+            Self::normalize_id(arg).unwrap_or(arg).to_string()
+        } else {
+            // Interactive Selection
+            println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+            println!("│ 🔑 SELECT AI PROVIDER TO CONFIGURE CREDENTIALS                         │");
+            println!("├────────────────────────────────────────────────────────────────────────┤");
+            for (idx, p) in all.iter().enumerate() {
+                let active_tag = if p.is_active { " (Active)" } else { "" };
+                let cfg_tag = if p.is_configured { "✓" } else { " " };
+                println!("│   [{:>2}] [{}] {:<24} ({}){}", idx + 1, cfg_tag, p.name, p.default_model, active_tag);
+            }
+            println!("└────────────────────────────────────────────────────────────────────────┘");
+            print!("Select provider [1-{} | Enter to cancel]: ", all.len());
+            let _ = std::io::stdout().flush();
+
+            let mut input = String::new();
+            if std::io::stdin().read_line(&mut input).is_err() || input.trim().is_empty() {
+                return Ok(());
+            }
+            let choice = input.trim();
+            if let Ok(num) = choice.parse::<usize>() {
+                if num >= 1 && num <= all.len() {
+                    all[num - 1].id.clone()
+                } else {
+                    return Err(format!("Invalid choice number {}", num));
+                }
+            } else if let Some(norm) = Self::normalize_id(choice) {
+                norm.to_string()
+            } else {
+                return Err(format!("Unknown provider '{}'", choice));
+            }
+        };
+
+        let provider = Self::get(&target_id)
+            .ok_or_else(|| format!("Unknown provider '{}'. Run 'ntx provider list' for options.", target_id))?;
+
+        // 2. Handle Google Gemini Authentication Flow
+        if provider.id == "gemini" {
+            if let Some(key) = key_arg {
+                Self::set_key("gemini", key)?;
+                Self::set_active("gemini")?;
+                println!("✓ Stored Gemini API key and activated Google Gemini.");
+                return Ok(());
+            }
+
+            println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+            println!("│ 🌐 GOOGLE GEMINI AUTHENTICATION METHOD                                 │");
+            println!("├────────────────────────────────────────────────────────────────────────┤");
+            println!("│   [1] Google OAuth 2.0 (Browser sign-in with Google Account)           │");
+            println!("│   [2] Gemini API Key (Enter key from https://aistudio.google.com)      │");
+            println!("│   [3] Use existing Google Cloud ADC (gcloud credentials)               │");
+            println!("└────────────────────────────────────────────────────────────────────────┘");
+            print!("Select method [1-3 | Enter for Browser OAuth]: ");
+            let _ = std::io::stdout().flush();
+
+            let mut method_input = String::new();
+            let _ = std::io::stdin().read_line(&mut method_input);
+            let method = method_input.trim();
+
+            match method {
+                "2" => {
+                    println!("\nGet your API key at: {}", Self::portal_url("gemini"));
+                    print!("Enter Gemini API Key (AIza...): ");
+                    let _ = std::io::stdout().flush();
+                    let mut key_in = String::new();
+                    std::io::stdin().read_line(&mut key_in).map_err(|e| e.to_string())?;
+                    let clean_key = key_in.trim();
+                    if clean_key.is_empty() {
+                        return Err("No API key provided.".to_string());
+                    }
+                    Self::set_key("gemini", clean_key)?;
+                    Self::set_active("gemini")?;
+                    println!("✓ Successfully configured and activated Google Gemini with API Key.");
+                    return Ok(());
+                }
+                "3" => {
+                    if let Some(creds) = GoogleOAuthEngine::load_credentials() {
+                        if creds.auth_source == "gcloud_adc" {
+                            Self::set_active("gemini")?;
+                            println!("✓ Successfully activated Google Gemini using gcloud ADC credentials.");
+                            return Ok(());
+                        }
+                    }
+                    println!("[INFO] Launching browser Google OAuth 2.0 flow...");
+                    GoogleOAuthEngine::interactive_login(None, None)?;
+                    Self::set_active("gemini")?;
+                    println!("✓ Successfully authenticated with Google OAuth and activated Google Gemini.");
+                    return Ok(());
+                }
+                _ => {
+                    // Default: Browser OAuth with clean scopes
+                    println!("[INFO] Launching browser Google OAuth 2.0 flow...");
+                    GoogleOAuthEngine::interactive_login(None, None)?;
+                    Self::set_active("gemini")?;
+                    println!("✓ Successfully authenticated with Google OAuth and activated Google Gemini.");
+                    return Ok(());
+                }
+            }
+        }
+
+        // 3. Local Providers (Ollama, LM Studio, vLLM)
+        if provider.auth_type == "none" {
+            Self::set_active(&provider.id)?;
+            println!("✓ Activated {} ({}) at {}.", provider.name, provider.default_model, provider.base_url);
+            println!("  Local models require zero credentials.");
+            return Ok(());
+        }
+
+        // 4. Commercial / Cloud Providers (Anthropic, OpenAI, Nous, DeepSeek, Groq, etc.)
+        let api_key = if let Some(key) = key_arg {
+            key.trim().to_string()
+        } else {
+            println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+            println!("│ 🔑 {} AUTHENTICATION", provider.name.to_uppercase());
+            println!("├────────────────────────────────────────────────────────────────────────┤");
+            println!("│ 1. Create or retrieve an API key at:                                   │");
+            println!("│    {}", Self::portal_url(&provider.id));
+            println!("│ 2. Paste your API key below:                                           │");
+            println!("└────────────────────────────────────────────────────────────────────────┘");
+            print!("Enter {} API Key: ", provider.name);
+            let _ = std::io::stdout().flush();
+
+            let mut key_in = String::new();
+            std::io::stdin().read_line(&mut key_in).map_err(|e| e.to_string())?;
+            let clean = key_in.trim().to_string();
+            if clean.is_empty() {
+                return Err("Authentication cancelled: empty API key provided.".to_string());
+            }
+            clean
+        };
+
+        // Store key and set active
+        Self::set_key(&provider.id, &api_key)?;
+        Self::set_active(&provider.id)?;
+
+        println!("\n✓ Successfully authenticated and activated {} ({})!", provider.name, provider.default_model);
+        println!("  Credentials stored securely in {}", Self::config_path().display());
+        Ok(())
+    }
+
+    pub fn logout_provider(provider_arg: Option<&str>) -> Result<(), String> {
+        let target = provider_arg.unwrap_or("all");
+        let mut config = Self::load_config();
+
+        if target == "all" {
+            let _ = GoogleOAuthEngine::clear_credentials();
+            config.keys.clear();
+            Self::save_config(&config)?;
+            println!("✓ Cleared all stored credentials across all providers.");
+            return Ok(());
+        }
+
+        let normalized = Self::normalize_id(target).unwrap_or(target);
+        if normalized == "gemini" {
+            let _ = GoogleOAuthEngine::clear_credentials();
+            config.keys.remove("gemini");
+            Self::save_config(&config)?;
+            println!("✓ Cleared Google Gemini credentials.");
+            return Ok(());
+        }
+
+        if config.keys.remove(normalized).is_some() {
+            Self::save_config(&config)?;
+            println!("✓ Cleared credentials for {}.", normalized);
+        } else {
+            println!("No stored credentials found for {}.", normalized);
+        }
+
+        Ok(())
     }
 }
 

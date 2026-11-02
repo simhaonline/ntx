@@ -2,7 +2,7 @@
 //! Provides guided prompts, color theme customization, workspace trust verification, and AI completions.
 
 use crate::db::MemoryEngine;
-use crate::provider::{GoogleOAuthEngine, ProviderRegistry};
+use crate::provider::ProviderRegistry;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
@@ -434,20 +434,14 @@ impl InteractiveShell {
             }
             "/auth" => {
                 if parts.len() > 1 && parts[1] == "login" {
-                    println!("[INFO] Starting Google OAuth login for Gemini...");
-                    let _ = GoogleOAuthEngine::interactive_login(None, None);
+                    let provider = parts.get(2).copied();
+                    let _ = ProviderRegistry::login_provider(provider, None);
+                } else if parts.len() > 1 && parts[1] == "logout" {
+                    let provider = parts.get(2).copied();
+                    let _ = ProviderRegistry::logout_provider(provider);
                 } else {
-                    println!("\n{}Google OAuth 2.0 Status:{}", theme.bold, theme.reset);
-                    if let Some(creds) = GoogleOAuthEngine::load_credentials() {
-                        let email = creds.email.as_deref().unwrap_or("Connected Account");
-                        let mins = (creds.expires_at - chrono::Utc::now().timestamp()) / 60;
-                        println!("  {}Status       : AUTHENTICATED ✓{}", theme.success, theme.reset);
-                        println!("  Account      : {}", email);
-                        println!("  Expires In   : ~{} minutes (Auto-Refresh Enabled)", mins);
-                    } else {
-                        println!("  {}Status       : NOT AUTHENTICATED{}", theme.warning, theme.reset);
-                        println!("  Type '/auth login' or 'ntx auth login google' to connect your Google account.");
-                    }
+                    ProviderRegistry::print_auth_status();
+                    println!("\n  {}Commands:{} '/auth login [provider]' to authenticate, '/auth logout [provider]' to clear.", theme.dim, theme.reset);
                 }
             }
             "/bot" => {

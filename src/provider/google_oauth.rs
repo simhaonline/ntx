@@ -13,7 +13,7 @@ pub const DEFAULT_REDIRECT_URI: &str = "http://127.0.0.1:8085/oauth/callback";
 pub const GOOGLE_AUTH_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 pub const GOOGLE_TOKEN_ENDPOINT: &str = "https://oauth2.googleapis.com/token";
 pub const GOOGLE_USERINFO_ENDPOINT: &str = "https://www.googleapis.com/oauth2/v3/userinfo";
-pub const GOOGLE_SCOPES: &str = "https://www.googleapis.com/auth/generative-language https://www.googleapis.com/auth/cloud-platform email profile";
+pub const GOOGLE_SCOPES: &str = "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
 
 // Default public client ID for Gemini CLI / Antigravity developer tooling
 pub const DEFAULT_CLIENT_ID: &str = "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com";
@@ -169,13 +169,15 @@ impl GoogleOAuthEngine {
         client_secret: &str,
         redirect_uri: &str,
     ) -> Result<GoogleOAuthCredentials, String> {
-        let body = format!(
-            "code={}&client_id={}&client_secret={}&redirect_uri={}&grant_type=authorization_code",
+        let mut body = format!(
+            "code={}&client_id={}&redirect_uri={}&grant_type=authorization_code",
             url_encode(code),
             url_encode(client_id),
-            url_encode(client_secret),
             url_encode(redirect_uri)
         );
+        if !client_secret.is_empty() {
+            body.push_str(&format!("&client_secret={}", url_encode(client_secret)));
+        }
 
         let output = Command::new("curl")
             .arg("-s")

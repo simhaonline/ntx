@@ -1875,65 +1875,33 @@ complete -F _ntx_completions ntx"#);
     }
 
     pub fn cmd_auth(&self, args: &[String]) {
-        use crate::provider::GoogleOAuthEngine;
+        use crate::provider::ProviderRegistry;
 
         if args.is_empty() || args[0] == "status" {
-            println!("================================================================================");
-            println!("                     NITYAKSHA AI AUTHENTICATION STATUS                         ");
-            println!("================================================================================");
-            if let Some(creds) = GoogleOAuthEngine::load_credentials() {
-                let email = creds.email.as_deref().unwrap_or("Connected Account");
-                let remaining_secs = creds.expires_at - chrono::Utc::now().timestamp();
-                println!("  Google Gemini OAuth : \x1b[32mAUTHENTICATED\x1b[0m");
-                println!("    Account           : {}", email);
-                println!("    Expires In        : ~{} minutes (Auto-Refresh Enabled)", remaining_secs / 60);
-                println!("    Auth Source       : {}", creds.auth_source);
-                println!("    Scopes            : {}", creds.scopes.join(", "));
-                println!("    Token Vault       : {}", GoogleOAuthEngine::credential_path().display());
-            } else {
-                println!("  Google Gemini OAuth : \x1b[33mNOT AUTHENTICATED\x1b[0m (Run 'ntx auth login google')");
-            }
-
-            println!("\n  Available Auth Commands:");
-            println!("    ntx auth login google             - Authenticate Gemini with Google Account");
-            println!("    ntx auth logout google            - Revoke and clear Google OAuth tokens");
-            println!("    ntx auth status                   - View active OAuth sessions and expiry");
+            ProviderRegistry::print_auth_status();
             return;
         }
 
         match args[0].as_str() {
             "login" => {
-                let target = if args.len() > 1 { args[1].as_str() } else { "google" };
-                if target == "google" || target == "gemini" {
-                    let client_id = if args.len() > 2 { Some(args[2].as_str()) } else { None };
-                    let client_secret = if args.len() > 3 { Some(args[3].as_str()) } else { None };
-                    match GoogleOAuthEngine::interactive_login(client_id, client_secret) {
-                        Ok(_) => {
-                            let _ = crate::provider::ProviderRegistry::set_active("gemini");
-                            println!("[SUCCESS] Google Gemini is now configured and active as your default AI provider.");
-                        }
-                        Err(e) => eprintln!("[ERROR] Authentication failed: {}", e),
-                    }
-                } else {
-                    eprintln!("Unknown auth provider '{}'. Supported: google, gemini", target);
+                let provider = args.get(1).map(|s| s.as_str());
+                let key = args.get(2).map(|s| s.as_str());
+                if let Err(e) = ProviderRegistry::login_provider(provider, key) {
+                    eprintln!("[ERROR] Authentication failed: {}", e);
                 }
             }
             "logout" => {
-                let target = if args.len() > 1 { args[1].as_str() } else { "google" };
-                if target == "google" || target == "gemini" {
-                    match GoogleOAuthEngine::clear_credentials() {
-                        Ok(()) => println!("[SUCCESS] Cleared Google OAuth credentials."),
-                        Err(e) => eprintln!("[ERROR] {}", e),
-                    }
+                let provider = args.get(1).map(|s| s.as_str());
+                if let Err(e) = ProviderRegistry::logout_provider(provider) {
+                    eprintln!("[ERROR] Logout failed: {}", e);
                 }
             }
-            "gemini" => {
-                let client_id = if args.len() > 1 { Some(args[1].as_str()) } else { None };
-                let client_secret = if args.len() > 2 { Some(args[2].as_str()) } else { None };
-                let _ = GoogleOAuthEngine::interactive_login(client_id, client_secret);
-            }
-            _ => {
-                eprintln!("Unknown auth command '{}'. Try 'ntx auth status' or 'ntx auth login google'", args[0]);
+            target => {
+                // If user typed `ntx auth google` or `ntx auth claude` directly
+                let key = args.get(1).map(|s| s.as_str());
+                if let Err(e) = ProviderRegistry::login_provider(Some(target), key) {
+                    eprintln!("[ERROR] Authentication failed: {}", e);
+                }
             }
         }
     }
