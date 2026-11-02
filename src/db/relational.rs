@@ -137,6 +137,8 @@ pub struct RelationalTables {
     pub swarm_touches: Vec<SwarmTouchRow>,
     pub swarm_messages: Vec<SwarmMessageRow>,
     pub audit_events: Vec<AuditEventRow>,
+    #[serde(default)]
+    pub configs: HashMap<String, String>,
 }
 
 pub struct RelationalStore {
@@ -364,5 +366,91 @@ impl RelationalStore {
             details: details.into(),
         });
         let _ = self.persist();
+    }
+
+    pub fn upsert_session(&self, session: AgentSessionRow) -> io::Result<()> {
+        let mut t = self.tables.write().unwrap();
+        t.agent_sessions.insert(session.session_id.clone(), session);
+        drop(t);
+        self.persist()
+    }
+
+    pub fn list_sessions(&self) -> Vec<AgentSessionRow> {
+        let t = self.tables.read().unwrap();
+        t.agent_sessions.values().cloned().collect()
+    }
+
+    pub fn get_session(&self, id: &str) -> Option<AgentSessionRow> {
+        let t = self.tables.read().unwrap();
+        t.agent_sessions.get(id).cloned()
+    }
+
+    pub fn delete_session(&self, id: &str) -> bool {
+        let mut t = self.tables.write().unwrap();
+        let removed = t.agent_sessions.remove(id).is_some();
+        drop(t);
+        if removed {
+            let _ = self.persist();
+        }
+        removed
+    }
+
+    pub fn archive_session(&self, id: &str) -> bool {
+        let mut t = self.tables.write().unwrap();
+        if let Some(s) = t.agent_sessions.get_mut(id) {
+            s.status = "archived".into();
+            s.updated_at = chrono::Utc::now().to_rfc3339();
+            drop(t);
+            let _ = self.persist();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn unarchive_session(&self, id: &str) -> bool {
+        let mut t = self.tables.write().unwrap();
+        if let Some(s) = t.agent_sessions.get_mut(id) {
+            s.status = "idle".into();
+            s.updated_at = chrono::Utc::now().to_rfc3339();
+            drop(t);
+            let _ = self.persist();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn add_trajectory(&self, traj: TrajectoryRow) -> io::Result<()> {
+        let mut t = self.tables.write().unwrap();
+        t.trajectories.insert(traj.id.clone(), traj);
+        drop(t);
+        self.persist()
+    }
+
+    pub fn list_trajectories(&self, session_id: Option<&str>) -> Vec<TrajectoryRow> {
+        let t = self.tables.read().unwrap();
+        t.trajectories
+            .values()
+            .filter(|tr| session_id.map_or(true, |sid| tr.session_id == sid))
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_config(&self, key: &str) -> Option<String> {
+        let t = self.tables.read().unwrap();
+        t.configs.get(key).cloned()
+    }
+
+    pub fn set_config(&self, key: &str, val: &str) -> io::Result<()> {
+        let mut t = self.tables.write().unwrap();
+        t.configs.insert(key.to_string(), val.to_string());
+        drop(t);
+        self.persist()
+    }
+
+    pub fn list_configs(&self) -> HashMap<String, String> {
+        let t = self.tables.read().unwrap();
+        t.configs.clone()
     }
 }

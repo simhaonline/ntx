@@ -77,6 +77,19 @@ fn handle_connection(
     }
 
     if (method == "GET" || method == "HEAD") && (uri == "/" || uri == "/index.html") {
+        let html = include_str!("../../index.html");
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+            html.len()
+        );
+        stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(html.as_bytes())?;
+        }
+        return Ok(());
+    }
+
+    if (method == "GET" || method == "HEAD") && (uri == "/app" || uri == "/dashboard") {
         let html = webui::EMBEDDED_WEBUI_HTML;
         let resp = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",

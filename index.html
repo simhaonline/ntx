@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NITYAKSHA — An AI Concierge Platform | Pure Rust Native Agent Infrastructure</title>
+  <meta name="description" content="Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust. Built-in Agent Memory Stack, zero external DB, kernel-enforced sandboxes, and AI Harness.">
+  <meta name="keywords" content="Nityaksha, AI Concierge, Rust AI, Agent Control Plane, Vector Database Rust, HITL Gates, AI Harness">
+  <meta name="author" content="Simha (simhaonline)">
+  <link rel="canonical" href="https://simhaonline.ai">
+
+  <!-- OpenGraph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://simhaonline.ai/">
+  <meta property="og:title" content="NITYAKSHA — An AI Concierge Platform">
+  <meta property="og:description" content="Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.">
+  <meta property="og:image" content="https://simhaonline.ai/og-image.png">
+
+  <style>
+    :root {
+      --bg-deep: #07090e;
+      --bg-surface: #0d1117;
+      --bg-card: #121824;
+      --bg-card-hover: #182234;
+      --border: #1e293b;
+      --border-glow: rgba(56, 189, 248, 0.3);
+      --accent: #38bdf8;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-violet: #8b5cf6;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 15% 70%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+      background-attachment: fixed;
+    }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: #7dd3fc; }
+
+    /* Container */
+    .container { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* Top Navigation */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(7, 9, 14, 0.85);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 800;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-violet));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+    }
+    .brand-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text-main); }
+    .nav-actions { display: flex; align-items: center; gap: 1rem; }
+    .btn-github {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn-github:hover {
+      background: #334155;
+      border-color: #475569;
+      color: #fff;
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 5rem 0 4rem;
+      text-align: center;
+    }
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 1rem;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 2rem;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+    }
+    .hero h1 {
+      font-size: clamp(2.5rem, 5.5vw, 4.25rem);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(180deg, #ffffff 20%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-subtitle {
+      font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+      color: var(--accent);
+      font-weight: 600;
+      max-width: 860px;
+      margin: 0 auto 1.5rem;
+      line-height: 1.4;
+    }
+    .hero-desc {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 780px;
+      margin: 0 auto 2.5rem;
+    }
+
+    /* Install Card */
+    .install-box {
+      max-width: 720px;
+      margin: 0 auto 3.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 30px rgba(56, 189, 248, 0.1);
+    }
+    .install-tabs {
+      display: flex;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .install-tab {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: none;
+      background: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+    }
+    .install-tab:hover { color: var(--text-main); }
+    .install-tab.active {
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.05);
+      border-bottom: 2px solid var(--accent);
+    }
+    .install-cmd-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      background: #090d14;
+    }
+    .install-cmd {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: nowrap;
+      text-align: left;
+    }
+    .btn-copy {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+    .btn-copy:hover {
+      background: rgba(56, 189, 248, 0.3);
+      color: #fff;
+    }
+    .install-meta {
+      display: flex;
+      justify-content: space-around;
+      padding: 0.75rem 1.5rem;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    .install-meta span { display: flex; align-items: center; gap: 0.35rem; }
+
+    /* Interactive Terminal Simulator */
+    .terminal-section {
+      max-width: 980px;
+      margin: 0 auto 5rem;
+      background: #090d15;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+    .terminal-header {
+      background: #0e1420;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .terminal-dots { display: flex; gap: 8px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-green { background: #10b981; }
+    .terminal-tabs {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .term-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .term-tab:hover { color: var(--text-main); }
+    .term-tab.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+    }
+    .terminal-body {
+      padding: 1.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.875rem;
+      line-height: 1.7;
+      text-align: left;
+      min-height: 280px;
+      max-height: 420px;
+      overflow-y: auto;
+      background: #06090e;
+    }
+    .term-prompt { color: var(--accent-emerald); font-weight: bold; }
+    .term-cmd { color: #f8fafc; font-weight: bold; }
+    .term-out { color: #94a3b8; }
+    .term-pass { color: var(--accent-emerald); font-weight: bold; }
+    .term-highlight { color: var(--accent); }
+    .term-warn { color: var(--accent-amber); }
+
+    /* Stats Grid */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 5rem;
+    }
+    .stat-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      text-align: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat-box:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+    }
+    .stat-num {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 0.25rem;
+      letter-spacing: -0.02em;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Pillars Grid */
+    .section-title {
+      text-align: center;
+      margin-bottom: 3.5rem;
+    }
+    .section-title h2 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+    .section-title p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 2rem;
+      margin-bottom: 6rem;
+    }
+    .pillar-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      transition: all 0.3s;
+      display: flex;
+      flex-direction: column;
+    }
+    .pillar-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+    }
+    .pillar-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    .pillar-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: var(--text-main);
+    }
+    .pillar-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      flex: 1;
+    }
+
+    /* Architecture Flow Diagram */
+    .flow-section {
+      background: #090e18;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      margin-bottom: 6rem;
+    }
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      position: relative;
+    }
+    .flow-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      position: relative;
+    }
+    .flow-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    .flow-step h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+    .flow-step p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* CLI Reference Table */
+    .cli-table-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 6rem;
+    }
+    .cli-filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      padding: 1rem 1.5rem;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .cli-filter-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .cli-filter-btn:hover { color: var(--text-main); }
+    .cli-filter-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    table.cli-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    table.cli-table th, table.cli-table td {
+      padding: 1rem 1.5rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    table.cli-table th {
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .cmd-name {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .cmd-desc { color: var(--text-muted); }
+    .cmd-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--accent-violet);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    /* FAQ Section */
+    .faq-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 6rem;
+    }
+    .faq-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.75rem;
+    }
+    .faq-card h4 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+    }
+    .faq-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      background: #04060a;
+      padding: 4rem 0 2rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 3rem;
+      margin-bottom: 3rem;
+    }
+    .footer-brand h3 {
+      color: var(--text-main);
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 0.75rem;
+    }
+    .footer-brand p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      max-width: 360px;
+    }
+    .footer-col h5 {
+      color: var(--text-main);
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .footer-col ul { list-style: none; }
+    .footer-col li { margin-bottom: 0.6rem; }
+    .footer-col a { color: var(--text-muted); }
+    .footer-col a:hover { color: var(--accent); }
+    .footer-bottom {
+      border-top: 1px solid #131926;
+      padding-top: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
+      .footer-bottom { flex-direction: column; gap: 1rem; text-align: center; }
+      .faq-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header>
+    <div class="container nav-inner">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <span>NITYAKSHA</span>
+        <span class="brand-badge">AI Concierge</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#cli">CLI Reference</a></li>
+        <li><a href="#catalog">Catalog</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://github.com/simhaonline/ntx" target="_blank" rel="noopener noreferrer" class="btn-github">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          Star on GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero container">
+    <div class="hero-pill">
+      <span>⚡ 100% Pure Native Rust</span>
+      <span>•</span>
+      <span>Zero External DB Runtime</span>
+      <span>•</span>
+      <span>Sub-millisecond Cold Start</span>
+    </div>
+    <h1>NITYAKSHA — An AI Concierge Platform</h1>
+    <div class="hero-subtitle">
+      Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.
+    </div>
+    <p class="hero-desc">
+      A sovereign, memory-safe AI concierge and multi-agent control plane. Complete with a native Agent Memory Stack (ACID WAL, Dense SIMD Vectors, Sparse BM25, and Multimodal CAS), POSIX container sandboxes, physical loop breakers, and HITL merge gates.
+    </p>
+
+    <!-- Install Card -->
+    <div class="install-box" id="install">
+      <div class="install-tabs">
+        <button class="install-tab active" onclick="switchInstallTab('linux')">Linux & macOS</button>
+        <button class="install-tab" onclick="switchInstallTab('windows')">Windows (PowerShell)</button>
+        <button class="install-tab" onclick="switchInstallTab('ios')">iOS (iSH / a-Shell)</button>
+        <button class="install-tab" onclick="switchInstallTab('github')">GitHub Fallback</button>
+        <button class="install-tab" onclick="switchInstallTab('cargo')">Cargo Crates</button>
+      </div>
+      <div class="install-cmd-wrap">
+        <div class="install-cmd" id="install-command">curl -fsSL https://simhaonline.ai/install.sh | bash</div>
+        <button class="btn-copy" onclick="copyInstallCmd()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="copy-text">Copy</span>
+        </button>
+      </div>
+      <div class="install-meta">
+        <span>✓ Zero Python or Node.js runtime</span>
+        <span>✓ POSIX Atomic Replacement (No ETXTBSY)</span>
+        <span>✓ Standalone Binary: /usr/local/bin/ntx</span>
+      </div>
+    </div>
+
+    <!-- Live Terminal Simulator -->
+    <div class="terminal-section">
+      <div class="terminal-header">
+        <div class="terminal-dots">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+        </div>
+        <div class="terminal-tabs">
+          <button class="term-tab active" onclick="setTerminalOutput('status')">ntx status</button>
+          <button class="term-tab" onclick="setTerminalOutput('doctor')">ntx doctor</button>
+          <button class="term-tab" onclick="setTerminalOutput('harness')">ntx harness status</button>
+          <button class="term-tab" onclick="setTerminalOutput('exec')">ntx -p (Exec)</button>
+          <button class="term-tab" onclick="setTerminalOutput('ps')">ntx ps</button>
+        </div>
+      </div>
+      <div class="terminal-body" id="term-display">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-box">
+        <div class="stat-num">100%</div>
+        <div class="stat-label">Pure Native Rust</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">&lt; 1.2ms</div>
+        <div class="stat-label">Cold Start Latency</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">0</div>
+        <div class="stat-label">External DB Dependencies</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">87</div>
+        <div class="stat-label">Proprietary Skills</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">13</div>
+        <div class="stat-label">Autonomous Agents</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">133</div>
+        <div class="stat-label">Dense SIMD Vectors</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Core Pillars -->
+  <section class="container" id="features">
+    <div class="section-title">
+      <h2>Architectural Pillars of Nityaksha</h2>
+      <p>Engineered from first principles in pure Rust for deterministic enterprise AI agent execution.</p>
+    </div>
+
+    <div class="pillars-grid">
+      <div class="pillar-card">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h3>Pure Native Rust Control Plane</h3>
+        <p>Zero Python or Node.js runtime dependencies. Compiles to a single stripped binary under 1MB with sub-millisecond cold boot latency and under 12MB RAM utilization.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        </div>
+        <h3>Self-Contained Agent Memory Stack</h3>
+        <p>No PostgreSQL, pgvector, or Redis required. Features native Relational ACID WAL, Dense SIMD float vector indexing, Sparse BM25 inverted index, and Content-Addressed Storage (CAS) with MVCC versioning.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+        </div>
+        <h3>Deterministic AI Harness & Loop Breaker</h3>
+        <p>Enforces physical loop step limits and outer runtime budgets (CPU, RAM, time). Detects and forcefully terminates file thrashing and hash oscillation loops.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>Kernel-Enforced POSIX Sandboxes</h3>
+        <p>Short-lived Linux namespaces (Mount, UTS, IPC, PID, Net) coupled with Cgroups v2 quotas (`memory.max`, `pids.max`, `cpu.max`) preventing unconfined host mutation.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>HITL Merge Gates & RedTeam Shield</h3>
+        <p>Mandatory cryptographic approval tokens intercept destructive actions (production git pushes, database drops, capital allocations). Pre-flight adversarial heuristics block prompt injections.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>Hot-Swappable Multi-Provider Adapters</h3>
+        <p>Standardized tool call and inference interfaces. Seamlessly switch between OpenAI, Anthropic, Gemini, DeepSeek, and local Ollama/LMStudio engines without changing execution code.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Request Lifecycle Flow -->
+  <section class="container" id="architecture">
+    <div class="section-title">
+      <h2>Deterministic Execution Pipeline</h2>
+      <p>How an incoming prompt flows through Nityaksha's pure Rust sovereign harness.</p>
+    </div>
+
+    <div class="flow-section">
+      <div class="flow-grid">
+        <div class="flow-step">
+          <div class="flow-badge">Step 01</div>
+          <h4>Adversarial Shield</h4>
+          <p>RedTeam Shield evaluates injection attacks, delimiter collisions, and jailbreak vectors.</p>
+        </div>
+        <div class="flow-step">
+          <div class="flow-badge">Step 02</div>
+          <h4>Anti-Slop Filter</h4>
+          <p>Real-time conversational boilerplates, excessive hedging, and apologies sanitized in-stream.</p>
+        </div>
+        <div class="flow-step">
+          <div class="flow-badge">Step 03</div>
+          <h4>Intent Classifier</h4>
+          <p>Determines complexity: routes to fast flash models or deep architectural reasoning engines.</p>
+        </div>
+        <div class="flow-step">
+          <div class="flow-badge">Step 04</div>
+          <h4>Hybrid Vector RAG</h4>
+          <p>Cosine SIMD float retrieval + BM25 keyword matching over past agent episodic trajectories.</p>
+        </div>
+        <div class="flow-step">
+          <div class="flow-badge">Step 05</div>
+          <h4>Sandbox & Gating</h4>
+          <p>Executes inside Linux namespaces. If destructive, triggers interactive human-in-the-loop approval.</p>
+        </div>
+        <div class="flow-step">
+          <div class="flow-badge">Step 06</div>
+          <h4>LLM-Judge & WAL</h4>
+          <p>Evaluates trajectory scores and commits state snapshot to append-only WAL & CAS store.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLI Reference Table -->
+  <section class="container" id="cli">
+    <div class="section-title">
+      <h2>Complete CLI Subcommands & Options</h2>
+      <p>Universal command line interface modeled for power-users, CI/CD pipelines, and automated daemons.</p>
+    </div>
+
+    <div class="cli-table-wrap">
+      <div class="cli-filter-bar">
+        <button class="cli-filter-btn active" onclick="filterCli('all')">All Commands</button>
+        <button class="cli-filter-btn" onclick="filterCli('core')">Core & Health</button>
+        <button class="cli-filter-btn" onclick="filterCli('exec')">Execution & Headless</button>
+        <button class="cli-filter-btn" onclick="filterCli('session')">Sessions & Daemon</button>
+        <button class="cli-filter-btn" onclick="filterCli('harness')">AI Harness & Sandboxes</button>
+        <button class="cli-filter-btn" onclick="filterCli('memory')">Memory & Catalog</button>
+      </div>
+
+      <table class="cli-table" id="cli-table-el">
+        <thead>
+          <tr>
+            <th>Command / Option</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Usage Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-cat="core">
+            <td class="cmd-name">ntx status</td>
+            <td><span class="cmd-badge">core</span></td>
+            <td class="cmd-desc">Comprehensive system health, active runtimes, memory metrics, and catalog stats.</td>
+            <td><code>ntx status</code></td>
+          </tr>
+          <tr data-cat="core">
+            <td class="cmd-name">ntx doctor</td>
+            <td><span class="cmd-badge">core</span></td>
+            <td class="cmd-desc">Audits policy files, POSIX cgroup v2, Agent Memory Stack, and IBAC security gates.</td>
+            <td><code>ntx doctor</code></td>
+          </tr>
+          <tr data-cat="exec">
+            <td class="cmd-name">ntx -p / --print</td>
+            <td><span class="cmd-badge">exec</span></td>
+            <td class="cmd-desc">Executes task non-interactively and prints result (supports stdin piping).</td>
+            <td><code>ntx -p "review PR"</code></td>
+          </tr>
+          <tr data-cat="exec">
+            <td class="cmd-name">--output-format</td>
+            <td><span class="cmd-badge">exec</span></td>
+            <td class="cmd-desc">Formats output as text, structured single json, or realtime stream-json (NDJSON).</td>
+            <td><code>ntx -p --output-format json "..."</code></td>
+          </tr>
+          <tr data-cat="exec">
+            <td class="cmd-name">--json-schema</td>
+            <td><span class="cmd-badge">exec</span></td>
+            <td class="cmd-desc">Enforces JSON Schema validation for structured output tasks.</td>
+            <td><code>ntx -p --json-schema schema.json "..."</code></td>
+          </tr>
+          <tr data-cat="exec">
+            <td class="cmd-name">ntx review</td>
+            <td><span class="cmd-badge">exec</span></td>
+            <td class="cmd-desc">Runs deterministic multi-agent code review on repository files or git diff.</td>
+            <td><code>ntx review src/</code></td>
+          </tr>
+          <tr data-cat="session">
+            <td class="cmd-name">ntx ps</td>
+            <td><span class="cmd-badge">session</span></td>
+            <td class="cmd-desc">Lists active interactive, background workers, and system daemons.</td>
+            <td><code>ntx ps</code></td>
+          </tr>
+          <tr data-cat="session">
+            <td class="cmd-name">ntx attach</td>
+            <td><span class="cmd-badge">session</span></td>
+            <td class="cmd-desc">Connects terminal REPL to a background or saved session.</td>
+            <td><code>ntx attach sess-123</code></td>
+          </tr>
+          <tr data-cat="session">
+            <td class="cmd-name">ntx compact</td>
+            <td><span class="cmd-badge">session</span></td>
+            <td class="cmd-desc">Compacts context window sliding buffer and flushes episodic memory to SIMD vectors.</td>
+            <td><code>ntx compact</code></td>
+          </tr>
+          <tr data-cat="session">
+            <td class="cmd-name">ntx config</td>
+            <td><span class="cmd-badge">session</span></td>
+            <td class="cmd-desc">Gets, sets, and lists persistent configuration settings across sessions.</td>
+            <td><code>ntx config set theme dark</code></td>
+          </tr>
+          <tr data-cat="harness">
+            <td class="cmd-name">ntx harness status</td>
+            <td><span class="cmd-badge">harness</span></td>
+            <td class="cmd-desc">Inspects physical loop counters, outer runtime budgets, and HITL gates.</td>
+            <td><code>ntx harness status</code></td>
+          </tr>
+          <tr data-cat="harness">
+            <td class="cmd-name">ntx sandbox run</td>
+            <td><span class="cmd-badge">harness</span></td>
+            <td class="cmd-desc">Executes command inside isolated POSIX namespaces and Cgroups v2 quotas.</td>
+            <td><code>ntx sandbox run "cargo test"</code></td>
+          </tr>
+          <tr data-cat="memory">
+            <td class="cmd-name">ntx memory query</td>
+            <td><span class="cmd-badge">memory</span></td>
+            <td class="cmd-desc">Runs hybrid dense float cosine + sparse BM25 retrieval over episodic memory.</td>
+            <td><code>ntx memory query "auth tokens"</code></td>
+          </tr>
+          <tr data-cat="memory">
+            <td class="cmd-name">ntx catalog inspect</td>
+            <td><span class="cmd-badge">memory</span></td>
+            <td class="cmd-desc">Inspects full manifest, cryptographic digest, and origin of registered capabilities.</td>
+            <td><code>ntx catalog inspect ntx-hitl-gate</code></td>
+          </tr>
+          <tr data-cat="core">
+            <td class="cmd-name">ntx completion</td>
+            <td><span class="cmd-badge">core</span></td>
+            <td class="cmd-desc">Generates autocomplete shell scripts for bash, zsh, fish, and powershell.</td>
+            <td><code>eval "$(ntx completion bash)"</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="container" id="faq">
+    <div class="section-title">
+      <h2>Frequently Asked Questions</h2>
+      <p>Direct technical answers regarding Nityaksha's architecture and deployment.</p>
+    </div>
+
+    <div class="faq-grid">
+      <div class="faq-card">
+        <h4>Is Nityaksha purely built in Rust?</h4>
+        <p>Yes. The entire control plane, AI harness, vector database, and CLI are 100% written in pure native Rust. There are zero Python runtime dependencies and zero Node.js wrappers.</p>
+      </div>
+
+      <div class="faq-card">
+        <h4>Are external databases like PostgreSQL or pgvector required?</h4>
+        <p>No. Nityaksha includes its own native Agent Memory Stack with Relational ACID WAL, Dense SIMD float vector cache, BM25 inverted index, and Multimodal CAS stored directly in memory or local disk directories.</p>
+      </div>
+
+      <div class="faq-card">
+        <h4>How does it prevent agent runaway loops and thrashing?</h4>
+        <p>Nityaksha implements physical loop iteration counters and task runtime budgets (CPU, memory, time). It detects repetitive file mutation oscillation and forcefully terminates stuck loops with deterministic hard exits.</p>
+      </div>
+
+      <div class="faq-card">
+        <h4>How do I deploy this landing page on Plesk?</h4>
+        <p>Connect your Plesk domain to the GitHub repository <code>https://github.com/simhaonline/ntx.git</code>. Plesk will pull this exact <code>index.html</code> directly into your web root (<code>/httpdocs</code>) and serve it immediately without any build steps.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <h3>⬡ NITYAKSHA</h3>
+        <p>Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.</p>
+      </div>
+      <div class="footer-col">
+        <h5>Architecture</h5>
+        <ul>
+          <li><a href="#features">Pure Rust Engine</a></li>
+          <li><a href="#architecture">Agent Memory Stack</a></li>
+          <li><a href="#features">POSIX Sandboxes</a></li>
+          <li><a href="#features">HITL Merge Gates</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Installers</h5>
+        <ul>
+          <li><a href="https://simhaonline.ai/install.sh">Linux / macOS</a></li>
+          <li><a href="https://simhaonline.ai/install.ps1">Windows PowerShell</a></li>
+          <li><a href="https://simhaonline.ai/install-ios.sh">iOS (iSH / a-Shell)</a></li>
+          <li><a href="https://github.com/simhaonline/ntx">GitHub Repository</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h5>Ecosystem</h5>
+        <ul>
+          <li><a href="https://simhaonline.ai">Simha Online</a></li>
+          <li><a href="https://github.com/simhaonline/ntx/releases">Release Notes</a></li>
+          <li><a href="#cli">CLI Reference</a></li>
+          <li><a href="http://127.0.0.1:8080">Local WebUI (:8080)</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <div>© 2026 Simha (simhaonline). All rights reserved.</div>
+      <div>Domain: <a href="https://simhaonline.ai" style="color: var(--accent);">simhaonline.ai</a></div>
+    </div>
+  </footer>
+
+  <script>
+    const installCommands = {
+      linux: "curl -fsSL https://simhaonline.ai/install.sh | bash",
+      windows: "irm https://simhaonline.ai/install.ps1 | iex",
+      ios: "curl -fsSL https://simhaonline.ai/install-ios.sh | sh",
+      github: "curl -fsSL https://raw.githubusercontent.com/simhaonline/ntx/main/install.sh | bash",
+      cargo: "cargo install --git https://github.com/simhaonline/ntx.git ntx"
+    };
+
+    function switchInstallTab(platform) {
+      document.querySelectorAll('.install-tab').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('install-command').textContent = installCommands[platform] || installCommands.linux;
+    }
+
+    function copyInstallCmd() {
+      const text = document.getElementById('install-command').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const copyText = document.getElementById('copy-text');
+        copyText.textContent = "Copied!";
+        setTimeout(() => { copyText.textContent = "Copy"; }, 2000);
+      });
+    }
+
+    const terminalOutputs = {
+      status: `================================================================================
+                   NITYAKSHA - An AI Concierge Platform                         
+  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  
+================================================================================
+Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):
+--------------------------------------------------------------------------------
+  [PASS] Policy file (/etc/nityaksha/policy.yaml)
+  [PASS] Agent Memory Stack (/var/lib/nityaksha/db)
+  [PASS] Container Sandboxes (/srv/agent-workspaces)
+  [PASS] Content-Addressed Storage CAS (/var/lib/nityaksha/cas-cache)
+  [PASS] Service account (nityaksha)
+  [PASS] Cgroup v2 hierarchy (/sys/fs/cgroup)
+  [PASS] IBAC Gating Invariants
+--------------------------------------------------------------------------------
+
+Catalog Statistics (Database-backed SoT - Pure Rust):
+  - agent       : 13 assets
+  - mcp         : 11 assets
+  - plugin      : 11 assets
+  - prompt      : 11 assets
+  - skill       : 87 assets
+  - Vector Store: 133 dense vectors indexed
+  - Media Assets: 0 multimodal blobs in CAS`,
+
+      doctor: `Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):
+--------------------------------------------------------------------------------
+  [PASS] Policy file (/etc/nityaksha/policy.yaml)
+  [PASS] Agent Memory Stack (/var/lib/nityaksha/db)
+  [PASS] Container Sandboxes (/srv/agent-workspaces)
+  [PASS] Content-Addressed Storage CAS (/var/lib/nityaksha/cas-cache)
+  [PASS] Service account (nityaksha)
+  [PASS] Cgroup v2 hierarchy (/sys/fs/cgroup)
+  [PASS] IBAC Gating Invariants
+--------------------------------------------------------------------------------
+✓ 7 / 7 Architectural invariants verified. System operational.`,
+
+      harness: `Nityaksha Autonomous AI Harness Architecture (Pure Rust Native):
+--------------------------------------------------------------------------------
+  [ACTIVE] Outer Runtime Budgets & Physical Loop Counter
+  [ACTIVE] Thrashing & File Oscillation Detector
+  [ACTIVE] Multi-Tier Memory (Short-Term Sliding Cache, Episodic RAG, Checkpoints)
+  [ACTIVE] AST Syntax Tree Pruner & Context Window Optimizer
+  [ACTIVE] Dynamic Prompt Augmentation (Intent Routing, Few-Shot, Negative Cache)
+  [ACTIVE] Human-in-the-Loop (HITL) Merge Gates & Cryptographic Audit Trail
+  [ACTIVE] Layered Deterministic Checks & LLM-as-a-Judge Evaluation Engine
+  [ACTIVE] Standardized Hot-Swappable Provider Adapters (OpenAI, Anthropic, Gemini, DeepSeek, Ollama)
+--------------------------------------------------------------------------------`,
+
+      exec: `ntx -p --output-format json "validate security policy"
+{
+  "memory_matches": 3,
+  "model_tier": "FastFlash",
+  "prompt": "validate security policy",
+  "response": "Execution completed under Nityaksha AI Concierge Engine.\\nIntent Tier: FastFlash\\nSecurity Clearance: Verified (Risk: 0.02)\\nContext Injected: 3 episodic vector memories\\nTask Output: System invariants validated successfully.",
+  "security_cleared": true,
+  "syntax_valid": true
+}`,
+
+      ps: `Nityaksha Active Sessions & Runtime Daemons:
+SESSION ID               RUNTIME          STATUS       TOKENS     WORKSPACE               
+----------------------------------------------------------------------------------------------------
+nityaksha-webui          systemd-daemon   active       N/A        http://0.0.0.0:8080     
+sess-1793657968211       pure-rust-cli    completed    61         .                       
+sess-1793657973953       pure-rust-cli    completed    59         .                       
+sess-1793657970951       pure-rust-cli    completed    61         .                       
+----------------------------------------------------------------------------------------------------`
+    };
+
+    function setTerminalOutput(key) {
+      document.querySelectorAll('.term-tab').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      const out = terminalOutputs[key] || terminalOutputs.status;
+      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #cbd5e1;">${escapeHtml(out)}</pre>`;
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function filterCli(category) {
+      document.querySelectorAll('.cli-filter-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      const rows = document.querySelectorAll('#cli-table-el tbody tr');
+      rows.forEach(r => {
+        if (category === 'all' || r.getAttribute('data-cat') === category) {
+          r.style.display = '';
+        } else {
+          r.style.display = 'none';
+        }
+      });
+    }
+
+    // Initialize terminal display
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #cbd5e1;">${escapeHtml(terminalOutputs.status)}</pre>`;
+    });
+  </script>
+</body>
+</html>

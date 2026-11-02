@@ -340,15 +340,69 @@ ntx repl
 ntx
 ```
 
+### 8.9 Non-Interactive Execution, Review & Git Operations
+```bash
+# Execute prompt non-interactively (supports text, json, stream-json)
+ntx -p "explain rust borrow checker"
+ntx -p --output-format json "validate security policy"
+ntx -p --output-format stream-json "stream response"
+
+# Run automated multi-agent code review
+ntx review src/
+
+# Git patch inspection and working diff
+ntx diff
+ntx apply patch.diff
+
+# Context window compaction and SIMD vector flush
+ntx compact
+```
+
+### 8.10 Session, Daemon & Configuration Lifecycle
+```bash
+# List active interactive sessions, background workers, and daemons
+ntx ps
+
+# Attach terminal to an active session
+ntx attach sess-123
+
+# Inspect execution logs and trajectory traces
+ntx logs sess-123
+
+# Stop, kill, or respawn worker sessions
+ntx kill sess-123
+ntx respawn sess-123
+
+# Queue steering message into session inbox
+ntx queue sess-123 "abort previous task and refactor"
+
+# Persistent configuration management
+ntx config list
+ntx config set theme dark
+ntx config get theme
+
+# Generate shell completions (bash, zsh, fish, powershell)
+eval "$(ntx completion bash)"
+```
+
 ---
 
-## 9. Embedded Workstation WebUI & REST API
+## 9. Single-Page Landing Page & Plesk Hosting
 
-The single-binary executable includes a multi-threaded HTTP/1.1 server and a reactive single-page dashboard running on port `8080`.
+Nityaksha includes a self-contained, responsive single-page landing page (`index.html`) at the repository root.
+
+### Hosting on Plesk via Git:
+1. In the **Plesk Control Panel**, add a Git repository targeting `https://github.com/simhaonline/ntx.git`.
+2. Set the deployment destination path to your domain's document root (e.g. `/httpdocs` or `/public_html`).
+3. Enable **Automatic Deployment**. When changes are pushed to `main`, Plesk pulls `index.html` and immediately serves the AI Concierge Platform landing page at `https://simhaonline.ai`.
+4. Zero NPM or Node build steps required—pure inline CSS, inlined SVG icons, and vanilla JavaScript.
+
+### Embedded Web Server Endpoints (:8080):
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/` | Reactive single-page workstation dashboard |
+| `GET` | `/` or `/index.html` | High-converting single-page landing page (matching Plesk) |
+| `GET` | `/app` or `/dashboard` | Reactive single-page workstation dashboard |
 | `GET` | `/install.sh` | Serves Linux / macOS universal installer script |
 | `GET` | `/install.ps1` | Serves Windows PowerShell installer script |
 | `GET` | `/install-ios.sh` | Serves iOS terminal installer script |
