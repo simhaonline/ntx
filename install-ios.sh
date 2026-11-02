@@ -10,8 +10,8 @@ set -e
 
 printf "\033[0;36m"
 printf "================================================================================\n"
-printf "         NITYAKSHA AI AGENT & BOT CONTROL PLANE (v1.0.0 by Simha)               \n"
-printf "         iOS & iPadOS Terminal Native Installer (simhaonline.ai)                 \n"
+printf "                   NITYAKSHA - An AI Concierge Platform                         \n"
+printf "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  \n"
 printf "================================================================================\n"
 printf "\033[0m"
 

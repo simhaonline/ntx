@@ -11,8 +11,8 @@ param()
 $ErrorActionPreference = 'Stop'
 
 Write-Host "================================================================================" -ForegroundColor Cyan
-Write-Host "         NITYAKSHA AI AGENT & BOT CONTROL PLANE (v1.0.0 by Simha)               " -ForegroundColor Cyan
-Write-Host "         Windows Pure Native Rust Installer (simhaonline.ai)                    " -ForegroundColor Cyan
+Write-Host "                   NITYAKSHA - An AI Concierge Platform                         " -ForegroundColor Cyan
+Write-Host "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  " -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
 
 $InstallDir = Join-Path $env:USERPROFILE ".nityaksha\bin"

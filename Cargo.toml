@@ -3,7 +3,7 @@ name = "ntx"
 version = "1.0.0"
 edition = "2024"
 authors = ["Simha <simhaonline.in@gmail.com>"]
-description = "Nityaksha AI Agent & Bot Control Plane CLI by Simha (Pure Rust)"
+description = "NITYAKSHA - An AI Concierge Platform in pure Rust"
 
 [[bin]]
 name = "ntx"

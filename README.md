@@ -1,4 +1,6 @@
-# `ntx` — Nityaksha AI Agent & Bot Control Plane CLI
+# `ntx` — NITYAKSHA - An AI Concierge Platform
+
+Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.
 
 **Version:** `v1.0.0`  
 **Author:** Simha (`simhaonline`)  
@@ -373,4 +375,4 @@ The single-binary executable includes a multi-threaded HTTP/1.1 server and a rea
 ## 11. Author & Maintainer
 
 **Simha** ([@simhaonline](https://github.com/simhaonline))  
-*Engineered for high-velocity, deterministic, and sovereign AI agent infrastructure in pure Rust.*
+*Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.*

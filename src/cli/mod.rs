@@ -54,7 +54,8 @@ impl CliHandler {
             "scrape" => self.cmd_scrape(&args[2..]),
             "repl" => self.interactive_repl(),
             "--version" | "-v" | "version" => {
-                println!("ntx (Nityaksha AI Agent Control Plane CLI) v1.0.0 (Pure Rust Native)");
+                println!("ntx (NITYAKSHA - An AI Concierge Platform) v1.0.0 (Pure Rust Native)");
+                println!("Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.");
                 println!("Author: Simha <simhaonline.in@gmail.com>");
             }
             "help" | "--help" | "-h" => self.cmd_help(),
@@ -67,8 +68,8 @@ impl CliHandler {
 
     pub fn cmd_status(&self) {
         println!("================================================================================");
-        println!("         NITYAKSHA AI AGENT & BOT CONTROL PLANE (v1.0.0 by Simha)               ");
-        println!("         Pure Native Rust Engine | Zero Python Runtime Overhead                 ");
+        println!("                   NITYAKSHA - An AI Concierge Platform                         ");
+        println!("  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  ");
         println!("================================================================================");
         self.cmd_doctor();
         println!();
@@ -619,7 +620,8 @@ impl CliHandler {
     }
 
     pub fn cmd_help(&self) {
-        println!("Nityaksha AI Agent Control Plane CLI (v1.0.0 Pure Rust Native)");
+        println!("NITYAKSHA - An AI Concierge Platform (v1.0.0 Pure Rust Native)");
+        println!("Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.\n");
         println!("Usage: ntx [COMMAND] [ARGS...]\n");
         println!("Commands:");
         println!("  status              Display complete system health, runtimes, and catalog stats");

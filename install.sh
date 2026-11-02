@@ -17,8 +17,8 @@ NC='\033[0m' # No Color
 
 echo -e "${CYAN}${BOLD}"
 echo "================================================================================"
-echo "         NITYAKSHA AI AGENT & BOT CONTROL PLANE (v1.0.0 by Simha)               "
-echo "         Universal Pure Native Rust Installer (simhaonline.ai)                  "
+echo "                   NITYAKSHA - An AI Concierge Platform                         "
+echo "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  "
 echo "================================================================================"
 echo -e "${NC}"
 
