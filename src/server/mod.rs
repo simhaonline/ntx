@@ -131,6 +131,42 @@ fn handle_connection(
         return Ok(());
     }
 
+    if (method == "GET" || method == "HEAD") && (uri == "/logo-dark.svg") {
+        let svg = include_str!("../../brand/logo-dark.svg");
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: image/svg+xml\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: public, max-age=86400\r\n\r\n",
+            svg.len()
+        );
+        stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(svg.as_bytes())?;
+        }
+        return Ok(());
+    }
+
+    if (method == "GET" || method == "HEAD") && (uri == "/hero.png" || uri == "/brand/hero.png") {
+        let p1 = std::path::Path::new("/root/install/hero.png");
+        let p2 = std::path::Path::new("hero.png");
+        let bytes = if p1.exists() {
+            std::fs::read(p1).unwrap_or_default()
+        } else if p2.exists() {
+            std::fs::read(p2).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if !bytes.is_empty() {
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: public, max-age=86400\r\n\r\n",
+                bytes.len()
+            );
+            stream.write_all(resp.as_bytes())?;
+            if method == "GET" {
+                stream.write_all(&bytes)?;
+            }
+            return Ok(());
+        }
+    }
+
     if (method == "GET" || method == "HEAD") && (uri == "/favicon.ico") {
         let bytes = include_bytes!("../../brand/logo-32.png");
         let resp = format!(

@@ -123,7 +123,7 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
 <body>
   <div id="sidebar">
     <a href="/" class="brand-box">
-      <img src="NITYAKSHA_LOGO.png" alt="Nityaksha Logo" class="brand-logo">
+      <img src="logo.svg" alt="Nityaksha Logo" class="brand-logo" id="webui-brand-logo">
       <div>
         <div class="brand-title">NITYAKSHA</div>
         <span class="brand-pill">PURE RUST</span>
@@ -335,22 +335,22 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
     let pollInterval = null;
 
     function initDashboardTheme() {
-      const savedTheme = localStorage.getItem('nityaksha-theme');
-      if (savedTheme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-      } else {
-        document.documentElement.setAttribute('data-theme', 'light');
-      }
+      const savedTheme = localStorage.getItem('nityaksha-theme') || 'light';
+      setWebuiTheme(savedTheme);
     }
 
     function toggleDashboardTheme() {
-      const current = document.documentElement.getAttribute('data-theme');
-      if (current === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'light');
-        localStorage.setItem('nityaksha-theme', 'light');
-      } else {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('nityaksha-theme', 'dark');
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const target = current === 'dark' ? 'light' : 'dark';
+      setWebuiTheme(target);
+    }
+
+    function setWebuiTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('nityaksha-theme', theme);
+      const logo = document.getElementById('webui-brand-logo');
+      if (logo) {
+        logo.src = theme === 'dark' ? 'logo-dark.svg' : 'logo.svg';
       }
     }
 

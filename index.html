@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NITYAKSHA — An AI Concierge Platform | Pure Rust Native Agent Infrastructure</title>
   <meta name="description" content="Engineered for high-velocity, deterministic AI in pure Rust. Built-in Agent Memory Stack, zero external DB runtime, POSIX sandboxes, and sovereign multi-agent control plane.">
-  <meta name="keywords" content="Nityaksha, AI Concierge, Rust AI, Agent Control Plane, Vector Database Rust, HITL Gates, AI Harness">
+  <meta name="keywords" content="Nityaksha, AI Concierge, Rust AI, Agent Control Plane, Vector Database Rust, HITL Gates, AI Harness, DAG Workflow Engine, Bot App Store">
   <meta name="author" content="Simha (simhaonline)">
   <link rel="canonical" href="https://simhaonline.ai">
-  <link rel="icon" type="image/png" href="NITYAKSHA_LOGO.png">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
   <link rel="apple-touch-icon" href="logo-180.png">
 
   <!-- OpenGraph / Social Media -->
@@ -29,6 +29,9 @@
       --color-brand-accent: #C05A28;      /* Rust Orange */
       --color-brand-accent-hover: #A3481D;
       --color-brand-accent-glow: rgba(192, 90, 40, 0.35);
+      --color-brand-cyan: #0EA5E9;
+      --color-brand-green: #10B981;
+      --color-brand-purple: #8B5CF6;
 
       /* Light Mode Palette (Default) */
       --bg-canvas: #F4F6F9;              /* Off-White Canvas */
@@ -36,7 +39,7 @@
       --bg-surface-elevated: #FFFFFF;
       --bg-card: #FFFFFF;
       --bg-card-hover: #F8FAFC;
-      --bg-nav: rgba(255, 255, 255, 0.92);
+      --bg-nav: rgba(255, 255, 255, 0.94);
       --border-subtle: #E2E8F0;          /* Clean Subtle Border */
       --border-accent: rgba(192, 90, 40, 0.4);
       --text-heading: #0D2340;           /* Deep Navy Headings */
@@ -52,7 +55,8 @@
       --term-header: #0D2340;
       --term-text: #E2E8F0;
       --term-accent: #C05A28;
-      --term-border: #2E4F6F;
+      --term-border: #1E3A5F;
+      --term-scrollbar: #163252;
 
       /* Typography */
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -66,7 +70,7 @@
       --bg-surface-elevated: #132D4E;
       --bg-card: #0D2340;
       --bg-card-hover: #132D4E;
-      --bg-nav: rgba(9, 25, 46, 0.92);
+      --bg-nav: rgba(9, 25, 46, 0.94);
       --border-subtle: #2E4F6F;          /* Slate Steel Border */
       --border-accent: rgba(192, 90, 40, 0.6);
       --text-heading: #FFFFFF;           /* Pure White Headings */
@@ -81,6 +85,7 @@
       --term-header: #09192E;
       --term-text: #E2E8F0;
       --term-border: #1E3A5F;
+      --term-scrollbar: #163252;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -98,19 +103,20 @@
       background-attachment: fixed;
     }
 
-    a { color: var(--color-brand-accent); text-decoration: none; transition: color 0.2s; }
-    a:hover { color: var(--color-brand-accent-hover); }
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
 
-    .container { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
-
-    /* Sticky Header */
+    /* Top Sticky Header */
     header {
       position: sticky;
       top: 0;
-      z-index: 1000;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      z-index: 100;
       background: var(--bg-nav);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border-subtle);
       transition: all 0.3s ease;
     }
@@ -118,237 +124,544 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 76px;
+      height: 72px;
     }
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.85rem;
-      font-weight: 800;
-      font-size: 1.35rem;
-      letter-spacing: -0.02em;
-      color: var(--text-heading);
+      gap: 0.75rem;
+      text-decoration: none;
     }
     .brand-logo-img {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       object-fit: contain;
-      filter: drop-shadow(0 2px 6px rgba(13, 35, 64, 0.15));
+      transition: transform 0.2s;
+    }
+    .brand:hover .brand-logo-img {
+      transform: scale(1.05);
+    }
+    .brand-name {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.02em;
     }
     .brand-badge {
       font-family: var(--font-mono);
       font-size: 0.68rem;
       font-weight: 700;
-      padding: 0.25rem 0.55rem;
+      padding: 0.2rem 0.5rem;
       border-radius: 9999px;
       background: rgba(192, 90, 40, 0.12);
       color: var(--color-brand-accent);
       border: 1px solid rgba(192, 90, 40, 0.3);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.04em;
     }
+
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 1.85rem;
+      gap: 1.5rem;
       list-style: none;
     }
     .nav-links a {
-      color: var(--text-muted);
-      font-size: 0.95rem;
+      color: var(--text-body);
+      text-decoration: none;
+      font-size: 0.9rem;
       font-weight: 600;
       transition: color 0.2s;
     }
-    .nav-links a:hover { color: var(--text-heading); }
-    .nav-actions { display: flex; align-items: center; gap: 0.85rem; }
+    .nav-links a:hover {
+      color: var(--color-brand-accent);
+    }
 
-    /* Buttons */
-    .btn-rust {
-      display: inline-flex;
+    .nav-actions {
+      display: flex;
       align-items: center;
-      gap: 0.5rem;
-      background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%);
-      color: #FFFFFF !important;
-      padding: 0.55rem 1.15rem;
-      border-radius: 9999px;
-      font-size: 0.875rem;
-      font-weight: 700;
-      box-shadow: 0 4px 14px var(--color-brand-accent-glow);
-      border: none;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-rust:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(192, 90, 40, 0.45);
-    }
-    .btn-outline {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      color: var(--text-heading) !important;
-      padding: 0.55rem 1.15rem;
-      border-radius: 9999px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-outline:hover {
-      border-color: var(--color-brand-accent);
-      color: var(--color-brand-accent) !important;
-      transform: translateY(-1px);
+      gap: 0.75rem;
     }
     .btn-theme-toggle {
-      background: var(--bg-surface);
+      background: var(--bg-canvas);
       border: 1px solid var(--border-subtle);
       color: var(--text-heading);
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       transition: all 0.2s;
     }
     .btn-theme-toggle:hover {
       border-color: var(--color-brand-accent);
-      transform: rotate(15deg);
+      transform: translateY(-1px);
+    }
+    .btn-outline {
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-heading);
+      background: var(--bg-canvas);
+      transition: all 0.2s;
+    }
+    .btn-outline:hover {
+      border-color: var(--color-brand-accent);
+      color: var(--color-brand-accent);
+    }
+    .btn-rust {
+      padding: 0.45rem 1.15rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-decoration: none;
+      background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%);
+      color: #FFFFFF !important;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      box-shadow: 0 2px 10px rgba(192, 90, 40, 0.3);
+      transition: all 0.2s;
+      border: none;
+    }
+    .btn-rust:hover {
+      box-shadow: 0 4px 14px rgba(192, 90, 40, 0.45);
+      transform: translateY(-1px);
     }
 
     /* Hero Section */
     .hero {
-      padding: 5rem 0 4rem;
+      padding: 3.5rem 0 2.5rem;
       text-align: center;
-    }
-    .hero-logo-wrap {
-      margin-bottom: 1.75rem;
-      display: inline-block;
-    }
-    .hero-logo-wrap img {
-      width: 104px;
-      height: 104px;
-      object-fit: contain;
-      filter: drop-shadow(0 8px 24px rgba(13, 35, 64, 0.12));
-      animation: float 4s ease-in-out infinite;
-    }
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-6px); }
     }
     .hero-pill {
       display: inline-flex;
       align-items: center;
-      gap: 0.6rem;
-      padding: 0.35rem 1.15rem;
+      gap: 0.5rem;
+      padding: 0.35rem 0.95rem;
       border-radius: 9999px;
       background: rgba(192, 90, 40, 0.08);
-      border: 1px solid rgba(192, 90, 40, 0.28);
-      color: var(--color-brand-accent);
+      border: 1px solid rgba(192, 90, 40, 0.25);
       font-family: var(--font-mono);
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       font-weight: 700;
-      letter-spacing: 0.05em;
-      margin-bottom: 1.75rem;
-    }
-    .hero h1 {
-      font-size: clamp(2.4rem, 5.2vw, 4.1rem);
-      font-weight: 900;
-      line-height: 1.12;
-      letter-spacing: -0.03em;
+      color: var(--color-brand-accent);
       margin-bottom: 1.25rem;
+      letter-spacing: 0.05em;
+    }
+    .hero-title {
+      font-size: 3.4rem;
+      font-weight: 900;
       color: var(--text-heading);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
     }
     .hero-subtitle {
-      font-size: clamp(1.15rem, 2.2vw, 1.45rem);
-      color: var(--color-brand-accent);
+      font-size: 1.65rem;
       font-weight: 700;
-      max-width: 860px;
-      margin: 0 auto 1.5rem;
-      line-height: 1.4;
+      color: var(--color-brand-accent);
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.01em;
+    }
+    .hero-tagline {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text-heading);
+      margin-bottom: 1rem;
     }
     .hero-desc {
-      font-size: 1.1rem;
-      color: var(--text-muted);
-      max-width: 780px;
-      margin: 0 auto 2.75rem;
+      max-width: 820px;
+      margin: 0 auto 2rem;
+      font-size: 1.05rem;
+      color: var(--text-body);
+      line-height: 1.7;
+    }
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
+    }
+    .btn-primary-hero {
+      padding: 0.85rem 1.75rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%);
+      color: #FFFFFF !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      box-shadow: 0 4px 18px rgba(192, 90, 40, 0.35);
+      transition: all 0.2s;
+    }
+    .btn-primary-hero:hover {
+      box-shadow: 0 6px 24px rgba(192, 90, 40, 0.5);
+      transform: translateY(-2px);
+    }
+    .btn-secondary-hero {
+      padding: 0.85rem 1.6rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      background: var(--bg-surface);
+      color: var(--text-heading);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+    }
+    .btn-secondary-hero:hover {
+      border-color: var(--color-brand-accent);
+      color: var(--color-brand-accent);
+      transform: translateY(-2px);
+    }
+    .btn-gh-hero {
+      padding: 0.85rem 1.6rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      text-decoration: none;
+      background: var(--bg-surface);
+      color: var(--text-heading);
+      border: 1px solid var(--border-subtle);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+    }
+    .btn-gh-hero:hover {
+      border-color: var(--color-brand-accent);
+      transform: translateY(-2px);
+    }
+    .live-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #10B981;
+      display: inline-block;
+      box-shadow: 0 0 8px #10B981;
+      animation: pulse-dot 1.5s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.7; }
     }
 
-    /* Universal Install Card */
-    .install-box {
-      max-width: 720px;
-      margin: 0 auto 3.75rem;
+    /* ==========================================================================
+       LIVE RUNNING FLOW: AGENTIC AI & BOT ORCHESTRATION (Reference hero.png)
+       ========================================================================== */
+    .flow-showcase {
+      max-width: 1180px;
+      margin: 0 auto 3.5rem;
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: 14px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      text-align: left;
+      position: relative;
+    }
+    .flow-top-bar {
+      background: var(--bg-canvas);
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .telemetry-tag {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-weight: 700;
+      color: #10B981;
+    }
+    .telemetry-metrics {
+      display: flex;
+      gap: 1.25rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+    .flow-header {
+      padding: 1.5rem 1.75rem 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .flow-title {
+      font-size: 1.45rem;
+      font-weight: 900;
+      color: var(--text-heading);
+      letter-spacing: -0.02em;
+    }
+    .flow-subtitle {
+      font-size: 0.88rem;
+      color: var(--color-brand-accent);
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-top: 0.2rem;
+    }
+    .btn-blueprint-modal {
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-heading);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+    .btn-blueprint-modal:hover {
+      border-color: var(--color-brand-accent);
+      color: var(--color-brand-accent);
+    }
+
+    /* 5-Stage Live Flow Grid */
+    .flow-grid-stages {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1rem;
+      padding: 1.25rem 1.75rem;
+      position: relative;
+    }
+    .flow-stage-col {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 1.15rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .flow-stage-col:hover {
+      border-color: var(--color-brand-accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-sm);
+    }
+    .flow-stage-header {
+      margin-bottom: 0.85rem;
+    }
+    .stage-num {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: var(--color-brand-accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stage-name {
+      font-size: 0.98rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      margin: 0.15rem 0;
+    }
+    .stage-status {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.12);
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .stage-node-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      margin-bottom: 0.85rem;
+    }
+    .stage-details {
+      list-style: none;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .stage-details li {
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .stage-details li::before {
+      content: "•";
+      color: var(--color-brand-accent);
+      font-weight: bold;
+    }
+    .flow-arrow-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-brand-accent);
+      font-weight: 800;
+      font-size: 1.2rem;
+    }
+
+    /* Live Progress Telemetry Track */
+    .flow-bottom-track {
+      background: var(--bg-canvas);
+      border-top: 1px solid var(--border-subtle);
+      padding: 1rem 1.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .progress-bar-wrap {
+      flex: 1;
+      min-width: 240px;
+    }
+    .progress-label-bar {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 0.35rem;
+    }
+    .progress-track {
+      height: 7px;
+      border-radius: 9999px;
+      background: var(--border-subtle);
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 78%;
+      background: linear-gradient(90deg, #10B981 0%, #0EA5E9 50%, #C05A28 100%);
+      border-radius: 9999px;
+      position: relative;
+      animation: flow-pulse-track 3s ease-in-out infinite;
+    }
+    @keyframes flow-pulse-track {
+      0% { width: 45%; }
+      50% { width: 92%; }
+      100% { width: 45%; }
+    }
+    .telemetry-pills-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .telemetry-pill {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-heading);
+    }
+
+    /* ==========================================================================
+       UNIVERSAL INSTALLATION BOX (Screenshot_2 Fix: ZERO Scrollbars)
+       ========================================================================== */
+    .install-box {
+      max-width: 860px;
+      margin: 0 auto 3.5rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
       overflow: hidden;
       box-shadow: var(--shadow-md);
-      transition: all 0.3s;
-    }
-    .install-box:hover {
-      border-color: var(--border-accent);
-      box-shadow: var(--shadow-lg);
     }
     .install-tabs {
       display: flex;
       background: var(--bg-canvas);
+      padding: 0.4rem;
+      gap: 0.35rem;
+      justify-content: center;
       border-bottom: 1px solid var(--border-subtle);
-      overflow-x: auto;
+      flex-wrap: wrap;
     }
     .install-tab {
-      padding: 0.85rem 1.35rem;
-      font-size: 0.85rem;
+      padding: 0.45rem 1rem;
+      font-size: 0.82rem;
       font-weight: 700;
       color: var(--text-muted);
-      border: none;
+      border: 1px solid transparent;
       background: none;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: all 0.2s;
+      border-radius: 6px;
+      transition: all 0.15s ease;
       white-space: nowrap;
-      border-bottom: 2px solid transparent;
     }
-    .install-tab:hover { color: var(--text-heading); }
+    .install-tab:hover {
+      color: var(--text-heading);
+    }
     .install-tab.active {
       color: var(--color-brand-accent);
       background: var(--bg-surface);
-      border-bottom: 2px solid var(--color-brand-accent);
+      border-color: var(--border-subtle);
+      box-shadow: 0 1px 4px rgba(13, 35, 64, 0.05);
     }
     .install-cmd-wrap {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 1.25rem 1.6rem;
+      padding: 1.15rem 1.5rem;
       background: var(--term-bg);
+      gap: 1rem;
     }
     .install-cmd {
       font-family: var(--font-mono);
       font-size: 0.95rem;
       color: #FFFFFF;
-      overflow-x: auto;
       white-space: nowrap;
+      overflow-x: auto;
       text-align: left;
+      flex: 1;
     }
     .btn-copy {
       background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%);
       border: none;
       color: #FFFFFF;
-      padding: 0.5rem 1rem;
+      padding: 0.5rem 1.15rem;
       border-radius: 6px;
       font-size: 0.85rem;
       font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       transition: all 0.2s;
       box-shadow: 0 2px 10px rgba(192, 90, 40, 0.3);
+      white-space: nowrap;
     }
     .btn-copy:hover {
       box-shadow: 0 4px 14px rgba(192, 90, 40, 0.45);
@@ -360,13 +673,17 @@
       padding: 0.85rem 1.5rem;
       background: var(--bg-surface);
       border-top: 1px solid var(--border-subtle);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
 
-    /* Terminal Simulator */
+    /* ==========================================================================
+       TERMINAL SIMULATOR (Screenshot_3 Fix: Custom Dark Scrollbar)
+       ========================================================================== */
     .terminal-section {
-      max-width: 1000px;
+      max-width: 980px;
       margin: 0 auto 5rem;
       background: var(--term-bg);
       border: 1px solid var(--term-border);
@@ -376,266 +693,167 @@
     }
     .terminal-header {
       background: var(--term-header);
-      padding: 0.85rem 1.35rem;
+      padding: 0.75rem 1.25rem;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 1rem;
       border-bottom: 1px solid var(--term-border);
+      overflow-x: auto;
     }
-    .terminal-dots { display: flex; gap: 8px; }
-    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+    }
     .dot-red { background: #EF4444; }
     .dot-yellow { background: #F59E0B; }
     .dot-green { background: #10B981; }
-    .terminal-tabs { display: flex; gap: 0.4rem; overflow-x: auto; }
+    .terminal-tabs {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .terminal-tabs::-webkit-scrollbar { display: none; }
     .term-tab {
-      background: transparent;
-      border: 1px solid transparent;
-      color: #94A3B8;
-      font-size: 0.8rem;
+      background: none;
+      border: none;
+      color: var(--text-dim);
       font-family: var(--font-mono);
-      padding: 0.25rem 0.65rem;
+      font-size: 0.78rem;
+      padding: 0.35rem 0.75rem;
       border-radius: 4px;
       cursor: pointer;
-      transition: all 0.2s;
       white-space: nowrap;
+      transition: all 0.15s;
     }
     .term-tab:hover { color: #FFFFFF; }
     .term-tab.active {
       background: rgba(192, 90, 40, 0.2);
-      border-color: rgba(192, 90, 40, 0.5);
-      color: #FF8A50;
+      color: #FF7A3D;
+      border: 1px solid rgba(192, 90, 40, 0.4);
       font-weight: 700;
     }
     .terminal-body {
       padding: 1.5rem;
       font-family: var(--font-mono);
-      font-size: 0.86rem;
+      font-size: 0.85rem;
       line-height: 1.65;
       text-align: left;
       min-height: 290px;
-      max-height: 420px;
+      max-height: 380px;
       overflow-y: auto;
       background: var(--term-bg);
       color: var(--term-text);
+      /* Custom Scrollbar Styles to eliminate white bar */
+      scrollbar-width: thin;
+      scrollbar-color: var(--term-scrollbar) var(--term-bg);
+    }
+    .terminal-body::-webkit-scrollbar {
+      width: 7px;
+    }
+    .terminal-body::-webkit-scrollbar-track {
+      background: var(--term-bg);
+    }
+    .terminal-body::-webkit-scrollbar-thumb {
+      background: var(--term-scrollbar);
+      border-radius: 4px;
+    }
+    .terminal-body::-webkit-scrollbar-thumb:hover {
+      background: var(--color-brand-accent);
     }
 
-    /* Stats Grid */
+    /* Stats Grid Bar */
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 5.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 5rem;
     }
     .stat-box {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
       border-radius: 12px;
-      padding: 1.75rem 1.25rem;
+      padding: 1.5rem 1.25rem;
       text-align: center;
       box-shadow: var(--shadow-sm);
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .stat-box:hover {
-      transform: translateY(-4px);
-      border-color: var(--color-brand-accent);
-      box-shadow: var(--shadow-md);
     }
     .stat-num {
-      font-size: 2.3rem;
+      font-size: 2.1rem;
       font-weight: 900;
       color: var(--color-brand-accent);
-      margin-bottom: 0.25rem;
       letter-spacing: -0.02em;
     }
     .stat-label {
-      font-size: 0.85rem;
-      color: var(--text-muted);
+      font-size: 0.82rem;
       font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
     }
 
     /* Section Headers */
     .section-title {
       text-align: center;
-      margin-bottom: 3.5rem;
+      max-width: 760px;
+      margin: 0 auto 3rem;
     }
     .section-title h2 {
       font-size: 2.25rem;
-      font-weight: 800;
+      font-weight: 900;
+      color: var(--text-heading);
       letter-spacing: -0.02em;
       margin-bottom: 0.75rem;
-      color: var(--text-heading);
     }
     .section-title p {
+      font-size: 1.05rem;
       color: var(--text-muted);
-      font-size: 1.1rem;
-      max-width: 700px;
-      margin: 0 auto;
     }
 
-    /* Pillars Grid */
+    /* Architectural Pillars */
     .pillars-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-      gap: 2rem;
-      margin-bottom: 6rem;
+      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 5rem;
     }
     .pillar-card {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
-      border-radius: 14px;
-      padding: 2.25rem 2rem;
+      border-radius: 12px;
+      padding: 1.85rem;
       box-shadow: var(--shadow-sm);
-      transition: all 0.3s;
-      display: flex;
-      flex-direction: column;
+      transition: all 0.2s;
     }
     .pillar-card:hover {
-      border-color: var(--border-accent);
-      transform: translateY(-4px);
+      border-color: var(--color-brand-accent);
+      transform: translateY(-2px);
       box-shadow: var(--shadow-md);
     }
     .pillar-icon {
-      width: 48px;
-      height: 48px;
+      width: 46px;
+      height: 46px;
       border-radius: 10px;
       background: rgba(192, 90, 40, 0.1);
-      border: 1px solid rgba(192, 90, 40, 0.25);
       color: var(--color-brand-accent);
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1.35rem;
+      margin-bottom: 1.15rem;
     }
     .pillar-card h3 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      margin-bottom: 0.75rem;
+      font-size: 1.2rem;
+      font-weight: 800;
       color: var(--text-heading);
+      margin-bottom: 0.5rem;
     }
     .pillar-card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
+      color: var(--text-body);
+      font-size: 0.92rem;
       line-height: 1.6;
-      flex: 1;
-    }
-
-    /* Pipeline Flow */
-    .flow-section {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: 16px;
-      padding: 3rem 2rem;
-      margin-bottom: 6rem;
-      box-shadow: var(--shadow-sm);
-    }
-    .flow-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 1.25rem;
-    }
-    .flow-step {
-      background: var(--bg-canvas);
-      border: 1px solid var(--border-subtle);
-      border-radius: 10px;
-      padding: 1.5rem 1rem;
-      text-align: center;
-      transition: border-color 0.2s;
-    }
-    .flow-step:hover {
-      border-color: var(--color-brand-accent);
-    }
-    .flow-badge {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--color-brand-accent);
-      text-transform: uppercase;
-      margin-bottom: 0.5rem;
-      letter-spacing: 0.05em;
-    }
-    .flow-step h4 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-      color: var(--text-heading);
-    }
-    .flow-step p {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
-    /* CLI Reference Table */
-    .cli-table-wrap {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-subtle);
-      border-radius: 14px;
-      overflow: hidden;
-      margin-bottom: 6rem;
-      box-shadow: var(--shadow-sm);
-    }
-    .cli-filter-bar {
-      display: flex;
-      gap: 0.5rem;
-      padding: 1rem 1.5rem;
-      background: var(--bg-canvas);
-      border-bottom: 1px solid var(--border-subtle);
-      overflow-x: auto;
-    }
-    .cli-filter-btn {
-      background: transparent;
-      border: 1px solid var(--border-subtle);
-      color: var(--text-muted);
-      padding: 0.45rem 0.95rem;
-      border-radius: 9999px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
-    .cli-filter-btn:hover { color: var(--text-heading); border-color: var(--color-brand-accent); }
-    .cli-filter-btn.active {
-      background: var(--color-brand-accent);
-      border-color: var(--color-brand-accent);
-      color: #FFFFFF !important;
-    }
-    table.cli-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-    table.cli-table th, table.cli-table td {
-      padding: 1.1rem 1.5rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    table.cli-table th {
-      background: var(--bg-canvas);
-      color: var(--text-heading);
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 700;
-    }
-    .cmd-name {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      color: var(--color-brand-accent);
-      white-space: nowrap;
-    }
-    .cmd-desc { color: var(--text-muted); }
-    .cmd-badge {
-      display: inline-block;
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
-      background: rgba(13, 35, 64, 0.08);
-      color: var(--text-heading);
-      border: 1px solid var(--border-subtle);
     }
 
     /* Bot Showcase Styles */
@@ -733,6 +951,8 @@
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 1rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
     .wf-nodes-flow {
       display: flex;
@@ -768,10 +988,112 @@
       font-size: 1.1rem;
     }
 
+    /* CLI Reference Table */
+    .cli-table-wrap {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 5rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .cli-filter-bar {
+      display: flex;
+      background: var(--bg-canvas);
+      padding: 0.6rem;
+      gap: 0.4rem;
+      border-bottom: 1px solid var(--border-subtle);
+      overflow-x: auto;
+    }
+    .cli-filter-btn {
+      padding: 0.45rem 0.95rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: none;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .cli-filter-btn:hover { color: var(--text-heading); }
+    .cli-filter-btn.active {
+      background: var(--bg-surface);
+      border-color: var(--border-subtle);
+      color: var(--color-brand-accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .cli-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .cli-table th, .cli-table td {
+      text-align: left;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .cli-table th {
+      background: var(--bg-canvas);
+      color: var(--text-heading);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+    .cmd-name {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--color-brand-accent);
+      white-space: nowrap;
+    }
+    .cmd-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: rgba(13, 35, 64, 0.08);
+      color: var(--text-heading);
+      border: 1px solid var(--border-subtle);
+    }
+
+    /* Comparison Architecture Table */
+    .compare-section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 2.5rem;
+      margin-bottom: 5rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+    }
+    .compare-table th, .compare-table td {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+      text-align: left;
+    }
+    .compare-table th {
+      background: var(--bg-canvas);
+      color: var(--text-heading);
+      font-weight: 800;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+    }
+    .val-good { color: #10B981; font-weight: 700; }
+    .val-bad { color: #EF4444; font-weight: 500; }
+
     /* FAQ Section */
     .faq-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
       gap: 1.5rem;
       margin-bottom: 6rem;
     }
@@ -784,14 +1106,53 @@
     }
     .faq-card h4 {
       font-size: 1.15rem;
-      font-weight: 700;
+      font-weight: 800;
       margin-bottom: 0.5rem;
       color: var(--text-heading);
     }
     .faq-card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
+      color: var(--text-body);
+      font-size: 0.92rem;
       line-height: 1.6;
+    }
+
+    /* Lightbox Modal for hero.png */
+    #blueprint-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(5, 14, 26, 0.88);
+      backdrop-filter: blur(8px);
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    #blueprint-modal.active { display: flex; }
+    .blueprint-modal-content {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      max-width: 1100px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 1.5rem;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+    .blueprint-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .blueprint-modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-heading);
     }
 
     /* Footer */
@@ -833,15 +1194,15 @@
     }
     .footer-col h5 {
       color: var(--text-heading);
-      font-size: 0.95rem;
-      font-weight: 700;
+      font-size: 0.92rem;
+      font-weight: 800;
       margin-bottom: 1rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
     .footer-col ul { list-style: none; }
     .footer-col li { margin-bottom: 0.65rem; }
-    .footer-col a { color: var(--text-muted); font-weight: 500; }
+    .footer-col a { color: var(--text-muted); font-weight: 500; text-decoration: none; }
     .footer-col a:hover { color: var(--color-brand-accent); }
     .footer-bottom {
       border-top: 1px solid var(--border-subtle);
@@ -851,12 +1212,16 @@
       align-items: center;
       color: var(--text-dim);
       font-size: 0.85rem;
+      flex-wrap: wrap;
+      gap: 1rem;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       .nav-links { display: none; }
+      .flow-grid-stages { grid-template-columns: 1fr; }
+      .hero-title { font-size: 2.5rem; }
       .footer-grid { grid-template-columns: 1fr; gap: 2rem; }
-      .footer-bottom { flex-direction: column; gap: 1rem; text-align: center; }
+      .footer-bottom { flex-direction: column; text-align: center; }
       .faq-grid { grid-template-columns: 1fr; }
     }
   </style>
@@ -867,16 +1232,18 @@
   <header>
     <div class="container nav-inner">
       <a href="/" class="brand">
-        <img src="NITYAKSHA_LOGO.png" alt="Nityaksha Logo" class="brand-logo-img">
-        <span>NITYAKSHA</span>
+        <!-- Dynamic Logo for Light and Dark mode -->
+        <img src="logo.svg" alt="Nityaksha Logo" class="brand-logo-img" id="main-brand-logo">
+        <span class="brand-name">NITYAKSHA</span>
         <span class="brand-badge">AI Concierge</span>
       </a>
 
       <ul class="nav-links">
+        <li><a href="#live-flow">Live Flow</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#bots">Bot Store</a></li>
         <li><a href="#workflows">Workflows</a></li>
-        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#memory">Memory Stack</a></li>
         <li><a href="#cli">CLI Reference</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
@@ -898,32 +1265,183 @@
     </div>
   </header>
 
-  <!-- Hero Section -->
+  <!-- Hero Section (Cleaned, Logo Removed) -->
   <section class="hero container">
-    <div class="hero-logo-wrap">
-      <img src="NITYAKSHA_LOGO.png" alt="Nityaksha Logo Orbital System">
-    </div>
     <div class="hero-pill">
       <span>ENGINEERED IN PURE RUST</span>
       <span>•</span>
       <span>100% NATIVE MEMORY STACK</span>
+      <span>•</span>
+      <span>ZERO EXTERNAL DB</span>
     </div>
-    <h1>NITYAKSHA — An AI Concierge Platform</h1>
-    <div class="hero-subtitle">
-      Engineered for high-velocity, deterministic AI in pure Rust.
-    </div>
+    <h1 class="hero-title">NITYAKSHA</h1>
+    <div class="hero-subtitle">An AI Concierge Platform</div>
+    <p class="hero-tagline">Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.</p>
     <p class="hero-desc">
-      A sovereign, memory-safe AI concierge and multi-agent control plane. Complete with a native Agent Memory Stack (ACID WAL, Dense SIMD Vectors, Sparse BM25, and Multimodal CAS), POSIX container sandboxes, physical loop breakers, and HITL merge gates.
+      A sovereign, memory-safe AI concierge and multi-agent control plane. Complete with a self-contained Agent Memory Stack (ACID WAL, Dense SIMD Vectors, Sparse BM25, and Multimodal CAS), POSIX container sandboxes, physical loop breakers, and cryptographic HITL merge gates.
     </p>
 
-    <!-- Universal Install Box -->
+    <div class="hero-actions">
+      <a href="/app" class="btn-primary-hero">
+        <span class="live-dot"></span> Launch Workstation WebUI
+      </a>
+      <a href="#install" class="btn-secondary-hero">
+        ⚡ Universal Installer
+      </a>
+      <a href="https://github.com/simhaonline/ntx" target="_blank" rel="noopener noreferrer" class="btn-gh-hero">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        Star on GitHub
+      </a>
+    </div>
+
+    <!-- ==========================================================================
+         LIVE RUNNING FLOW: AGENTIC AI & BOT ORCHESTRATION (hero.png Blueprint)
+         ========================================================================== -->
+    <div class="flow-showcase" id="live-flow">
+      <div class="flow-top-bar">
+        <div class="telemetry-tag">
+          <span class="live-dot"></span>
+          <span>LIVE TELEMETRY: ACTIVE</span>
+        </div>
+        <div class="telemetry-metrics">
+          <span>SYSTEM STATUS: <strong style="color:#10B981">RUNNING</strong></span>
+          <span>THROUGHPUT: <strong style="color:var(--text-heading)">REALTIME</strong></span>
+          <span>LATENCY: <strong style="color:var(--color-brand-accent)">&lt; 0.42ms</strong></span>
+          <span>DAEMON: <strong style="color:#0EA5E9">:8080 ACTIVE</strong></span>
+        </div>
+      </div>
+
+      <div class="flow-header">
+        <div>
+          <div class="flow-title">LIVE RUNNING FLOW: AGENTIC AI & BOT ORCHESTRATION</div>
+          <div class="flow-subtitle">Multi-Stage Autonomous Invariant Enforcement • Pure Rust Engine (ntx-core)</div>
+        </div>
+        <button class="btn-blueprint-modal" onclick="openBlueprintModal()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          Expand Full Blueprint
+        </button>
+      </div>
+
+      <!-- 5-Stage Live Flow Circuit -->
+      <div class="flow-grid-stages">
+        <!-- Stage 1 -->
+        <div class="flow-stage-col">
+          <div class="flow-stage-header">
+            <span class="stage-num">Phase 01</span>
+            <div class="stage-name">TRIGGER / PERCEIVE</div>
+            <span class="stage-status">ACTIVE</span>
+          </div>
+          <div class="stage-node-icon">📡</div>
+          <ul class="stage-details">
+            <li>Multimodal Audio/Voice</li>
+            <li>REST API Webhook</li>
+            <li>Interactive CLI Session</li>
+            <li>Git Worktree Trajectory</li>
+            <li>Cron Telemetry Trigger</li>
+          </ul>
+        </div>
+
+        <!-- Stage 2 -->
+        <div class="flow-stage-col">
+          <div class="flow-stage-header">
+            <span class="stage-num">Phase 02</span>
+            <div class="stage-name">PLANNER / REASON</div>
+            <span class="stage-status">RUNNING</span>
+          </div>
+          <div class="stage-node-icon">🧠</div>
+          <ul class="stage-details">
+            <li>Multi-Model Gateway</li>
+            <li>DeepReasoning Engine</li>
+            <li>AST Dependency Pruning</li>
+            <li>Noise-Free Context Filter</li>
+            <li>Prompt Dynamic Hydration</li>
+          </ul>
+        </div>
+
+        <!-- Stage 3 -->
+        <div class="flow-stage-col">
+          <div class="flow-stage-header">
+            <span class="stage-num">Phase 03</span>
+            <div class="stage-name">ORCHESTRATOR</div>
+            <span class="stage-status">DISPATCHING</span>
+          </div>
+          <div class="stage-node-icon">⚙️</div>
+          <ul class="stage-details">
+            <li>Kahn's DAG Cycle Check</li>
+            <li>Zero-Cycle Invariant (0)</li>
+            <li>Parallel Ready Resolver</li>
+            <li>Intent Router Classifier</li>
+            <li>State Checkpoint Snapshot</li>
+          </ul>
+        </div>
+
+        <!-- Stage 4 -->
+        <div class="flow-stage-col">
+          <div class="flow-stage-header">
+            <span class="stage-num">Phase 04</span>
+            <div class="stage-name">EXECUTOR / ACT</div>
+            <span class="stage-status">EXECUTING</span>
+          </div>
+          <div class="stage-node-icon">🛠️</div>
+          <ul class="stage-details">
+            <li>POSIX Sandbox Namespaces</li>
+            <li>Cgroups v2 Quota Limits</li>
+            <li>7 Pre-Configured Bots</li>
+            <li>87 Autonomous Skills</li>
+            <li>Lock-Free Ring IPC</li>
+          </ul>
+        </div>
+
+        <!-- Stage 5 -->
+        <div class="flow-stage-col">
+          <div class="flow-stage-header">
+            <span class="stage-num">Phase 05</span>
+            <div class="stage-name">EVALUATOR / REFLECT</div>
+            <span class="stage-status">VERIFIED</span>
+          </div>
+          <div class="stage-node-icon">🛡️</div>
+          <ul class="stage-details">
+            <li>Mandatory HITL Gate</li>
+            <li>Cryptographic Token Check</li>
+            <li>Anti-Slop Sanitizer</li>
+            <li>RedTeam Delimiter Shield</li>
+            <li>MVCC WAL & CAS Commit</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Telemetry Progress Track -->
+      <div class="flow-bottom-track">
+        <div class="progress-bar-wrap">
+          <div class="progress-label-bar">
+            <span>LIVE INVARIANT EXECUTION TRACK</span>
+            <span>78% THROUGHPUT VELOCITY</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill"></div>
+          </div>
+        </div>
+        <div class="telemetry-pills-row">
+          <span class="telemetry-pill">Cold Boot: 0.8ms</span>
+          <span class="telemetry-pill">RAM: 3.3MB</span>
+          <span class="telemetry-pill">Hard Exit: Max 25 Turns</span>
+          <span class="telemetry-pill">Ext DBs: 0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================================================
+         UNIVERSAL INSTALLATION BOX (Zero Scrollbars)
+         ========================================================================== -->
     <div class="install-box" id="install">
       <div class="install-tabs">
         <button class="install-tab active" onclick="switchInstallTab('linux')">Linux & macOS</button>
-        <button class="install-tab" onclick="switchInstallTab('windows')">Windows (PowerShell)</button>
-        <button class="install-tab" onclick="switchInstallTab('ios')">iOS (iSH / a-Shell)</button>
-        <button class="install-tab" onclick="switchInstallTab('github')">GitHub Fallback</button>
-        <button class="install-tab" onclick="switchInstallTab('cargo')">Cargo Crates</button>
+        <button class="install-tab" onclick="switchInstallTab('windows')">Windows (PS)</button>
+        <button class="install-tab" onclick="switchInstallTab('ios')">iOS (iSH)</button>
+        <button class="install-tab" onclick="switchInstallTab('cargo')">Cargo Crate</button>
+        <button class="install-tab" onclick="switchInstallTab('github')">GitHub Source</button>
       </div>
       <div class="install-cmd-wrap">
         <div class="install-cmd" id="install-command">curl -fsSL https://simhaonline.ai/install.sh | bash</div>
@@ -942,7 +1460,7 @@
       </div>
     </div>
 
-    <!-- Live Terminal Simulator -->
+    <!-- Live Terminal Simulator (Clean Custom Dark Scrollbar) -->
     <div class="terminal-section">
       <div class="terminal-header">
         <div class="terminal-dots">
@@ -952,15 +1470,15 @@
         </div>
         <div class="terminal-tabs">
           <button class="term-tab active" onclick="setTerminalOutput('status')">ntx status</button>
+          <button class="term-tab" onclick="setTerminalOutput('bots')">ntx bot list</button>
+          <button class="term-tab" onclick="setTerminalOutput('workflow')">ntx workflow run</button>
           <button class="term-tab" onclick="setTerminalOutput('skills')">ntx skill list</button>
           <button class="term-tab" onclick="setTerminalOutput('doctor')">ntx doctor</button>
           <button class="term-tab" onclick="setTerminalOutput('harness')">ntx harness status</button>
-          <button class="term-tab" onclick="setTerminalOutput('exec')">ntx -p (Exec JSON)</button>
-          <button class="term-tab" onclick="setTerminalOutput('ps')">ntx ps</button>
         </div>
       </div>
       <div class="terminal-body" id="term-display">
-        <!-- Rendered by JavaScript -->
+        <!-- Rendered by JavaScript with Custom Dark Scrollbar -->
       </div>
     </div>
 
@@ -971,24 +1489,24 @@
         <div class="stat-label">Pure Native Rust</div>
       </div>
       <div class="stat-box">
-        <div class="stat-num">&lt; 1.2ms</div>
+        <div class="stat-num">&lt; 0.8ms</div>
         <div class="stat-label">Cold Start Latency</div>
       </div>
       <div class="stat-box">
+        <div class="stat-num">3.3 MB</div>
+        <div class="stat-label">Resident Daemon RAM</div>
+      </div>
+      <div class="stat-box">
         <div class="stat-num">0</div>
-        <div class="stat-label">External DB Dependencies</div>
+        <div class="stat-label">External DBs (Built-in)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">7</div>
+        <div class="stat-label">Pre-Configured Bots</div>
       </div>
       <div class="stat-box">
         <div class="stat-num">87</div>
         <div class="stat-label">Proprietary Skills</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">13</div>
-        <div class="stat-label">Autonomous Agents</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">133</div>
-        <div class="stat-label">Dense SIMD Vectors</div>
       </div>
     </div>
   </section>
@@ -1006,7 +1524,7 @@
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
         </div>
         <h3>Pure Native Rust Control Plane</h3>
-        <p>Zero Python or Node.js runtime dependencies. Compiles to a single stripped binary under 1MB with sub-millisecond cold boot latency and under 12MB RAM utilization.</p>
+        <p>Zero Python or Node.js runtime dependencies. Compiles to a single stripped binary under 2MB with sub-millisecond cold boot latency and under 3.5MB RAM footprint.</p>
       </div>
 
       <div class="pillar-card">
@@ -1014,7 +1532,7 @@
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
         </div>
         <h3>Self-Contained Agent Memory Stack</h3>
-        <p>No PostgreSQL, pgvector, or Redis required. Features native Relational ACID WAL, Dense SIMD float vector indexing, Sparse BM25 inverted index, and Content-Addressed Storage (CAS) with MVCC versioning.</p>
+        <p>No PostgreSQL, pgvector, or Redis required. Features native Relational ACID WAL, Dense SIMD 384-dim float vectors, Sparse BM25 inverted index, and Multimodal CAS with MVCC version timelines.</p>
       </div>
 
       <div class="pillar-card">
@@ -1022,7 +1540,7 @@
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
         </div>
         <h3>Deterministic AI Harness & Loop Breaker</h3>
-        <p>Enforces physical loop step limits and outer runtime budgets (CPU, RAM, time). Detects and forcefully terminates file thrashing and hash oscillation loops.</p>
+        <p>Physical loop step counters enforce outer runtime budgets (CPU, RAM, time). Detects and forcefully terminates file thrashing and mutation oscillation loops after N iterations.</p>
       </div>
 
       <div class="pillar-card">
@@ -1250,7 +1768,7 @@
           <span class="dag-arrow">→</span>
           <div class="dag-node-badge">6. Atomic WAL Commit <span class="cmd-badge">Memory</span></div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-brand-accent);">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-brand-accent); flex-wrap: wrap; gap: 0.5rem;">
           <code>ntx workflow run wf-code-security-pipeline</code>
           <span style="color: var(--text-muted); font-size: 0.78rem;">Approval Token: NTX-APPROVE-PROD</span>
         </div>
@@ -1277,7 +1795,7 @@
           <span class="dag-arrow">→</span>
           <div class="dag-node-badge">4. Ledger WAL Sync <span class="cmd-badge">Memory</span></div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-brand-accent);">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-brand-accent); flex-wrap: wrap; gap: 0.5rem;">
           <code>ntx workflow run wf-quant-risk-deploy</code>
           <span style="color: var(--text-muted); font-size: 0.78rem;">Approval Token: NTX-APPROVE-ORDER</span>
         </div>
@@ -1285,50 +1803,105 @@
     </div>
   </section>
 
-  <!-- Execution Pipeline Flow -->
-  <section class="container" id="architecture">
+  <!-- Complete Agent Memory Stack Breakdown -->
+  <section class="container" id="memory">
     <div class="section-title">
-      <h2>Deterministic Execution Pipeline</h2>
-      <p>How an incoming prompt flows through Nityaksha's pure Rust sovereign harness.</p>
+      <h2>Complete Native Agent Memory Stack</h2>
+      <p>No PostgreSQL. No pgvector. No Redis. Built from the metal up in pure Rust for sub-millisecond edge and server workloads.</p>
     </div>
 
-    <div class="flow-section">
-      <div class="flow-grid">
-        <div class="flow-step">
-          <div class="flow-badge">Step 01</div>
-          <h4>Adversarial Shield</h4>
-          <p>RedTeam Shield evaluates injection attacks, delimiter collisions, and jailbreak vectors.</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-badge">Step 02</div>
-          <h4>Anti-Slop Filter</h4>
-          <p>Real-time conversational boilerplates, excessive hedging, and apologies sanitized in-stream.</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-badge">Step 03</div>
-          <h4>Intent Classifier</h4>
-          <p>Determines complexity: routes to fast flash models or deep architectural reasoning engines.</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-badge">Step 04</div>
-          <h4>Hybrid Vector RAG</h4>
-          <p>Cosine SIMD float retrieval + BM25 keyword matching over past agent episodic trajectories.</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-badge">Step 05</div>
-          <h4>Sandbox & Gating</h4>
-          <p>Executes inside Linux namespaces. If destructive, triggers interactive human-in-the-loop approval.</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-badge">Step 06</div>
-          <h4>LLM-Judge & WAL</h4>
-          <p>Evaluates trajectory scores and commits state snapshot to append-only WAL & CAS store.</p>
-        </div>
+    <div class="pillars-grid">
+      <div class="pillar-card">
+        <div class="pillar-icon">🗄️</div>
+        <h3>Relational ACID WAL Engine</h3>
+        <p>In-memory and disk-directory relational storage with write-ahead logging (WAL), atomic multi-agent session snapshots, and tamper-evident audit journals.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">📐</div>
+        <h3>Dense SIMD 384-Dim Vector Index</h3>
+        <p>Hardware-accelerated AVX2/NEON float cosine distance calculations. Indexes millions of dense vectors directly on disk with fast edge caching.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">🔍</div>
+        <h3>Sparse BM25 Keyword Index (Hybrid RAG)</h3>
+        <p>Fused hybrid retrieval engine combining dense semantic embeddings with sparse BM25 inverted index with parameter-tunable alpha weightings.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">📦</div>
+        <h3>Multimodal Content-Addressed Storage</h3>
+        <p>SHA-256 CAS engine co-locating raw PDF papers, financial spreadsheets, technical charts, and screenshot media alongside conversational vectors.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">🏰</div>
+        <h3>Spatial Loci Associative Memory</h3>
+        <p>Method of Loci spatial indexing organizing memories into Wings, Rooms, and Drawers for instant associative recall without context window pollution.</p>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-icon">⏳</div>
+        <h3>Git-Like MVCC State Commit Chains</h3>
+        <p>Cryptographic commit chains and parent-hash tracking enabling point-in-time delta rollbacks and time-travel trajectory audits.</p>
       </div>
     </div>
   </section>
 
-  <!-- CLI Reference Table -->
+  <!-- Security & Architecture Comparison -->
+  <section class="container" id="architecture">
+    <div class="compare-section">
+      <div class="section-title" style="margin-bottom: 1.5rem;">
+        <h2>Architectural Security Comparison</h2>
+        <p>Why enterprises deploy Nityaksha over legacy Python/Node agent harnesses.</p>
+      </div>
+
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Security & Architecture Vector</th>
+            <th>Nityaksha Pure Rust Native</th>
+            <th>Legacy Python / Node Agent Frameworks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Runtime Cold Boot Latency</strong></td>
+            <td class="val-good">&lt; 0.8 ms (Stripped Binary)</td>
+            <td class="val-bad">4,500 ms – 12,000 ms (Interpreter + Virtualenv)</td>
+          </tr>
+          <tr>
+            <td><strong>Daemon Memory Footprint</strong></td>
+            <td class="val-good">3.3 MB RAM</td>
+            <td class="val-bad">380 MB – 850 MB RAM per worker process</td>
+          </tr>
+          <tr>
+            <td><strong>Database Dependencies</strong></td>
+            <td class="val-good">0 External (Built-in Relational + Vectors + CAS)</td>
+            <td class="val-bad">PostgreSQL + pgvector + Redis + ChromaDB required</td>
+          </tr>
+          <tr>
+            <td><strong>Sandbox Isolation Layer</strong></td>
+            <td class="val-good">Linux Namespaces (Mount, PID, Net) + Cgroups v2</td>
+            <td class="val-bad">None or unconfined local subshell processes</td>
+          </tr>
+          <tr>
+            <td><strong>Loop Breakers & Thrash Guards</strong></td>
+            <td class="val-good">Hardware physical loop counter & hash oscillation detector</td>
+            <td class="val-bad">Relies on soft LLM prompts (causes infinite billing loops)</td>
+          </tr>
+          <tr>
+            <td><strong>HITL Merge Gates</strong></td>
+            <td class="val-good">Kernel-enforced cryptographic approval token intercepts</td>
+            <td class="val-bad">Ad-hoc python input() prompt prompts easily bypassed</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Complete CLI Subcommands Table -->
   <section class="container" id="cli">
     <div class="section-title">
       <h2>Complete CLI Subcommands & Options</h2>
@@ -1339,10 +1912,10 @@
       <div class="cli-filter-bar">
         <button class="cli-filter-btn active" onclick="filterCli('all')">All Commands</button>
         <button class="cli-filter-btn" onclick="filterCli('core')">Core & Health</button>
+        <button class="cli-filter-btn" onclick="filterCli('bots')">Bots & Workflows</button>
         <button class="cli-filter-btn" onclick="filterCli('exec')">Execution & Headless</button>
-        <button class="cli-filter-btn" onclick="filterCli('session')">Sessions & Daemon</button>
         <button class="cli-filter-btn" onclick="filterCli('harness')">AI Harness & Sandboxes</button>
-        <button class="cli-filter-btn" onclick="filterCli('memory')">Memory & Catalog</button>
+        <button class="cli-filter-btn" onclick="filterCli('memory')">Memory & Vectors</button>
       </div>
 
       <table class="cli-table" id="cli-table-el">
@@ -1367,6 +1940,42 @@
             <td class="cmd-desc">Audits policy files, POSIX cgroup v2, Agent Memory Stack, and IBAC security gates.</td>
             <td><code>ntx doctor</code></td>
           </tr>
+          <tr data-cat="bots">
+            <td class="cmd-name">ntx bot list</td>
+            <td><span class="cmd-badge">bots</span></td>
+            <td class="cmd-desc">Lists pre-configured autonomous bot personas with categories and model tiers.</td>
+            <td><code>ntx bot list</code></td>
+          </tr>
+          <tr data-cat="bots">
+            <td class="cmd-name">ntx bot inspect</td>
+            <td><span class="cmd-badge">bots</span></td>
+            <td class="cmd-desc">Displays bot system prompt template, allowed tools whitelist, and starter prompts.</td>
+            <td><code>ntx bot inspect ntx-bot-concierge-prime</code></td>
+          </tr>
+          <tr data-cat="bots">
+            <td class="cmd-name">ntx bot run</td>
+            <td><span class="cmd-badge">bots</span></td>
+            <td class="cmd-desc">Hydrates prompt variables and dispatches execution to persona with noise-free invariants.</td>
+            <td><code>ntx bot run ntx-bot-code-architect "audit AST"</code></td>
+          </tr>
+          <tr data-cat="bots">
+            <td class="cmd-name">ntx workflow list</td>
+            <td><span class="cmd-badge">bots</span></td>
+            <td class="cmd-desc">Lists registered Directed Acyclic Graph (DAG) templates and node counts.</td>
+            <td><code>ntx workflow list</code></td>
+          </tr>
+          <tr data-cat="bots">
+            <td class="cmd-name">ntx workflow run</td>
+            <td><span class="cmd-badge">bots</span></td>
+            <td class="cmd-desc">Executes DAG workflow with Kahn's cycle detection and multi-model dispatch.</td>
+            <td><code>ntx workflow run wf-code-security-pipeline</code></td>
+          </tr>
+          <tr data-cat="bots">
+            <td class="cmd-name">ntx workflow approve</td>
+            <td><span class="cmd-badge">bots</span></td>
+            <td class="cmd-desc">Submits cryptographic approval token to resume suspended HITL workflow node.</td>
+            <td><code>ntx workflow approve exec-123 NTX-APPROVE-PROD</code></td>
+          </tr>
           <tr data-cat="exec">
             <td class="cmd-name">ntx -p / --print</td>
             <td><span class="cmd-badge">exec</span></td>
@@ -1378,60 +1987,6 @@
             <td><span class="cmd-badge">exec</span></td>
             <td class="cmd-desc">Formats output as text, structured single json, or realtime stream-json (NDJSON).</td>
             <td><code>ntx -p --output-format json "..."</code></td>
-          </tr>
-          <tr data-cat="exec">
-            <td class="cmd-name">--json-schema</td>
-            <td><span class="cmd-badge">exec</span></td>
-            <td class="cmd-desc">Enforces JSON Schema validation for structured output tasks.</td>
-            <td><code>ntx -p --json-schema schema.json "..."</code></td>
-          </tr>
-          <tr data-cat="exec">
-            <td class="cmd-name">ntx review</td>
-            <td><span class="cmd-badge">exec</span></td>
-            <td class="cmd-desc">Runs deterministic multi-agent code review on repository files or git diff.</td>
-            <td><code>ntx review src/</code></td>
-          </tr>
-          <tr data-cat="session">
-            <td class="cmd-name">ntx ps</td>
-            <td><span class="cmd-badge">session</span></td>
-            <td class="cmd-desc">Lists active interactive, background workers, and system daemons.</td>
-            <td><code>ntx ps</code></td>
-          </tr>
-          <tr data-cat="session">
-            <td class="cmd-name">ntx attach</td>
-            <td><span class="cmd-badge">session</span></td>
-            <td class="cmd-desc">Connects terminal REPL to a background or saved session.</td>
-            <td><code>ntx attach sess-123</code></td>
-          </tr>
-          <tr data-cat="session">
-            <td class="cmd-name">ntx compact</td>
-            <td><span class="cmd-badge">session</span></td>
-            <td class="cmd-desc">Compacts context window sliding buffer and flushes episodic memory to SIMD vectors.</td>
-            <td><code>ntx compact</code></td>
-          </tr>
-          <tr data-cat="session">
-            <td class="cmd-name">ntx config</td>
-            <td><span class="cmd-badge">session</span></td>
-            <td class="cmd-desc">Gets, sets, and lists persistent configuration settings across sessions.</td>
-            <td><code>ntx config set theme dark</code></td>
-          </tr>
-          <tr data-cat="exec">
-            <td class="cmd-name">ntx bot list / run</td>
-            <td><span class="cmd-badge">exec</span></td>
-            <td class="cmd-desc">Inspects and launches pre-configured autonomous bot personas with prompt hydration.</td>
-            <td><code>ntx bot run ntx-bot-concierge-prime</code></td>
-          </tr>
-          <tr data-cat="harness">
-            <td class="cmd-name">ntx workflow run</td>
-            <td><span class="cmd-badge">harness</span></td>
-            <td class="cmd-desc">Executes Directed Acyclic Graph (DAG) workflow with cycle detection and HITL gates.</td>
-            <td><code>ntx workflow run wf-code-security-pipeline</code></td>
-          </tr>
-          <tr data-cat="harness">
-            <td class="cmd-name">ntx workflow approve</td>
-            <td><span class="cmd-badge">harness</span></td>
-            <td class="cmd-desc">Submits cryptographic approval token to resume suspended HITL workflow node.</td>
-            <td><code>ntx workflow approve exec-123 NTX-APPROVE-PROD</code></td>
           </tr>
           <tr data-cat="harness">
             <td class="cmd-name">ntx harness status</td>
@@ -1457,18 +2012,12 @@
             <td class="cmd-desc">Inspects full manifest, cryptographic digest, and origin of registered capabilities.</td>
             <td><code>ntx catalog inspect ntx-hitl-gate</code></td>
           </tr>
-          <tr data-cat="core">
-            <td class="cmd-name">ntx completion</td>
-            <td><span class="cmd-badge">core</span></td>
-            <td class="cmd-desc">Generates autocomplete shell scripts for bash, zsh, fish, and powershell.</td>
-            <td><code>eval "$(ntx completion bash)"</code></td>
-          </tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <!-- FAQ Section -->
+  <!-- Technical FAQ Section -->
   <section class="container" id="faq">
     <div class="section-title">
       <h2>Frequently Asked Questions</h2>
@@ -1482,168 +2031,205 @@
       </div>
 
       <div class="faq-card">
-        <h4>Are external databases like PostgreSQL or pgvector required?</h4>
-        <p>No. Nityaksha includes its own native Agent Memory Stack with Relational ACID WAL, Dense SIMD float vector cache, BM25 inverted index, and Multimodal CAS stored directly in memory or local disk directories.</p>
+        <h4>Does Nityaksha require PostgreSQL or pgvector?</h4>
+        <p>No. Nityaksha includes a self-contained pure Rust Agent Memory Stack featuring an ACID write-ahead log (WAL) relational store, dense SIMD float vector indexing, and sparse BM25 retrieval without external daemons.</p>
       </div>
 
       <div class="faq-card">
-        <h4>How does it prevent agent runaway loops and thrashing?</h4>
-        <p>Nityaksha implements physical loop iteration counters and task runtime budgets (CPU, memory, time). It detects repetitive file mutation oscillation and forcefully terminates stuck loops with deterministic hard exits.</p>
+        <h4>How do Human-in-the-Loop (HITL) gates function?</h4>
+        <p>When an agent initiates a high-risk action (such as production code pushing, deleting files, or capital allocation), execution is forcefully suspended at the harness layer. Downstream steps are blocked until a matching cryptographic approval token is submitted.</p>
       </div>
 
       <div class="faq-card">
-        <h4>How do I deploy this landing page on Plesk?</h4>
-        <p>Connect your Plesk domain to the GitHub repository <code>https://github.com/simhaonline/ntx.git</code>. Plesk will pull this exact <code>index.html</code> directly into your web root (<code>/httpdocs</code>) and serve it immediately without any build steps.</p>
+        <h4>Can Nityaksha host as a static landing page on Plesk?</h4>
+        <p>Yes. The single-page `index.html` is completely self-contained with embedded SVG assets, CSS variables, and JavaScript, making it directly hostable via Plesk, Nginx, or GitHub Pages.</p>
       </div>
     </div>
   </section>
 
+  <!-- High-Res Blueprint Modal -->
+  <div id="blueprint-modal" onclick="closeBlueprintModal(event)">
+    <div class="blueprint-modal-content" onclick="event.stopPropagation()">
+      <div class="blueprint-modal-header">
+        <div>
+          <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-heading);">Live Running Flow: Agentic AI & Bot Orchestration Blueprint</h3>
+          <span style="font-size: 0.8rem; color: var(--color-brand-accent); font-family: var(--font-mono);">High-Resolution Architecture Diagram</span>
+        </div>
+        <button class="blueprint-modal-close" onclick="closeBlueprintModal()">&times;</button>
+      </div>
+      <img src="hero.png" alt="Live Running Flow Blueprint Architecture Diagram" style="width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border-subtle);">
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer>
-    <div class="container footer-grid">
-      <div class="footer-brand">
-        <div class="footer-brand-title">
-          <img src="NITYAKSHA_LOGO.png" alt="Nityaksha Logo">
-          <span>NITYAKSHA</span>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="footer-brand-title">
+            <img src="logo.svg" alt="Nityaksha Logo" id="footer-brand-logo">
+            <span>NITYAKSHA</span>
+          </div>
+          <p>Engineered for high-velocity, deterministic AI in pure Rust. Built by Simha (simhaonline) for sovereign enterprise agent orchestration.</p>
         </div>
-        <p>Engineered for high-velocity, deterministic AI in pure Rust.</p>
+
+        <div class="footer-col">
+          <h5>Platform</h5>
+          <ul>
+            <li><a href="#live-flow">Live Running Flow</a></li>
+            <li><a href="#features">Architecture Pillars</a></li>
+            <li><a href="#bots">Bot App Store</a></li>
+            <li><a href="#workflows">DAG Workflow Engine</a></li>
+            <li><a href="#memory">Agent Memory Stack</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5>Interfaces</h5>
+          <ul>
+            <li><a href="/app">Workstation WebUI</a></li>
+            <li><a href="#cli">CLI Reference</a></li>
+            <li><a href="/api/health">REST API Health</a></li>
+            <li><a href="/api/bots">Bot Catalog API</a></li>
+            <li><a href="/api/workflows">Workflow Engine API</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h5>Installers</h5>
+          <ul>
+            <li><a href="/install.sh">Linux & macOS (bash)</a></li>
+            <li><a href="/install.ps1">Windows (PowerShell)</a></li>
+            <li><a href="/install-ios.sh">iOS (iSH / a-Shell)</a></li>
+            <li><a href="https://github.com/simhaonline/ntx" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
+          </ul>
+        </div>
       </div>
-      <div class="footer-col">
-        <h5>Architecture</h5>
-        <ul>
-          <li><a href="#features">Pure Rust Engine</a></li>
-          <li><a href="#architecture">Agent Memory Stack</a></li>
-          <li><a href="#features">POSIX Sandboxes</a></li>
-          <li><a href="#features">HITL Merge Gates</a></li>
-        </ul>
+
+      <div class="footer-bottom">
+        <div>&copy; 2026 Nityaksha Platform. Engineered in pure native Rust by Simha (<a href="https://github.com/simhaonline" style="color:var(--color-brand-accent);text-decoration:none;">@simhaonline</a>).</div>
+        <div>Default Light Mode • Toggleable Dark Mode • High-Velocity AI Concierge</div>
       </div>
-      <div class="footer-col">
-        <h5>Installers</h5>
-        <ul>
-          <li><a href="https://simhaonline.ai/install.sh">Linux / macOS</a></li>
-          <li><a href="https://simhaonline.ai/install.ps1">Windows PowerShell</a></li>
-          <li><a href="https://simhaonline.ai/install-ios.sh">iOS (iSH / a-Shell)</a></li>
-          <li><a href="https://github.com/simhaonline/ntx">GitHub Repository</a></li>
-        </ul>
-      </div>
-      <div class="footer-col">
-        <h5>Ecosystem</h5>
-        <ul>
-          <li><a href="https://simhaonline.ai">Simha Online</a></li>
-          <li><a href="https://github.com/simhaonline/ntx/releases">Release Notes</a></li>
-          <li><a href="#cli">CLI Reference</a></li>
-          <li><a href="/app">Local Workstation UI (:8080)</a></li>
-        </ul>
-      </div>
-    </div>
-    <div class="container footer-bottom">
-      <div>© 2026 Simha (simhaonline). All rights reserved.</div>
-      <div>Official Domain: <a href="https://simhaonline.ai" style="color: var(--color-brand-accent);">simhaonline.ai</a></div>
     </div>
   </footer>
 
   <script>
-    // Theme Management: Default Light Mode with Dark Mode Toggle
+    // --- Light / Dark Theme Switcher with Dark Logo Swap ---
     function initTheme() {
-      const savedTheme = localStorage.getItem('nityaksha-theme');
-      if (savedTheme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        document.getElementById('theme-icon').textContent = '☀️';
-      } else {
-        document.documentElement.setAttribute('data-theme', 'light');
-        document.getElementById('theme-icon').textContent = '🌙';
-      }
+      const savedTheme = localStorage.getItem('nityaksha-theme') || 'light';
+      setTheme(savedTheme);
     }
 
     function toggleTheme() {
-      const currentTheme = document.documentElement.getAttribute('data-theme');
-      if (currentTheme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'light');
-        localStorage.setItem('nityaksha-theme', 'light');
-        document.getElementById('theme-icon').textContent = '🌙';
-      } else {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('nityaksha-theme', 'dark');
-        document.getElementById('theme-icon').textContent = '☀️';
-      }
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const target = current === 'dark' ? 'light' : 'dark';
+      setTheme(target);
+    }
+
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('nityaksha-theme', theme);
+
+      const iconEl = document.getElementById('theme-icon');
+      if (iconEl) iconEl.textContent = theme === 'dark' ? '☀️' : '🌙';
+
+      // Dynamically switch logo to crisp dark-mode version
+      const logoMain = document.getElementById('main-brand-logo');
+      const logoFooter = document.getElementById('footer-brand-logo');
+      const logoSrc = theme === 'dark' ? 'logo-dark.svg' : 'logo.svg';
+
+      if (logoMain) logoMain.src = logoSrc;
+      if (logoFooter) logoFooter.src = logoSrc;
     }
 
     initTheme();
 
+    // --- Universal Installation Tab Switcher ---
     const installCommands = {
-      linux: "curl -fsSL https://simhaonline.ai/install.sh | bash",
-      windows: "irm https://simhaonline.ai/install.ps1 | iex",
-      ios: "curl -fsSL https://simhaonline.ai/install-ios.sh | sh",
-      github: "curl -fsSL https://raw.githubusercontent.com/simhaonline/ntx/main/install.sh | bash",
-      cargo: "cargo install --git https://github.com/simhaonline/ntx.git ntx"
+      linux: 'curl -fsSL https://simhaonline.ai/install.sh | bash',
+      windows: 'irm https://simhaonline.ai/install.ps1 | iex',
+      ios: 'curl -fsSL https://simhaonline.ai/install-ios.sh | sh',
+      cargo: 'cargo install --git https://github.com/simhaonline/ntx.git ntx',
+      github: 'git clone https://github.com/simhaonline/ntx.git && cd ntx && cargo build --release'
     };
 
-    function switchInstallTab(platform) {
+    function switchInstallTab(tabKey) {
       document.querySelectorAll('.install-tab').forEach(b => b.classList.remove('active'));
-      event.target.classList.add('active');
-      document.getElementById('install-command').textContent = installCommands[platform] || installCommands.linux;
+      if (event && event.currentTarget) event.currentTarget.classList.add('active');
+
+      const cmdEl = document.getElementById('install-command');
+      if (cmdEl && installCommands[tabKey]) {
+        cmdEl.textContent = installCommands[tabKey];
+      }
     }
 
     function copyInstallCmd() {
-      const text = document.getElementById('install-command').textContent;
-      navigator.clipboard.writeText(text).then(() => {
+      const cmd = document.getElementById('install-command').textContent;
+      navigator.clipboard.writeText(cmd).then(() => {
         const copyText = document.getElementById('copy-text');
-        copyText.textContent = "Copied!";
-        setTimeout(() => { copyText.textContent = "Copy"; }, 2000);
+        copyText.textContent = 'Copied!';
+        setTimeout(() => copyText.textContent = 'Copy', 2000);
       });
     }
 
-    const terminalOutputs = {
-      status: `================================================================================
-                   NITYAKSHA - An AI Concierge Platform                         
-  Engineered for high-velocity, deterministic AI in pure Rust.
-================================================================================
-Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):
---------------------------------------------------------------------------------
-  [PASS] Policy file (/etc/nityaksha/policy.yaml)
-  [PASS] Agent Memory Stack (/var/lib/nityaksha/db)
-  [PASS] Container Sandboxes (/srv/agent-workspaces)
-  [PASS] Content-Addressed Storage CAS (/var/lib/nityaksha/cas-cache)
-  [PASS] Service account (nityaksha)
-  [PASS] Cgroup v2 hierarchy (/sys/fs/cgroup)
-  [PASS] IBAC Gating Invariants
---------------------------------------------------------------------------------
-
-Catalog Statistics (Database-backed SoT - Pure Rust):
-  - agent       : 13 assets
-  - mcp         : 11 assets
-  - plugin      : 11 assets
-  - prompt      : 11 assets
-  - skill       : 87 assets
-  - Vector Store: 133 dense vectors indexed
-  - Media Assets: 0 multimodal blobs in CAS`,
-
+    // --- Live Terminal Simulator with Custom Outputs ---
+    const terminalData = {
+      status: `=================================================================================================================
+          NITYAKSHA - An AI Concierge Platform (v1.0.0 Pure Rust Native)
+          Engineered for high-velocity, deterministic AI in pure Rust.
+=================================================================================================================
+Daemon Status      : Active (:8080)
+Resident Memory    : 3.3 MB (Peak: 5.0 MB)
+Relational WAL     : /var/lib/nityaksha/db/relational.json [OPERATIONAL]
+Vectors Indexed    : 133 dense float SIMD vectors [COSINE 384-DIM]
+Multimodal Assets  : 14 binary media files in CAS cache
+Registered Bots    : 7 Pre-Configured Personas [App Store Active]
+Active Workflows   : 4 Directed Acyclic Graphs (DAGs) [0 Cycles Verified]
+Loop Breakers      : Enforced (Hard stop after 25 iterations)
+HITL Gate Policy   : Strict Interception on Destructive Actions`,
+      bots: `=================================================================================================================
+          Nityaksha Sovereign Bot Catalog & App Store (7 pre-configured personas)
+=================================================================================================================
+  BOT ID                       CATEGORY             MODEL TIER      SANDBOX POLICY
+-----------------------------------------------------------------------------------------------------------------
+  ntx-bot-concierge-prime      Executive Concierge  DeepReasoning   workspace-write
+  ntx-bot-code-architect       Engineering          DeepReasoning   workspace-write
+  ntx-bot-quant-risk           Quant & Finance      DeepReasoning   read-only
+  ntx-bot-security-redteam     Security             Balanced        read-only
+  ntx-bot-devops-sre           SRE & DevOps         FastFlash       workspace-write
+  ntx-bot-anti-slop-strategist Content & Docs       FastFlash       workspace-write
+  ntx-bot-legal-compliance     Legal & Governance   DeepReasoning   read-only
+-----------------------------------------------------------------------------------------------------------------
+Tip: Run 'ntx bot run <id> [prompt]' to activate persona.`,
+      workflow: `=================================================================================================================
+  Launching Workflow Execution: Rust AST Prune, RedTeam & Confined Apply (wf-code-security-pipeline)
+=================================================================================================================
+[DAG VERIFIED]: Kahn's topological sort resolved with 0 cycles.
+[EXECUTION ID]: exec-20261102225209
+-----------------------------------------------------------------------------------------------------------------
+  [22:52:09] Node 'step-1-ast-prune' [FastFlash] -> SUCCEEDED
+  [22:52:09] Node 'step-2-redteam-audit' [Balanced] -> SUCCEEDED
+  [22:52:09] Node 'step-3-code-synthesis' [DeepReasoning] -> SUCCEEDED
+  [22:52:09] Node 'step-4-hitl-gate' -> [SUSPENDED - Awaiting token 'NTX-APPROVE-PROD']
+-----------------------------------------------------------------------------------------------------------------
+[STATUS]: SUSPENDED - WAITING FOR HUMAN-IN-THE-LOOP APPROVAL
+To approve and resume execution, run:
+  ntx workflow approve exec-20261102225209 NTX-APPROVE-PROD`,
       skills: `=================================================================================================================
-          Nityaksha Proprietary Autonomous Skills (87 registered in Native Memory Stack)          
+          Nityaksha Proprietary Autonomous Skills (87 registered in Native Memory Stack)
 =================================================================================================================
   SKILL NAME                         VERSION   TRUST TIER   DESCRIPTION
 -----------------------------------------------------------------------------------------------------------------
-  ntx-agent-web-identity             1.0.0     approved     Lets an AI agent or CLI session sign in to Intern...
-  ntx-ai-writing-detector            1.0.0     approved     Use when the user asks to detect, scan, audit, sc...
-  ntx-anti-slop                      1.0.0     approved     High-throughput text sanitizer that eliminates AI...
-  ntx-ast-pruner                     1.0.0     approved     Analyzes repository AST trees, identifies functio...
-  ntx-authoring                      1.0.0     approved     Add or edit an MCP server entry in mcptoon's conf...
-  ntx-autosync-ic-skills             1.0.0     approved     One-time installer that makes a Claude Code proje...
-  ntx-autoupgrade-icp-cli            1.0.0     approved     One-time installer that keeps a project's Interne...
-  ntx-avoid-ai-writing               1.0.0     approved     Audit and rewrite content to remove AI writing pa...
-  ntx-canister-security              1.0.0     approved     IC-specific security patterns for canister develo...
-  ntx-certified-variables            1.0.0     approved     Serve cryptographically verified responses from q...
-  ntx-ckbtc                          1.0.0     approved     Accept, send, and manage ckBTC (chain-key Bitcoin...
-  ntx-container-jail                 1.0.0     approved     Provisions short-lived Linux namespaces (Mount, U...
-  ntx-corpus-to-skill                1.0.0     approved     Distills dense technical textbooks, engineering s...
-  ntx-daemon-lifecycle               1.0.0     approved     Manages background AI agent worker daemons, syste...
-  ntx-data-visualizer                1.0.0     approved     Transforms structured data, metrics, and columnar...
-  ntx-hitl-merge-gate                1.0.0     approved     Intercepts destructive operations, production git...
+  ntx-anti-slop                      1.0.0     approved     High-throughput text sanitizer eliminating AI...
+  ntx-ast-pruner                     1.0.0     approved     Analyzes repository AST trees without file dumps...
+  ntx-container-jail                 1.0.0     approved     Provisions short-lived Linux namespaces and cgroups...
+  ntx-hitl-merge-gate                1.0.0     approved     Intercepts destructive operations with token checks...
+  ntx-hybrid-rag                     1.0.0     approved     Fused RAG combining dense float cosine with BM25...
 -----------------------------------------------------------------------------------------------------------------
-Tip: Run 'ntx skill inspect <name>' to view full manifest, runbook instructions, and invariants.`,
-
-      doctor: `Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):
---------------------------------------------------------------------------------
+Tip: Run 'ntx skill inspect <name>' to view full manifest and runbook instructions.`,
+      doctor: `=================================================================================================================
+Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):
+=================================================================================================================
   [PASS] Policy file (/etc/nityaksha/policy.yaml)
   [PASS] Agent Memory Stack (/var/lib/nityaksha/db)
   [PASS] Container Sandboxes (/srv/agent-workspaces)
@@ -1651,58 +2237,39 @@ Tip: Run 'ntx skill inspect <name>' to view full manifest, runbook instructions,
   [PASS] Service account (nityaksha)
   [PASS] Cgroup v2 hierarchy (/sys/fs/cgroup)
   [PASS] IBAC Gating Invariants
---------------------------------------------------------------------------------
-✓ 7 / 7 Architectural invariants verified. System operational.`,
-
-      harness: `Nityaksha Autonomous AI Harness Architecture (Pure Rust Native):
---------------------------------------------------------------------------------
-  [ACTIVE] Outer Runtime Budgets & Physical Loop Counter
-  [ACTIVE] Thrashing & File Oscillation Detector
-  [ACTIVE] Multi-Tier Memory (Short-Term Sliding Cache, Episodic RAG, Checkpoints)
-  [ACTIVE] AST Syntax Tree Pruner & Context Window Optimizer
-  [ACTIVE] Dynamic Prompt Augmentation (Intent Routing, Few-Shot, Negative Cache)
-  [ACTIVE] Human-in-the-Loop (HITL) Merge Gates & Cryptographic Audit Trail
-  [ACTIVE] Layered Deterministic Checks & LLM-as-a-Judge Evaluation Engine
-  [ACTIVE] Standardized Hot-Swappable Provider Adapters (OpenAI, Anthropic, Gemini, DeepSeek, Ollama)
---------------------------------------------------------------------------------`,
-
-      exec: `ntx -p --output-format json "validate security policy"
-{
-  "memory_matches": 3,
-  "model_tier": "FastFlash",
-  "prompt": "validate security policy",
-  "response": "Execution completed under Nityaksha AI Concierge Engine.\\nIntent Tier: FastFlash\\nSecurity Clearance: Verified (Risk: 0.02)\\nContext Injected: 3 episodic vector memories\\nTask Output: System invariants validated successfully.",
-  "security_cleared": true,
-  "syntax_valid": true
-}`,
-
-      ps: `Nityaksha Active Sessions & Runtime Daemons:
-SESSION ID               RUNTIME          STATUS       TOKENS     WORKSPACE               
-----------------------------------------------------------------------------------------------------
-nityaksha-webui          systemd-daemon   active       N/A        http://0.0.0.0:8080     
-sess-1793657968211       pure-rust-cli    completed    61         .                       
-sess-1793657973953       pure-rust-cli    completed    59         .                       
-sess-1793657970951       pure-rust-cli    completed    61         .                       
-----------------------------------------------------------------------------------------------------`
+  [PASS] Kahn's DAG Cycle Invariants (0 Cycles Verified)
+Result: SYSTEM READY - All 8 Governance Checks Passed`,
+      harness: `=================================================================================================================
+Nityaksha AI Harness Governance Engine:
+=================================================================================================================
+  * Physical Step Counter    : 0 / 25 turns active
+  * Mutation Oscillation     : 0 thrash oscillations detected
+  * Active Runtime Budget    : 0.12s elapsed (Timeout: 120s)
+  * Memory Sliding Window    : Short-Term Active (32KB / 128KB ceiling)
+  * Human-in-the-Loop Gate   : ARMED (Required tokens: NTX-APPROVE-PROD)
+  * Provider Adapter         : Pure Rust Hot-Swappable Gateway`
     };
 
     function setTerminalOutput(key) {
       document.querySelectorAll('.term-tab').forEach(b => b.classList.remove('active'));
-      event.target.classList.add('active');
-      const out = terminalOutputs[key] || terminalOutputs.status;
-      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #E2E8F0;">${escapeHtml(out)}</pre>`;
+      if (event && event.currentTarget) event.currentTarget.classList.add('active');
+
+      const termEl = document.getElementById('term-display');
+      if (termEl && terminalData[key]) {
+        termEl.textContent = terminalData[key];
+      }
     }
 
-    function escapeHtml(text) {
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
+    setTerminalOutput('status');
 
-    function filterCli(category) {
+    // --- CLI Table Filter ---
+    function filterCli(cat) {
       document.querySelectorAll('.cli-filter-btn').forEach(b => b.classList.remove('active'));
-      event.target.classList.add('active');
+      if (event && event.currentTarget) event.currentTarget.classList.add('active');
+
       const rows = document.querySelectorAll('#cli-table-el tbody tr');
       rows.forEach(r => {
-        if (category === 'all' || r.getAttribute('data-cat') === category) {
+        if (cat === 'all' || r.getAttribute('data-cat') === cat) {
           r.style.display = '';
         } else {
           r.style.display = 'none';
@@ -1710,10 +2277,13 @@ sess-1793657970951       pure-rust-cli    completed    61         .
       });
     }
 
-    // Initialize terminal display
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #E2E8F0;">${escapeHtml(terminalOutputs.status)}</pre>`;
-    });
+    // --- Blueprint Modal Functions ---
+    function openBlueprintModal() {
+      document.getElementById('blueprint-modal').classList.add('active');
+    }
+    function closeBlueprintModal(e) {
+      document.getElementById('blueprint-modal').classList.remove('active');
+    }
   </script>
 </body>
 </html>
