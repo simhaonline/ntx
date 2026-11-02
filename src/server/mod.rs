@@ -76,47 +76,55 @@ fn handle_connection(
         return Ok(());
     }
 
-    if method == "GET" && (uri == "/" || uri == "/index.html") {
+    if (method == "GET" || method == "HEAD") && (uri == "/" || uri == "/index.html") {
         let html = webui::EMBEDDED_WEBUI_HTML;
         let resp = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{}",
-            html.len(),
-            html
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+            html.len()
         );
         stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(html.as_bytes())?;
+        }
         return Ok(());
     }
 
-    if method == "GET" && uri == "/install.sh" {
+    if (method == "GET" || method == "HEAD") && uri == "/install.sh" {
         let script = include_str!("../../install.sh");
         let resp = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{}",
-            script.len(),
-            script
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+            script.len()
         );
         stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(script.as_bytes())?;
+        }
         return Ok(());
     }
 
-    if method == "GET" && uri == "/install.ps1" {
+    if (method == "GET" || method == "HEAD") && uri == "/install.ps1" {
         let script = include_str!("../../install.ps1");
         let resp = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{}",
-            script.len(),
-            script
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+            script.len()
         );
         stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(script.as_bytes())?;
+        }
         return Ok(());
     }
 
-    if method == "GET" && uri == "/install-ios.sh" {
+    if (method == "GET" || method == "HEAD") && uri == "/install-ios.sh" {
         let script = include_str!("../../install-ios.sh");
         let resp = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n{}",
-            script.len(),
-            script
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+            script.len()
         );
         stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(script.as_bytes())?;
+        }
         return Ok(());
     }
 
