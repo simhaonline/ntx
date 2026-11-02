@@ -75,6 +75,24 @@ pub struct CliOptions {
     pub remote_control: bool,
 }
 
+fn clean_terminal_text(desc: &str, max_len: usize) -> String {
+    let unescaped = desc
+        .replace("\\u2014", "—")
+        .replace("\\u2019", "'")
+        .replace("\\u201c", "\"")
+        .replace("\\u201d", "\"")
+        .replace('\r', "")
+        .replace('\n', " ");
+    let words: Vec<&str> = unescaped.split_whitespace().collect();
+    let text = words.join(" ");
+    if text.chars().count() > max_len {
+        let truncated: String = text.chars().take(max_len.saturating_sub(3)).collect();
+        format!("{}...", truncated)
+    } else {
+        text
+    }
+}
+
 pub struct CliHandler {
     engine: Arc<MemoryEngine>,
     sandbox: Arc<SandboxManager>,
@@ -934,21 +952,26 @@ complete -F _ntx_completions ntx"#);
         match action {
             "search" => {
                 let query = if args.len() > 1 { &args[1] } else { "" };
-                let results = self.engine.relational.search_capabilities(query, None);
-                println!("Capability Catalog Search for '{}' ({} matches):", query, results.len());
-                println!("--------------------------------------------------------------------------------------------------------------");
-                for r in results {
-                    let repo_str = if r.origin_repo.is_empty() { String::new() } else { format!("[{}]", r.origin_repo) };
+                let mut results = self.engine.relational.search_capabilities(query, None);
+                results.sort_by(|a, b| a.kind.cmp(&b.kind).then(a.name.cmp(&b.name)));
+                println!("=================================================================================================================");
+                println!("         Capability Catalog Search for '{}' ({} matches in Pure Rust SoT)          ", query, results.len());
+                println!("=================================================================================================================");
+                println!("  [{:<7}] {:<30} {:<8} {:<10} {}", "KIND", "CAPABILITY NAME", "VERSION", "TIER", "DESCRIPTION");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for r in &results {
+                    let desc = clean_terminal_text(&r.description, 48);
                     println!(
-                        "  [{:<7}] {:<28} {:<32} v{:<5} {}",
+                        "  [{:<7}] {:<30} {:<8} {:<10} {}",
                         r.kind,
                         r.name,
-                        repo_str,
                         r.version,
-                        r.description.chars().take(35).collect::<String>()
+                        r.trust_tier,
+                        desc
                     );
                 }
-                println!("--------------------------------------------------------------------------------------------------------------");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                println!("Tip: Run 'ntx catalog inspect <name>' to view the complete manifest and SHA256 integrity hash.");
             }
             "inspect" => {
                 if args.len() < 2 {
@@ -998,11 +1021,20 @@ complete -F _ntx_completions ntx"#);
         let action = if args.is_empty() { "list" } else { args[0].as_str() };
         match action {
             "list" => {
-                let results = self.engine.relational.search_capabilities("", Some("skill"));
-                println!("Proprietary Autonomous Skills ({} registered):", results.len());
-                for r in results {
-                    println!("  - {:<30} [{}] - {}", r.name, r.origin_repo, r.description);
+                let filter = if args.len() > 1 && !args[1].starts_with('-') { &args[1] } else { "" };
+                let mut results = self.engine.relational.search_capabilities(filter, Some("skill"));
+                results.sort_by(|a, b| a.name.cmp(&b.name));
+                println!("=================================================================================================================");
+                println!("          Nityaksha Proprietary Autonomous Skills ({} registered in Native Memory Stack)          ", results.len());
+                println!("=================================================================================================================");
+                println!("  {:<34} {:<9} {:<12} {}", "SKILL NAME", "VERSION", "TRUST TIER", "DESCRIPTION");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for r in &results {
+                    let desc = clean_terminal_text(&r.description, 52);
+                    println!("  {:<34} {:<9} {:<12} {}", r.name, r.version, r.trust_tier, desc);
                 }
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                println!("Tip: Run 'ntx skill inspect <name>' to view full manifest, runbook instructions, and invariants.");
             }
             "validate" => {
                 if args.len() < 2 {
@@ -1034,11 +1066,20 @@ complete -F _ntx_completions ntx"#);
         let action = if args.is_empty() { "list" } else { args[0].as_str() };
         match action {
             "list" => {
-                let results = self.engine.relational.search_capabilities("", Some("agent"));
-                println!("Proprietary Autonomous Agents ({} registered):", results.len());
-                for r in results {
-                    println!("  - {:<28} [{}] - {}", r.name, r.origin_repo, r.description);
+                let filter = if args.len() > 1 && !args[1].starts_with('-') { &args[1] } else { "" };
+                let mut results = self.engine.relational.search_capabilities(filter, Some("agent"));
+                results.sort_by(|a, b| a.name.cmp(&b.name));
+                println!("=================================================================================================================");
+                println!("          Nityaksha Proprietary Autonomous Agents ({} registered in Native Memory Stack)          ", results.len());
+                println!("=================================================================================================================");
+                println!("  {:<34} {:<9} {:<12} {}", "AGENT PERSONA", "VERSION", "TRUST TIER", "ROLE & PURPOSE");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for r in &results {
+                    let desc = clean_terminal_text(&r.description, 52);
+                    println!("  {:<34} {:<9} {:<12} {}", r.name, r.version, r.trust_tier, desc);
                 }
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                println!("Tip: Run 'ntx agent run <name>' to execute an agent persona inside an isolated POSIX sandbox.");
             }
             "run" => {
                 if args.len() < 2 {
@@ -1065,11 +1106,20 @@ complete -F _ntx_completions ntx"#);
         let action = if args.is_empty() { "list" } else { args[0].as_str() };
         match action {
             "list" => {
-                let results = self.engine.relational.search_capabilities("", Some("mcp"));
-                println!("Proprietary MCP Servers ({} registered):", results.len());
-                for r in results {
-                    println!("  - {:<28} [{}] - {}", r.name, r.origin_repo, r.description);
+                let filter = if args.len() > 1 && !args[1].starts_with('-') { &args[1] } else { "" };
+                let mut results = self.engine.relational.search_capabilities(filter, Some("mcp"));
+                results.sort_by(|a, b| a.name.cmp(&b.name));
+                println!("=================================================================================================================");
+                println!("          Nityaksha Model Context Protocol Servers ({} registered in Native Memory Stack)         ", results.len());
+                println!("=================================================================================================================");
+                println!("  {:<34} {:<9} {:<12} {}", "MCP SERVER", "VERSION", "TRUST TIER", "PROTOCOL FUNCTIONALITY");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for r in &results {
+                    let desc = clean_terminal_text(&r.description, 52);
+                    println!("  {:<34} {:<9} {:<12} {}", r.name, r.version, r.trust_tier, desc);
                 }
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                println!("Tip: Run 'ntx mcp test <name>' to verify stdio socket transport and permission invariants.");
             }
             "test" => {
                 if args.len() < 2 {
@@ -1094,11 +1144,20 @@ complete -F _ntx_completions ntx"#);
         let action = if args.is_empty() { "list" } else { args[0].as_str() };
         match action {
             "list" => {
-                let results = self.engine.relational.search_capabilities("", Some("prompt"));
-                println!("Proprietary Prompt Templates ({} registered):", results.len());
-                for r in results {
-                    println!("  - {:<28} [{}] - {}", r.name, r.origin_repo, r.description);
+                let filter = if args.len() > 1 && !args[1].starts_with('-') { &args[1] } else { "" };
+                let mut results = self.engine.relational.search_capabilities(filter, Some("prompt"));
+                results.sort_by(|a, b| a.name.cmp(&b.name));
+                println!("=================================================================================================================");
+                println!("          Nityaksha Hardened System Prompts ({} registered in Native Memory Stack)                ", results.len());
+                println!("=================================================================================================================");
+                println!("  {:<34} {:<9} {:<12} {}", "PROMPT TEMPLATE", "VERSION", "TRUST TIER", "INJECTION DEFENSE SCOPE");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for r in &results {
+                    let desc = clean_terminal_text(&r.description, 52);
+                    println!("  {:<34} {:<9} {:<12} {}", r.name, r.version, r.trust_tier, desc);
                 }
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                println!("Tip: Run 'ntx prompt test <name>' to test injection boundaries.");
             }
             "test" => {
                 if args.len() < 2 {
@@ -1123,11 +1182,19 @@ complete -F _ntx_completions ntx"#);
         let action = if args.is_empty() { "list" } else { args[0].as_str() };
         match action {
             "list" => {
-                let results = self.engine.relational.search_capabilities("", Some("plugin"));
-                println!("Proprietary Plugins ({} registered):", results.len());
-                for r in results {
-                    println!("  - {:<28} [{}] - {}", r.name, r.origin_repo, r.description);
+                let filter = if args.len() > 1 && !args[1].starts_with('-') { &args[1] } else { "" };
+                let mut results = self.engine.relational.search_capabilities(filter, Some("plugin"));
+                results.sort_by(|a, b| a.name.cmp(&b.name));
+                println!("=================================================================================================================");
+                println!("          Nityaksha Runtime Plugins ({} registered in Native Memory Stack)                         ", results.len());
+                println!("=================================================================================================================");
+                println!("  {:<34} {:<9} {:<12} {}", "PLUGIN NAME", "VERSION", "TRUST TIER", "INTEGRATION CAPABILITY");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for r in &results {
+                    let desc = clean_terminal_text(&r.description, 52);
+                    println!("  {:<34} {:<9} {:<12} {}", r.name, r.version, r.trust_tier, desc);
                 }
+                println!("-----------------------------------------------------------------------------------------------------------------");
             }
             _ => eprintln!("Usage: ntx plugin [list]"),
         }

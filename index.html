@@ -4,137 +4,220 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NITYAKSHA — An AI Concierge Platform | Pure Rust Native Agent Infrastructure</title>
-  <meta name="description" content="Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust. Built-in Agent Memory Stack, zero external DB, kernel-enforced sandboxes, and AI Harness.">
+  <meta name="description" content="Engineered for high-velocity, deterministic AI in pure Rust. Built-in Agent Memory Stack, zero external DB runtime, POSIX sandboxes, and sovereign multi-agent control plane.">
   <meta name="keywords" content="Nityaksha, AI Concierge, Rust AI, Agent Control Plane, Vector Database Rust, HITL Gates, AI Harness">
   <meta name="author" content="Simha (simhaonline)">
   <link rel="canonical" href="https://simhaonline.ai">
+  <link rel="icon" type="image/png" href="NITYAKSHA_LOGO.png">
+  <link rel="apple-touch-icon" href="logo-180.png">
 
   <!-- OpenGraph / Social Media -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://simhaonline.ai/">
   <meta property="og:title" content="NITYAKSHA — An AI Concierge Platform">
-  <meta property="og:description" content="Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.">
-  <meta property="og:image" content="https://simhaonline.ai/og-image.png">
+  <meta property="og:description" content="Engineered for high-velocity, deterministic AI in pure Rust.">
+  <meta property="og:image" content="https://simhaonline.ai/NITYAKSHA_LOGO.png">
 
   <style>
+    /* ==========================================================================
+       NITYAKSHA DESIGN SYSTEM TOKENS (Brand Kit Compliant)
+       Light Mode (Default) & Dark Mode (Toggled)
+       ========================================================================== */
     :root {
-      --bg-deep: #07090e;
-      --bg-surface: #0d1117;
-      --bg-card: #121824;
-      --bg-card-hover: #182234;
-      --border: #1e293b;
-      --border-glow: rgba(56, 189, 248, 0.3);
-      --accent: #38bdf8;
-      --accent-cyan: #06b6d4;
-      --accent-emerald: #10b981;
-      --accent-violet: #8b5cf6;
-      --accent-amber: #f59e0b;
-      --accent-red: #ef4444;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-dim: #64748b;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      /* Brand Core Colors */
+      --color-brand-primary: #0D2340;     /* Deep Navy */
+      --color-brand-accent: #C05A28;      /* Rust Orange */
+      --color-brand-accent-hover: #A3481D;
+      --color-brand-accent-glow: rgba(192, 90, 40, 0.35);
+
+      /* Light Mode Palette (Default) */
+      --bg-canvas: #F4F6F9;              /* Off-White Canvas */
+      --bg-surface: #FFFFFF;             /* Pure White Surface */
+      --bg-surface-elevated: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #F8FAFC;
+      --bg-nav: rgba(255, 255, 255, 0.92);
+      --border-subtle: #E2E8F0;          /* Clean Subtle Border */
+      --border-accent: rgba(192, 90, 40, 0.4);
+      --text-heading: #0D2340;           /* Deep Navy Headings */
+      --text-body: #2E4F6F;              /* Slate Steel Body */
+      --text-muted: #607D8B;             /* Cool Slate Muted */
+      --text-dim: #94A3B8;
+      --shadow-sm: 0 2px 8px rgba(13, 35, 64, 0.04);
+      --shadow-md: 0 6px 20px rgba(13, 35, 64, 0.06);
+      --shadow-lg: 0 12px 32px rgba(13, 35, 64, 0.08);
+
+      /* Terminal Always Deep Contrast */
+      --term-bg: #081628;
+      --term-header: #0D2340;
+      --term-text: #E2E8F0;
+      --term-accent: #C05A28;
+      --term-border: #2E4F6F;
+
+      /* Typography */
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, Menlo, Monaco, monospace;
+    }
+
+    /* Dark Mode Theme Tokens */
+    html[data-theme="dark"] {
+      --bg-canvas: #09192E;              /* Deep Navy Dark Canvas */
+      --bg-surface: #0D2340;             /* Navy Panel Surface */
+      --bg-surface-elevated: #132D4E;
+      --bg-card: #0D2340;
+      --bg-card-hover: #132D4E;
+      --bg-nav: rgba(9, 25, 46, 0.92);
+      --border-subtle: #2E4F6F;          /* Slate Steel Border */
+      --border-accent: rgba(192, 90, 40, 0.6);
+      --text-heading: #FFFFFF;           /* Pure White Headings */
+      --text-body: #CBD5E1;              /* Soft Light Body */
+      --text-muted: #94A3B8;             /* Cool Slate Muted */
+      --text-dim: #64748B;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+      --term-bg: #050E1A;
+      --term-header: #09192E;
+      --term-text: #E2E8F0;
+      --term-border: #1E3A5F;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      background-color: var(--bg-deep);
-      color: var(--text-main);
+      background-color: var(--bg-canvas);
+      color: var(--text-body);
       font-family: var(--font-sans);
       line-height: 1.6;
+      transition: background-color 0.3s ease, color 0.3s ease;
       overflow-x: hidden;
       background-image: 
-        radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 60%),
-        radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
-        radial-gradient(circle at 15% 70%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+        radial-gradient(circle at 50% 0%, rgba(192, 90, 40, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 80% 25%, rgba(13, 35, 64, 0.03) 0%, transparent 40%);
       background-attachment: fixed;
     }
 
-    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
-    a:hover { color: #7dd3fc; }
+    a { color: var(--color-brand-accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--color-brand-accent-hover); }
 
-    /* Container */
     .container { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 1.5rem; }
 
-    /* Top Navigation */
+    /* Sticky Header */
     header {
       position: sticky;
       top: 0;
-      z-index: 100;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      background: rgba(7, 9, 14, 0.85);
-      border-bottom: 1px solid var(--border);
+      z-index: 1000;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: var(--bg-nav);
+      border-bottom: 1px solid var(--border-subtle);
+      transition: all 0.3s ease;
     }
     .nav-inner {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 72px;
+      height: 76px;
     }
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.85rem;
       font-weight: 800;
       font-size: 1.35rem;
       letter-spacing: -0.02em;
-      color: var(--text-main);
+      color: var(--text-heading);
     }
-    .brand-icon {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-violet));
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+    .brand-logo-img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 6px rgba(13, 35, 64, 0.15));
     }
     .brand-badge {
-      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
       font-weight: 700;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      background: rgba(56, 189, 248, 0.15);
-      color: var(--accent);
-      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 0.25rem 0.55rem;
+      border-radius: 9999px;
+      background: rgba(192, 90, 40, 0.12);
+      color: var(--color-brand-accent);
+      border: 1px solid rgba(192, 90, 40, 0.3);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 2rem;
+      gap: 1.85rem;
       list-style: none;
     }
     .nav-links a {
       color: var(--text-muted);
       font-size: 0.95rem;
-      font-weight: 500;
+      font-weight: 600;
       transition: color 0.2s;
     }
-    .nav-links a:hover { color: var(--text-main); }
-    .nav-actions { display: flex; align-items: center; gap: 1rem; }
-    .btn-github {
+    .nav-links a:hover { color: var(--text-heading); }
+    .nav-actions { display: flex; align-items: center; gap: 0.85rem; }
+
+    /* Buttons */
+    .btn-rust {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      background: #1e293b;
-      border: 1px solid var(--border);
-      color: var(--text-main);
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
+      background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%);
+      color: #FFFFFF !important;
+      padding: 0.55rem 1.15rem;
+      border-radius: 9999px;
       font-size: 0.875rem;
-      font-weight: 600;
+      font-weight: 700;
+      box-shadow: 0 4px 14px var(--color-brand-accent-glow);
+      border: none;
+      cursor: pointer;
       transition: all 0.2s;
     }
-    .btn-github:hover {
-      background: #334155;
-      border-color: #475569;
-      color: #fff;
+    .btn-rust:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(192, 90, 40, 0.45);
+    }
+    .btn-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-heading) !important;
+      padding: 0.55rem 1.15rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-outline:hover {
+      border-color: var(--color-brand-accent);
+      color: var(--color-brand-accent) !important;
+      transform: translateY(-1px);
+    }
+    .btn-theme-toggle {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-heading);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.2s;
+    }
+    .btn-theme-toggle:hover {
+      border-color: var(--color-brand-accent);
+      transform: rotate(15deg);
     }
 
     /* Hero Section */
@@ -142,34 +225,48 @@
       padding: 5rem 0 4rem;
       text-align: center;
     }
+    .hero-logo-wrap {
+      margin-bottom: 1.75rem;
+      display: inline-block;
+    }
+    .hero-logo-wrap img {
+      width: 104px;
+      height: 104px;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 24px rgba(13, 35, 64, 0.12));
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
     .hero-pill {
       display: inline-flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.35rem 1rem;
+      gap: 0.6rem;
+      padding: 0.35rem 1.15rem;
       border-radius: 9999px;
-      background: rgba(56, 189, 248, 0.1);
-      border: 1px solid rgba(56, 189, 248, 0.25);
-      color: var(--accent);
-      font-size: 0.85rem;
-      font-weight: 600;
-      margin-bottom: 2rem;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+      background: rgba(192, 90, 40, 0.08);
+      border: 1px solid rgba(192, 90, 40, 0.28);
+      color: var(--color-brand-accent);
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-bottom: 1.75rem;
     }
     .hero h1 {
-      font-size: clamp(2.5rem, 5.5vw, 4.25rem);
+      font-size: clamp(2.4rem, 5.2vw, 4.1rem);
       font-weight: 900;
-      line-height: 1.1;
+      line-height: 1.12;
       letter-spacing: -0.03em;
-      margin-bottom: 1.5rem;
-      background: linear-gradient(180deg, #ffffff 20%, #94a3b8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      margin-bottom: 1.25rem;
+      color: var(--text-heading);
     }
     .hero-subtitle {
       font-size: clamp(1.15rem, 2.2vw, 1.45rem);
-      color: var(--accent);
-      font-weight: 600;
+      color: var(--color-brand-accent);
+      font-weight: 700;
       max-width: 860px;
       margin: 0 auto 1.5rem;
       line-height: 1.4;
@@ -178,29 +275,34 @@
       font-size: 1.1rem;
       color: var(--text-muted);
       max-width: 780px;
-      margin: 0 auto 2.5rem;
+      margin: 0 auto 2.75rem;
     }
 
-    /* Install Card */
+    /* Universal Install Card */
     .install-box {
       max-width: 720px;
-      margin: 0 auto 3.5rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      margin: 0 auto 3.75rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 30px rgba(56, 189, 248, 0.1);
+      box-shadow: var(--shadow-md);
+      transition: all 0.3s;
+    }
+    .install-box:hover {
+      border-color: var(--border-accent);
+      box-shadow: var(--shadow-lg);
     }
     .install-tabs {
       display: flex;
-      background: var(--bg-surface);
-      border-bottom: 1px solid var(--border);
+      background: var(--bg-canvas);
+      border-bottom: 1px solid var(--border-subtle);
       overflow-x: auto;
     }
     .install-tab {
-      padding: 0.75rem 1.25rem;
+      padding: 0.85rem 1.35rem;
       font-size: 0.85rem;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--text-muted);
       border: none;
       background: none;
@@ -212,151 +314,147 @@
       white-space: nowrap;
       border-bottom: 2px solid transparent;
     }
-    .install-tab:hover { color: var(--text-main); }
+    .install-tab:hover { color: var(--text-heading); }
     .install-tab.active {
-      color: var(--accent);
-      background: rgba(56, 189, 248, 0.05);
-      border-bottom: 2px solid var(--accent);
+      color: var(--color-brand-accent);
+      background: var(--bg-surface);
+      border-bottom: 2px solid var(--color-brand-accent);
     }
     .install-cmd-wrap {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 1.25rem 1.5rem;
-      background: #090d14;
+      padding: 1.25rem 1.6rem;
+      background: var(--term-bg);
     }
     .install-cmd {
       font-family: var(--font-mono);
       font-size: 0.95rem;
-      color: #38bdf8;
+      color: #FFFFFF;
       overflow-x: auto;
       white-space: nowrap;
       text-align: left;
     }
     .btn-copy {
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      color: var(--accent);
+      background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%);
+      border: none;
+      color: #FFFFFF;
       padding: 0.5rem 1rem;
       border-radius: 6px;
       font-size: 0.85rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 0.4rem;
       transition: all 0.2s;
+      box-shadow: 0 2px 10px rgba(192, 90, 40, 0.3);
     }
     .btn-copy:hover {
-      background: rgba(56, 189, 248, 0.3);
-      color: #fff;
+      box-shadow: 0 4px 14px rgba(192, 90, 40, 0.45);
+      transform: translateY(-1px);
     }
     .install-meta {
       display: flex;
       justify-content: space-around;
-      padding: 0.75rem 1.5rem;
-      background: var(--bg-card);
-      border-top: 1px solid var(--border);
-      font-size: 0.75rem;
-      color: var(--text-dim);
+      padding: 0.85rem 1.5rem;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      font-size: 0.78rem;
+      color: var(--text-muted);
     }
-    .install-meta span { display: flex; align-items: center; gap: 0.35rem; }
 
-    /* Interactive Terminal Simulator */
+    /* Terminal Simulator */
     .terminal-section {
-      max-width: 980px;
+      max-width: 1000px;
       margin: 0 auto 5rem;
-      background: #090d15;
-      border: 1px solid var(--border);
+      background: var(--term-bg);
+      border: 1px solid var(--term-border);
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      box-shadow: 0 20px 45px rgba(13, 35, 64, 0.2);
     }
     .terminal-header {
-      background: #0e1420;
-      padding: 0.75rem 1.25rem;
+      background: var(--term-header);
+      padding: 0.85rem 1.35rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--term-border);
     }
     .terminal-dots { display: flex; gap: 8px; }
     .dot { width: 12px; height: 12px; border-radius: 50%; }
-    .dot-red { background: #ef4444; }
-    .dot-yellow { background: #f59e0b; }
-    .dot-green { background: #10b981; }
-    .terminal-tabs {
-      display: flex;
-      gap: 0.5rem;
-    }
+    .dot-red { background: #EF4444; }
+    .dot-yellow { background: #F59E0B; }
+    .dot-green { background: #10B981; }
+    .terminal-tabs { display: flex; gap: 0.4rem; overflow-x: auto; }
     .term-tab {
       background: transparent;
       border: 1px solid transparent;
-      color: var(--text-muted);
+      color: #94A3B8;
       font-size: 0.8rem;
       font-family: var(--font-mono);
-      padding: 0.25rem 0.6rem;
+      padding: 0.25rem 0.65rem;
       border-radius: 4px;
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
     }
-    .term-tab:hover { color: var(--text-main); }
+    .term-tab:hover { color: #FFFFFF; }
     .term-tab.active {
-      background: rgba(56, 189, 248, 0.15);
-      border-color: rgba(56, 189, 248, 0.3);
-      color: var(--accent);
+      background: rgba(192, 90, 40, 0.2);
+      border-color: rgba(192, 90, 40, 0.5);
+      color: #FF8A50;
+      font-weight: 700;
     }
     .terminal-body {
       padding: 1.5rem;
       font-family: var(--font-mono);
-      font-size: 0.875rem;
-      line-height: 1.7;
+      font-size: 0.86rem;
+      line-height: 1.65;
       text-align: left;
-      min-height: 280px;
+      min-height: 290px;
       max-height: 420px;
       overflow-y: auto;
-      background: #06090e;
+      background: var(--term-bg);
+      color: var(--term-text);
     }
-    .term-prompt { color: var(--accent-emerald); font-weight: bold; }
-    .term-cmd { color: #f8fafc; font-weight: bold; }
-    .term-out { color: #94a3b8; }
-    .term-pass { color: var(--accent-emerald); font-weight: bold; }
-    .term-highlight { color: var(--accent); }
-    .term-warn { color: var(--accent-amber); }
 
     /* Stats Grid */
     .stats-bar {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 1.5rem;
-      margin-bottom: 5rem;
+      margin-bottom: 5.5rem;
     }
     .stat-box {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1.5rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.75rem 1.25rem;
       text-align: center;
+      box-shadow: var(--shadow-sm);
       transition: transform 0.2s, border-color 0.2s;
     }
     .stat-box:hover {
       transform: translateY(-4px);
-      border-color: var(--accent);
+      border-color: var(--color-brand-accent);
+      box-shadow: var(--shadow-md);
     }
     .stat-num {
-      font-size: 2.2rem;
-      font-weight: 800;
-      color: var(--accent);
+      font-size: 2.3rem;
+      font-weight: 900;
+      color: var(--color-brand-accent);
       margin-bottom: 0.25rem;
       letter-spacing: -0.02em;
     }
     .stat-label {
       font-size: 0.85rem;
       color: var(--text-muted);
-      font-weight: 500;
+      font-weight: 600;
     }
 
-    /* Pillars Grid */
+    /* Section Headers */
     .section-title {
       text-align: center;
       margin-bottom: 3.5rem;
@@ -366,13 +464,16 @@
       font-weight: 800;
       letter-spacing: -0.02em;
       margin-bottom: 0.75rem;
+      color: var(--text-heading);
     }
     .section-title p {
       color: var(--text-muted);
       font-size: 1.1rem;
-      max-width: 680px;
+      max-width: 700px;
       margin: 0 auto;
     }
+
+    /* Pillars Grid */
     .pillars-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -380,37 +481,37 @@
       margin-bottom: 6rem;
     }
     .pillar-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 2.25rem 2rem;
+      box-shadow: var(--shadow-sm);
       transition: all 0.3s;
       display: flex;
       flex-direction: column;
     }
     .pillar-card:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(56, 189, 248, 0.4);
+      border-color: var(--border-accent);
       transform: translateY(-4px);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--shadow-md);
     }
     .pillar-icon {
       width: 48px;
       height: 48px;
       border-radius: 10px;
-      background: rgba(56, 189, 248, 0.1);
-      border: 1px solid rgba(56, 189, 248, 0.25);
-      color: var(--accent);
+      background: rgba(192, 90, 40, 0.1);
+      border: 1px solid rgba(192, 90, 40, 0.25);
+      color: var(--color-brand-accent);
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.35rem;
     }
     .pillar-card h3 {
       font-size: 1.25rem;
       font-weight: 700;
       margin-bottom: 0.75rem;
-      color: var(--text-main);
+      color: var(--text-heading);
     }
     .pillar-card p {
       color: var(--text-muted);
@@ -419,77 +520,86 @@
       flex: 1;
     }
 
-    /* Architecture Flow Diagram */
+    /* Pipeline Flow */
     .flow-section {
-      background: #090e18;
-      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
       border-radius: 16px;
       padding: 3rem 2rem;
       margin-bottom: 6rem;
+      box-shadow: var(--shadow-sm);
     }
     .flow-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1.5rem;
-      position: relative;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1.25rem;
     }
     .flow-step {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
       border-radius: 10px;
       padding: 1.5rem 1rem;
       text-align: center;
-      position: relative;
+      transition: border-color 0.2s;
+    }
+    .flow-step:hover {
+      border-color: var(--color-brand-accent);
     }
     .flow-badge {
-      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
       font-weight: 700;
-      color: var(--accent-cyan);
+      color: var(--color-brand-accent);
       text-transform: uppercase;
       margin-bottom: 0.5rem;
+      letter-spacing: 0.05em;
     }
     .flow-step h4 {
       font-size: 1.05rem;
       font-weight: 700;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.4rem;
+      color: var(--text-heading);
     }
     .flow-step p {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       color: var(--text-muted);
+      line-height: 1.5;
     }
 
     /* CLI Reference Table */
     .cli-table-wrap {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
       overflow: hidden;
       margin-bottom: 6rem;
+      box-shadow: var(--shadow-sm);
     }
     .cli-filter-bar {
       display: flex;
       gap: 0.5rem;
       padding: 1rem 1.5rem;
-      background: var(--bg-surface);
-      border-bottom: 1px solid var(--border);
+      background: var(--bg-canvas);
+      border-bottom: 1px solid var(--border-subtle);
       overflow-x: auto;
     }
     .cli-filter-btn {
       background: transparent;
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-subtle);
       color: var(--text-muted);
-      padding: 0.4rem 0.8rem;
-      border-radius: 6px;
+      padding: 0.45rem 0.95rem;
+      border-radius: 9999px;
       font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
     }
-    .cli-filter-btn:hover { color: var(--text-main); }
+    .cli-filter-btn:hover { color: var(--text-heading); border-color: var(--color-brand-accent); }
     .cli-filter-btn.active {
-      background: rgba(56, 189, 248, 0.15);
-      border-color: var(--accent);
-      color: var(--accent);
+      background: var(--color-brand-accent);
+      border-color: var(--color-brand-accent);
+      color: #FFFFFF !important;
     }
     table.cli-table {
       width: 100%;
@@ -497,33 +607,35 @@
       font-size: 0.9rem;
     }
     table.cli-table th, table.cli-table td {
-      padding: 1rem 1.5rem;
+      padding: 1.1rem 1.5rem;
       text-align: left;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid var(--border-subtle);
     }
     table.cli-table th {
-      background: rgba(255, 255, 255, 0.02);
-      color: var(--text-muted);
+      background: var(--bg-canvas);
+      color: var(--text-heading);
       font-size: 0.8rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
+      font-weight: 700;
     }
     .cmd-name {
       font-family: var(--font-mono);
       font-weight: 700;
-      color: var(--accent);
+      color: var(--color-brand-accent);
       white-space: nowrap;
     }
     .cmd-desc { color: var(--text-muted); }
     .cmd-badge {
       display: inline-block;
+      font-family: var(--font-mono);
       font-size: 0.7rem;
       font-weight: 700;
       padding: 0.15rem 0.45rem;
       border-radius: 4px;
-      background: rgba(139, 92, 246, 0.15);
-      color: var(--accent-violet);
-      border: 1px solid rgba(139, 92, 246, 0.3);
+      background: rgba(13, 35, 64, 0.08);
+      color: var(--text-heading);
+      border: 1px solid var(--border-subtle);
     }
 
     /* FAQ Section */
@@ -534,16 +646,17 @@
       margin-bottom: 6rem;
     }
     .faq-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1.75rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.85rem;
+      box-shadow: var(--shadow-sm);
     }
     .faq-card h4 {
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       font-weight: 700;
       margin-bottom: 0.5rem;
-      color: var(--text-main);
+      color: var(--text-heading);
     }
     .faq-card p {
       color: var(--text-muted);
@@ -553,32 +666,43 @@
 
     /* Footer */
     footer {
-      border-top: 1px solid var(--border);
-      background: #04060a;
-      padding: 4rem 0 2rem;
-      font-size: 0.9rem;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      padding: 4.5rem 0 2.5rem;
+      font-size: 0.92rem;
       color: var(--text-muted);
     }
     .footer-grid {
       display: grid;
       grid-template-columns: 2fr 1fr 1fr 1fr;
       gap: 3rem;
-      margin-bottom: 3rem;
+      margin-bottom: 3.5rem;
     }
-    .footer-brand h3 {
-      color: var(--text-main);
-      font-size: 1.25rem;
+    .footer-brand {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .footer-brand-title {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 1.3rem;
       font-weight: 800;
-      margin-bottom: 0.75rem;
+      color: var(--text-heading);
+    }
+    .footer-brand-title img {
+      width: 32px;
+      height: 32px;
     }
     .footer-brand p {
-      color: var(--text-dim);
-      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-size: 0.92rem;
       line-height: 1.6;
       max-width: 360px;
     }
     .footer-col h5 {
-      color: var(--text-main);
+      color: var(--text-heading);
       font-size: 0.95rem;
       font-weight: 700;
       margin-bottom: 1rem;
@@ -586,11 +710,11 @@
       letter-spacing: 0.05em;
     }
     .footer-col ul { list-style: none; }
-    .footer-col li { margin-bottom: 0.6rem; }
-    .footer-col a { color: var(--text-muted); }
-    .footer-col a:hover { color: var(--accent); }
+    .footer-col li { margin-bottom: 0.65rem; }
+    .footer-col a { color: var(--text-muted); font-weight: 500; }
+    .footer-col a:hover { color: var(--color-brand-accent); }
     .footer-bottom {
-      border-top: 1px solid #131926;
+      border-top: 1px solid var(--border-subtle);
       padding-top: 2rem;
       display: flex;
       justify-content: space-between;
@@ -609,29 +733,30 @@
 </head>
 <body>
 
-  <!-- Navigation -->
+  <!-- Top Sticky Header -->
   <header>
     <div class="container nav-inner">
-      <div class="brand">
-        <div class="brand-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-            <polyline points="2 17 12 22 22 17"></polyline>
-            <polyline points="2 12 12 17 22 12"></polyline>
-          </svg>
-        </div>
+      <a href="/" class="brand">
+        <img src="NITYAKSHA_LOGO.png" alt="Nityaksha Logo" class="brand-logo-img">
         <span>NITYAKSHA</span>
         <span class="brand-badge">AI Concierge</span>
-      </div>
+      </a>
+
       <ul class="nav-links">
         <li><a href="#features">Features</a></li>
         <li><a href="#architecture">Architecture</a></li>
         <li><a href="#cli">CLI Reference</a></li>
-        <li><a href="#catalog">Catalog</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
+
       <div class="nav-actions">
-        <a href="https://github.com/simhaonline/ntx" target="_blank" rel="noopener noreferrer" class="btn-github">
+        <!-- Light / Dark Mode Toggle Button -->
+        <button class="btn-theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle Light / Dark Mode" aria-label="Toggle Theme">
+          <span id="theme-icon">🌙</span>
+        </button>
+
+        <a href="/app" class="btn-outline">Launch WebUI</a>
+        <a href="https://github.com/simhaonline/ntx" target="_blank" rel="noopener noreferrer" class="btn-rust">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
           </svg>
@@ -643,22 +768,23 @@
 
   <!-- Hero Section -->
   <section class="hero container">
+    <div class="hero-logo-wrap">
+      <img src="NITYAKSHA_LOGO.png" alt="Nityaksha Logo Orbital System">
+    </div>
     <div class="hero-pill">
-      <span>⚡ 100% Pure Native Rust</span>
+      <span>ENGINEERED IN PURE RUST</span>
       <span>•</span>
-      <span>Zero External DB Runtime</span>
-      <span>•</span>
-      <span>Sub-millisecond Cold Start</span>
+      <span>100% NATIVE MEMORY STACK</span>
     </div>
     <h1>NITYAKSHA — An AI Concierge Platform</h1>
     <div class="hero-subtitle">
-      Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.
+      Engineered for high-velocity, deterministic AI in pure Rust.
     </div>
     <p class="hero-desc">
       A sovereign, memory-safe AI concierge and multi-agent control plane. Complete with a native Agent Memory Stack (ACID WAL, Dense SIMD Vectors, Sparse BM25, and Multimodal CAS), POSIX container sandboxes, physical loop breakers, and HITL merge gates.
     </p>
 
-    <!-- Install Card -->
+    <!-- Universal Install Box -->
     <div class="install-box" id="install">
       <div class="install-tabs">
         <button class="install-tab active" onclick="switchInstallTab('linux')">Linux & macOS</button>
@@ -670,7 +796,7 @@
       <div class="install-cmd-wrap">
         <div class="install-cmd" id="install-command">curl -fsSL https://simhaonline.ai/install.sh | bash</div>
         <button class="btn-copy" onclick="copyInstallCmd()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
@@ -678,8 +804,8 @@
         </button>
       </div>
       <div class="install-meta">
-        <span>✓ Zero Python or Node.js runtime</span>
-        <span>✓ POSIX Atomic Replacement (No ETXTBSY)</span>
+        <span>✓ 100% Native Pure Rust</span>
+        <span>✓ POSIX Atomic Update (No ETXTBSY)</span>
         <span>✓ Standalone Binary: /usr/local/bin/ntx</span>
       </div>
     </div>
@@ -694,14 +820,15 @@
         </div>
         <div class="terminal-tabs">
           <button class="term-tab active" onclick="setTerminalOutput('status')">ntx status</button>
+          <button class="term-tab" onclick="setTerminalOutput('skills')">ntx skill list</button>
           <button class="term-tab" onclick="setTerminalOutput('doctor')">ntx doctor</button>
           <button class="term-tab" onclick="setTerminalOutput('harness')">ntx harness status</button>
-          <button class="term-tab" onclick="setTerminalOutput('exec')">ntx -p (Exec)</button>
+          <button class="term-tab" onclick="setTerminalOutput('exec')">ntx -p (Exec JSON)</button>
           <button class="term-tab" onclick="setTerminalOutput('ps')">ntx ps</button>
         </div>
       </div>
       <div class="terminal-body" id="term-display">
-        <!-- Rendered by JS -->
+        <!-- Rendered by JavaScript -->
       </div>
     </div>
 
@@ -734,7 +861,7 @@
     </div>
   </section>
 
-  <!-- Core Pillars -->
+  <!-- Architectural Pillars -->
   <section class="container" id="features">
     <div class="section-title">
       <h2>Architectural Pillars of Nityaksha</h2>
@@ -792,7 +919,7 @@
     </div>
   </section>
 
-  <!-- Request Lifecycle Flow -->
+  <!-- Execution Pipeline Flow -->
   <section class="container" id="architecture">
     <div class="section-title">
       <h2>Deterministic Execution Pipeline</h2>
@@ -991,8 +1118,11 @@
   <footer>
     <div class="container footer-grid">
       <div class="footer-brand">
-        <h3>⬡ NITYAKSHA</h3>
-        <p>Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.</p>
+        <div class="footer-brand-title">
+          <img src="NITYAKSHA_LOGO.png" alt="Nityaksha Logo">
+          <span>NITYAKSHA</span>
+        </div>
+        <p>Engineered for high-velocity, deterministic AI in pure Rust.</p>
       </div>
       <div class="footer-col">
         <h5>Architecture</h5>
@@ -1018,17 +1148,44 @@
           <li><a href="https://simhaonline.ai">Simha Online</a></li>
           <li><a href="https://github.com/simhaonline/ntx/releases">Release Notes</a></li>
           <li><a href="#cli">CLI Reference</a></li>
-          <li><a href="http://127.0.0.1:8080">Local WebUI (:8080)</a></li>
+          <li><a href="/app">Local Workstation UI (:8080)</a></li>
         </ul>
       </div>
     </div>
     <div class="container footer-bottom">
       <div>© 2026 Simha (simhaonline). All rights reserved.</div>
-      <div>Domain: <a href="https://simhaonline.ai" style="color: var(--accent);">simhaonline.ai</a></div>
+      <div>Official Domain: <a href="https://simhaonline.ai" style="color: var(--color-brand-accent);">simhaonline.ai</a></div>
     </div>
   </footer>
 
   <script>
+    // Theme Management: Default Light Mode with Dark Mode Toggle
+    function initTheme() {
+      const savedTheme = localStorage.getItem('nityaksha-theme');
+      if (savedTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.getElementById('theme-icon').textContent = '☀️';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.getElementById('theme-icon').textContent = '🌙';
+      }
+    }
+
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      if (currentTheme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem('nityaksha-theme', 'light');
+        document.getElementById('theme-icon').textContent = '🌙';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('nityaksha-theme', 'dark');
+        document.getElementById('theme-icon').textContent = '☀️';
+      }
+    }
+
+    initTheme();
+
     const installCommands = {
       linux: "curl -fsSL https://simhaonline.ai/install.sh | bash",
       windows: "irm https://simhaonline.ai/install.ps1 | iex",
@@ -1055,7 +1212,7 @@
     const terminalOutputs = {
       status: `================================================================================
                    NITYAKSHA - An AI Concierge Platform                         
-  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  
+  Engineered for high-velocity, deterministic AI in pure Rust.
 ================================================================================
 Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):
 --------------------------------------------------------------------------------
@@ -1076,6 +1233,30 @@ Catalog Statistics (Database-backed SoT - Pure Rust):
   - skill       : 87 assets
   - Vector Store: 133 dense vectors indexed
   - Media Assets: 0 multimodal blobs in CAS`,
+
+      skills: `=================================================================================================================
+          Nityaksha Proprietary Autonomous Skills (87 registered in Native Memory Stack)          
+=================================================================================================================
+  SKILL NAME                         VERSION   TRUST TIER   DESCRIPTION
+-----------------------------------------------------------------------------------------------------------------
+  ntx-agent-web-identity             1.0.0     approved     Lets an AI agent or CLI session sign in to Intern...
+  ntx-ai-writing-detector            1.0.0     approved     Use when the user asks to detect, scan, audit, sc...
+  ntx-anti-slop                      1.0.0     approved     High-throughput text sanitizer that eliminates AI...
+  ntx-ast-pruner                     1.0.0     approved     Analyzes repository AST trees, identifies functio...
+  ntx-authoring                      1.0.0     approved     Add or edit an MCP server entry in mcptoon's conf...
+  ntx-autosync-ic-skills             1.0.0     approved     One-time installer that makes a Claude Code proje...
+  ntx-autoupgrade-icp-cli            1.0.0     approved     One-time installer that keeps a project's Interne...
+  ntx-avoid-ai-writing               1.0.0     approved     Audit and rewrite content to remove AI writing pa...
+  ntx-canister-security              1.0.0     approved     IC-specific security patterns for canister develo...
+  ntx-certified-variables            1.0.0     approved     Serve cryptographically verified responses from q...
+  ntx-ckbtc                          1.0.0     approved     Accept, send, and manage ckBTC (chain-key Bitcoin...
+  ntx-container-jail                 1.0.0     approved     Provisions short-lived Linux namespaces (Mount, U...
+  ntx-corpus-to-skill                1.0.0     approved     Distills dense technical textbooks, engineering s...
+  ntx-daemon-lifecycle               1.0.0     approved     Manages background AI agent worker daemons, syste...
+  ntx-data-visualizer                1.0.0     approved     Transforms structured data, metrics, and columnar...
+  ntx-hitl-merge-gate                1.0.0     approved     Intercepts destructive operations, production git...
+-----------------------------------------------------------------------------------------------------------------
+Tip: Run 'ntx skill inspect <name>' to view full manifest, runbook instructions, and invariants.`,
 
       doctor: `Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):
 --------------------------------------------------------------------------------
@@ -1125,7 +1306,7 @@ sess-1793657970951       pure-rust-cli    completed    61         .
       document.querySelectorAll('.term-tab').forEach(b => b.classList.remove('active'));
       event.target.classList.add('active');
       const out = terminalOutputs[key] || terminalOutputs.status;
-      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #cbd5e1;">${escapeHtml(out)}</pre>`;
+      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #E2E8F0;">${escapeHtml(out)}</pre>`;
     }
 
     function escapeHtml(text) {
@@ -1147,7 +1328,7 @@ sess-1793657970951       pure-rust-cli    completed    61         .
 
     // Initialize terminal display
     document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #cbd5e1;">${escapeHtml(terminalOutputs.status)}</pre>`;
+      document.getElementById('term-display').innerHTML = `<pre style="white-space: pre-wrap; color: #E2E8F0;">${escapeHtml(terminalOutputs.status)}</pre>`;
     });
   </script>
 </body>

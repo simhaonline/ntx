@@ -212,41 +212,11 @@ impl RelationalStore {
 
         // Seed default sources
         t.sources.insert(
-            "simhaonline/icskills".to_string(),
+            "nityaksha/core".to_string(),
             SourceRow {
-                id: "simhaonline/icskills".into(),
-                provider: "github".into(),
-                repository: "simhaonline/icskills".into(),
-                status: "active".into(),
-                last_synced_at: now.clone(),
-            },
-        );
-        t.sources.insert(
-            "simhaonline/avoid-ai-writing".to_string(),
-            SourceRow {
-                id: "simhaonline/avoid-ai-writing".into(),
-                provider: "github".into(),
-                repository: "simhaonline/avoid-ai-writing".into(),
-                status: "active".into(),
-                last_synced_at: now.clone(),
-            },
-        );
-        t.sources.insert(
-            "simhaonline/mcptoon".to_string(),
-            SourceRow {
-                id: "simhaonline/mcptoon".into(),
-                provider: "github".into(),
-                repository: "simhaonline/mcptoon".into(),
-                status: "active".into(),
-                last_synced_at: now.clone(),
-            },
-        );
-        t.sources.insert(
-            "simhaonline/jscpd".to_string(),
-            SourceRow {
-                id: "simhaonline/jscpd".into(),
-                provider: "github".into(),
-                repository: "simhaonline/jscpd".into(),
+                id: "nityaksha/core".into(),
+                provider: "first_party".into(),
+                repository: "nityaksha/core".into(),
                 status: "active".into(),
                 last_synced_at: now.clone(),
             },

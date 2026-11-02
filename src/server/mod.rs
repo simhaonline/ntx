@@ -102,6 +102,45 @@ fn handle_connection(
         return Ok(());
     }
 
+    if (method == "GET" || method == "HEAD") && (uri == "/NITYAKSHA_LOGO.png" || uri == "/logo.png" || uri == "/logo-64.png" || uri == "/logo-180.png") {
+        let bytes = include_bytes!("../../brand/NITYAKSHA_LOGO.png");
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: public, max-age=86400\r\n\r\n",
+            bytes.len()
+        );
+        stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(bytes)?;
+        }
+        return Ok(());
+    }
+
+    if (method == "GET" || method == "HEAD") && (uri == "/logo.svg") {
+        let svg = include_str!("../../brand/logo.svg");
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: image/svg+xml\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: public, max-age=86400\r\n\r\n",
+            svg.len()
+        );
+        stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(svg.as_bytes())?;
+        }
+        return Ok(());
+    }
+
+    if (method == "GET" || method == "HEAD") && (uri == "/favicon.ico") {
+        let bytes = include_bytes!("../../brand/logo-32.png");
+        let resp = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+            bytes.len()
+        );
+        stream.write_all(resp.as_bytes())?;
+        if method == "GET" {
+            stream.write_all(bytes)?;
+        }
+        return Ok(());
+    }
+
     if (method == "GET" || method == "HEAD") && uri == "/install.sh" {
         let script = include_str!("../../install.sh");
         let resp = format!(
