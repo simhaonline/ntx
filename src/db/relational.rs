@@ -1,6 +1,8 @@
 //! Nityaksha Relational Agent Memory Stack (Pure Rust ACID Engine)
 //! In-memory and disk-directory relational tables with WAL, atomic snapshots, and multi-agent indexing.
 
+use crate::bot::{BotDefinition, BotRegistry};
+use crate::workflow::{WorkflowDefinition, WorkflowExecution, WorkflowRegistry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -139,6 +141,12 @@ pub struct RelationalTables {
     pub audit_events: Vec<AuditEventRow>,
     #[serde(default)]
     pub configs: HashMap<String, String>,
+    #[serde(default)]
+    pub bots: HashMap<String, BotDefinition>,
+    #[serde(default)]
+    pub workflows: HashMap<String, WorkflowDefinition>,
+    #[serde(default)]
+    pub workflow_executions: HashMap<String, WorkflowExecution>,
 }
 
 pub struct RelationalStore {
@@ -171,6 +179,8 @@ impl RelationalStore {
             if !data.is_empty() {
                 if let Ok(t) = serde_json::from_slice::<RelationalTables>(&data) {
                     *store.tables.write().unwrap() = t;
+                    store.seed_defaults();
+                    let _ = store.persist();
                     return Ok(store);
                 }
             }
@@ -221,6 +231,16 @@ impl RelationalStore {
                 last_synced_at: now.clone(),
             },
         );
+
+        // Seed or update Pre-Configured Bots
+        for bot in BotRegistry::default_bots() {
+            t.bots.entry(bot.id.clone()).or_insert(bot);
+        }
+
+        // Seed or update Pre-Configured DAG Workflows
+        for wf in WorkflowRegistry::default_workflows() {
+            t.workflows.insert(wf.id.clone(), wf);
+        }
     }
 
     pub fn persist(&self) -> io::Result<()> {
@@ -422,5 +442,97 @@ impl RelationalStore {
     pub fn list_configs(&self) -> HashMap<String, String> {
         let t = self.tables.read().unwrap();
         t.configs.clone()
+    }
+
+    // Method of Loci Drawers
+    pub fn upsert_palace_drawer(
+        &self,
+        wing: &str,
+        room: &str,
+        drawer: &str,
+        content: &str,
+        tags: &str,
+    ) {
+        let mut t = self.tables.write().unwrap();
+        let key = format!("{}:{}:{}", wing, room, drawer);
+        let now = chrono::Utc::now().to_rfc3339();
+        t.palace_drawers.insert(
+            key,
+            PalaceDrawerRow {
+                wing: wing.to_string(),
+                room: room.to_string(),
+                drawer: drawer.to_string(),
+                content: content.to_string(),
+                tags: tags.to_string(),
+                updated_at: now,
+            },
+        );
+        drop(t);
+        let _ = self.persist();
+    }
+
+    pub fn list_palace_drawers(&self, wing: Option<&str>) -> Vec<PalaceDrawerRow> {
+        let t = self.tables.read().unwrap();
+        t.palace_drawers
+            .values()
+            .filter(|d| wing.map_or(true, |w| d.wing == w))
+            .cloned()
+            .collect()
+    }
+
+    // Bot Registry Helpers
+    pub fn list_bots(&self) -> Vec<BotDefinition> {
+        let t = self.tables.read().unwrap();
+        t.bots.values().cloned().collect()
+    }
+
+    pub fn get_bot(&self, id: &str) -> Option<BotDefinition> {
+        let t = self.tables.read().unwrap();
+        t.bots.get(id).cloned()
+    }
+
+    pub fn upsert_bot(&self, bot: BotDefinition) -> io::Result<()> {
+        let mut t = self.tables.write().unwrap();
+        t.bots.insert(bot.id.clone(), bot);
+        drop(t);
+        self.persist()
+    }
+
+    // Workflow Graph Helpers
+    pub fn list_workflows(&self) -> Vec<WorkflowDefinition> {
+        let t = self.tables.read().unwrap();
+        t.workflows.values().cloned().collect()
+    }
+
+    pub fn get_workflow(&self, id: &str) -> Option<WorkflowDefinition> {
+        let t = self.tables.read().unwrap();
+        t.workflows.get(id).cloned()
+    }
+
+    pub fn upsert_workflow(&self, wf: WorkflowDefinition) -> io::Result<()> {
+        let mut t = self.tables.write().unwrap();
+        t.workflows.insert(wf.id.clone(), wf);
+        drop(t);
+        self.persist()
+    }
+
+    // Workflow Execution Lifecycle Helpers
+    pub fn get_execution(&self, id: &str) -> Option<WorkflowExecution> {
+        let t = self.tables.read().unwrap();
+        t.workflow_executions.get(id).cloned()
+    }
+
+    pub fn list_executions(&self) -> Vec<WorkflowExecution> {
+        let t = self.tables.read().unwrap();
+        let mut execs: Vec<WorkflowExecution> = t.workflow_executions.values().cloned().collect();
+        execs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        execs
+    }
+
+    pub fn save_execution(&self, exec: WorkflowExecution) -> io::Result<()> {
+        let mut t = self.tables.write().unwrap();
+        t.workflow_executions.insert(exec.id.clone(), exec);
+        drop(t);
+        self.persist()
     }
 }

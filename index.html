@@ -638,6 +638,136 @@
       border: 1px solid var(--border-subtle);
     }
 
+    /* Bot Showcase Styles */
+    .bot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 5rem;
+    }
+    .bot-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.25s ease;
+      box-shadow: var(--shadow-sm);
+    }
+    .bot-card:hover {
+      border-color: var(--color-brand-accent);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+    .bot-header {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      margin-bottom: 0.85rem;
+    }
+    .bot-avatar {
+      font-size: 1.8rem;
+      background: var(--bg-canvas);
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+    }
+    .bot-meta h3 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text-heading);
+    }
+    .bot-meta span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .bot-desc {
+      font-size: 0.9rem;
+      color: var(--text-body);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+    .bot-starters {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 0.85rem;
+      margin-bottom: 1rem;
+      font-size: 0.82rem;
+    }
+    .starter-item {
+      color: var(--color-brand-accent);
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+
+    /* Workflow DAG Styles */
+    .wf-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.75rem;
+      margin-bottom: 5rem;
+    }
+    .wf-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.25s;
+    }
+    .wf-card:hover {
+      border-color: var(--color-brand-accent);
+      box-shadow: var(--shadow-md);
+    }
+    .wf-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+    .wf-nodes-flow {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 1.25rem 0;
+      padding: 1.25rem;
+      background: var(--bg-canvas);
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+    }
+    .dag-node-badge {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 0.5rem 0.85rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-heading);
+    }
+    .dag-node-badge.hitl {
+      border-color: #F59E0B;
+      background: rgba(245, 158, 11, 0.1);
+      color: #D97706;
+    }
+    .dag-arrow {
+      color: var(--text-muted);
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+
     /* FAQ Section */
     .faq-grid {
       display: grid;
@@ -744,6 +874,8 @@
 
       <ul class="nav-links">
         <li><a href="#features">Features</a></li>
+        <li><a href="#bots">Bot Store</a></li>
+        <li><a href="#workflows">Workflows</a></li>
         <li><a href="#architecture">Architecture</a></li>
         <li><a href="#cli">CLI Reference</a></li>
         <li><a href="#faq">FAQ</a></li>
@@ -919,6 +1051,240 @@
     </div>
   </section>
 
+  <!-- Pre-Configured Bots & App Store -->
+  <section class="container" id="bots">
+    <div class="section-title">
+      <h2>Sovereign Bot Catalog & App Store</h2>
+      <p>Specialized autonomous bot personas with dynamic system prompt hydration, strict tool whitelists, and isolated sandbox policies.</p>
+    </div>
+
+    <div class="bot-grid">
+      <!-- Bot 1 -->
+      <div class="bot-card">
+        <div>
+          <div class="bot-header">
+            <div class="bot-avatar">🏛️</div>
+            <div class="bot-meta">
+              <h3>Nityaksha Sovereign Concierge</h3>
+              <span>Executive Concierge • v1.0.0</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
+            <span class="cmd-badge">DeepReasoning</span>
+            <span class="cmd-badge">workspace-write</span>
+          </div>
+          <p class="bot-desc">Master concierge supervising agent delegations, state checkpoints, and corporate policy governance.</p>
+          <div class="bot-starters">
+            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Starter Prompts</span>
+            <span class="starter-item">⚡ "Audit platform health and list active agent trajectories"</span>
+            <span class="starter-item">⚡ "Review security policy compliance across workspaces"</span>
+          </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent); background: var(--bg-canvas); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+          ntx bot run ntx-bot-concierge-prime
+        </div>
+      </div>
+
+      <!-- Bot 2 -->
+      <div class="bot-card">
+        <div>
+          <div class="bot-header">
+            <div class="bot-avatar">🦀</div>
+            <div class="bot-meta">
+              <h3>Pure Rust Code Architect</h3>
+              <span>Engineering • v1.0.0</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
+            <span class="cmd-badge">DeepReasoning</span>
+            <span class="cmd-badge">workspace-write</span>
+          </div>
+          <p class="bot-desc">Deep AST discovery, memory safety invariants, zero unwrap(), zero unsafe leaks, and sub-millisecond execution.</p>
+          <div class="bot-starters">
+            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Starter Prompts</span>
+            <span class="starter-item">⚡ "Analyze repository AST and prune unused function symbols"</span>
+            <span class="starter-item">⚡ "Refactor error handling to eliminate panics and unwraps"</span>
+          </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent); background: var(--bg-canvas); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+          ntx bot run ntx-bot-code-architect
+        </div>
+      </div>
+
+      <!-- Bot 3 -->
+      <div class="bot-card">
+        <div>
+          <div class="bot-header">
+            <div class="bot-avatar">📈</div>
+            <div class="bot-meta">
+              <h3>Quant Risk & Market Modeler</h3>
+              <span>Quant & Finance • v1.0.0</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
+            <span class="cmd-badge">DeepReasoning</span>
+            <span class="cmd-badge">read-only</span>
+          </div>
+          <p class="bot-desc">Manages CVD absorption, Killzones (London/NY UTC), liquidation bands, and Pine Script v6 matrix UDT verification.</p>
+          <div class="bot-starters">
+            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Starter Prompts</span>
+            <span class="starter-item">⚡ "Compute volume profile and CVD absorption levels for BTC"</span>
+            <span class="starter-item">⚡ "Stress-test liquidation band risk under 3-sigma volatility"</span>
+          </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent); background: var(--bg-canvas); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+          ntx bot run ntx-bot-quant-risk
+        </div>
+      </div>
+
+      <!-- Bot 4 -->
+      <div class="bot-card">
+        <div>
+          <div class="bot-header">
+            <div class="bot-avatar">🛡️</div>
+            <div class="bot-meta">
+              <h3>RedTeam Adversarial Shield</h3>
+              <span>Security • v1.0.0</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
+            <span class="cmd-badge">Balanced</span>
+            <span class="cmd-badge">read-only</span>
+          </div>
+          <p class="bot-desc">Proactive prompt injection defender, credential leakage scrubber, and container namespace jail inspector.</p>
+          <div class="bot-starters">
+            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Starter Prompts</span>
+            <span class="starter-item">⚡ "Scan workspace environment for accidental API token leakage"</span>
+            <span class="starter-item">⚡ "Audit model prompts for delimiter collisions and injection"</span>
+          </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent); background: var(--bg-canvas); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+          ntx bot run ntx-bot-security-redteam
+        </div>
+      </div>
+
+      <!-- Bot 5 -->
+      <div class="bot-card">
+        <div>
+          <div class="bot-header">
+            <div class="bot-avatar">⚡</div>
+            <div class="bot-meta">
+              <h3>SRE Incident Commander</h3>
+              <span>SRE & DevOps • v1.0.0</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
+            <span class="cmd-badge">FastFlash</span>
+            <span class="cmd-badge">workspace-write</span>
+          </div>
+          <p class="bot-desc">Kernel panic diagnostic specialist, out-of-memory isolation, automated service remediation, and cgroups supervisor.</p>
+          <div class="bot-starters">
+            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Starter Prompts</span>
+            <span class="starter-item">⚡ "Triage kernel out-of-memory crash log and suggest remediation"</span>
+            <span class="starter-item">⚡ "Inspect cgroups v2 memory.max and pids.max utilization"</span>
+          </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent); background: var(--bg-canvas); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+          ntx bot run ntx-bot-devops-sre
+        </div>
+      </div>
+
+      <!-- Bot 6 -->
+      <div class="bot-card">
+        <div>
+          <div class="bot-header">
+            <div class="bot-avatar">✨</div>
+            <div class="bot-meta">
+              <h3>Anti-Slop Text Sanitizer</h3>
+              <span>Content & Docs • v1.0.0</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
+            <span class="cmd-badge">FastFlash</span>
+            <span class="cmd-badge">workspace-write</span>
+          </div>
+          <p class="bot-desc">High-throughput content sanitizer eliminating conversational AI boilerplate, apologies, and repetitive throat-clearing.</p>
+          <div class="bot-starters">
+            <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Starter Prompts</span>
+            <span class="starter-item">⚡ "Sanitize documentation to eliminate AI conversational filler"</span>
+            <span class="starter-item">⚡ "Convert verbose explanations into dense technical runbooks"</span>
+          </div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent); background: var(--bg-canvas); padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+          ntx bot run ntx-bot-anti-slop-strategist
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pre-Configured Workflow Graph Engine -->
+  <section class="container" id="workflows">
+    <div class="section-title">
+      <h2>Directed Acyclic Graph (DAG) Workflow Engine</h2>
+      <p>Moving from single prompt completions to structured multi-agent graph orchestrations with cycle detection and HITL gates.</p>
+    </div>
+
+    <div class="wf-grid">
+      <!-- Workflow 1 -->
+      <div class="wf-card">
+        <div class="wf-header">
+          <div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-heading);">Rust AST Prune, RedTeam & Confined Apply</h3>
+            <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600;">Engineering & Security • 6 DAG Nodes • v1.0.0</span>
+          </div>
+          <span class="cmd-badge">wf-code-security-pipeline</span>
+        </div>
+        <p style="font-size: 0.95rem; color: var(--text-body); margin-bottom: 0.5rem;">
+          Isolates mutated functions via AST inspection, verifies zero unwrap() invariants, executes adversarial injection scan, suspends at Human-in-the-Loop merge gate, and applies changes inside a POSIX cgroup sandbox.
+        </p>
+        <div class="wf-nodes-flow">
+          <div class="dag-node-badge">1. AST Prune <span class="cmd-badge">FastFlash</span></div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge">2. RedTeam Audit <span class="cmd-badge">Balanced</span></div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge">3. Code Synthesis <span class="cmd-badge">DeepReasoning</span></div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge hitl">4. Production HITL Gate ⚠️</div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge">5. Sandbox Dry-Run <span class="cmd-badge">Tool</span></div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge">6. Atomic WAL Commit <span class="cmd-badge">Memory</span></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-brand-accent);">
+          <code>ntx workflow run wf-code-security-pipeline</code>
+          <span style="color: var(--text-muted); font-size: 0.78rem;">Approval Token: NTX-APPROVE-PROD</span>
+        </div>
+      </div>
+
+      <!-- Workflow 2 -->
+      <div class="wf-card">
+        <div class="wf-header">
+          <div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-heading);">Quant CVD Volatility & Risk Stress Test</h3>
+            <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600;">Quant & Finance • 4 DAG Nodes • v1.0.0</span>
+          </div>
+          <span class="cmd-badge">wf-quant-risk-deploy</span>
+        </div>
+        <p style="font-size: 0.95rem; color: var(--text-body); margin-bottom: 0.5rem;">
+          Ingests market tick stream into lock-free ring buffer, computes volume delta absorption, executes 3-sigma tail-risk shock simulations, and enforces Capital HITL Gate before dispatching order.
+        </p>
+        <div class="wf-nodes-flow">
+          <div class="dag-node-badge">1. CVD Absorption <span class="cmd-badge">FastFlash</span></div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge">2. 3-Sigma Stress Test <span class="cmd-badge">DeepReasoning</span></div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge hitl">3. Capital Spending HITL Gate ⚠️</div>
+          <span class="dag-arrow">→</span>
+          <div class="dag-node-badge">4. Ledger WAL Sync <span class="cmd-badge">Memory</span></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-brand-accent);">
+          <code>ntx workflow run wf-quant-risk-deploy</code>
+          <span style="color: var(--text-muted); font-size: 0.78rem;">Approval Token: NTX-APPROVE-ORDER</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Execution Pipeline Flow -->
   <section class="container" id="architecture">
     <div class="section-title">
@@ -1048,6 +1414,24 @@
             <td><span class="cmd-badge">session</span></td>
             <td class="cmd-desc">Gets, sets, and lists persistent configuration settings across sessions.</td>
             <td><code>ntx config set theme dark</code></td>
+          </tr>
+          <tr data-cat="exec">
+            <td class="cmd-name">ntx bot list / run</td>
+            <td><span class="cmd-badge">exec</span></td>
+            <td class="cmd-desc">Inspects and launches pre-configured autonomous bot personas with prompt hydration.</td>
+            <td><code>ntx bot run ntx-bot-concierge-prime</code></td>
+          </tr>
+          <tr data-cat="harness">
+            <td class="cmd-name">ntx workflow run</td>
+            <td><span class="cmd-badge">harness</span></td>
+            <td class="cmd-desc">Executes Directed Acyclic Graph (DAG) workflow with cycle detection and HITL gates.</td>
+            <td><code>ntx workflow run wf-code-security-pipeline</code></td>
+          </tr>
+          <tr data-cat="harness">
+            <td class="cmd-name">ntx workflow approve</td>
+            <td><span class="cmd-badge">harness</span></td>
+            <td class="cmd-desc">Submits cryptographic approval token to resume suspended HITL workflow node.</td>
+            <td><code>ntx workflow approve exec-123 NTX-APPROVE-PROD</code></td>
           </tr>
           <tr data-cat="harness">
             <td class="cmd-name">ntx harness status</td>

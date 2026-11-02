@@ -4,8 +4,11 @@
 pub mod webui;
 
 use crate::anti_slop::AntiSlopFilter;
+use crate::bot::DynamicPromptWrapper;
 use crate::db::MemoryEngine;
 use crate::sandbox::SandboxManager;
+use crate::workflow::{GraphRunner, MultiModelGateway};
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
@@ -236,6 +239,209 @@ fn handle_connection(
         let payload = serde_json::json!({ "filtered": filtered });
         send_json(&mut stream, 200, &payload)?;
         return Ok(());
+    }
+
+    // --- Bot App Store API ---
+    if method == "GET" && uri.starts_with("/api/bots") {
+        let id_opt = if let Some(idx) = uri.find("id=") {
+            Some(uri[idx + 3..].split('&').next().unwrap_or("").to_string())
+        } else if uri.len() > 10 && uri.starts_with("/api/bots/") {
+            Some(uri[10..].to_string())
+        } else {
+            None
+        };
+
+        if let Some(bot_id) = id_opt {
+            if let Some(b) = engine.relational.get_bot(&bot_id) {
+                let payload = serde_json::to_value(b).unwrap_or_default();
+                send_json(&mut stream, 200, &payload)?;
+                return Ok(());
+            } else {
+                let payload = serde_json::json!({ "error": "Bot not found" });
+                send_json(&mut stream, 404, &payload)?;
+                return Ok(());
+            }
+        }
+
+        let bots = engine.relational.list_bots();
+        let payload = serde_json::to_value(bots).unwrap_or_default();
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && (uri == "/api/bots/run" || uri.starts_with("/api/bots/")) {
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let bot_id = req_val["bot_id"]
+            .as_str()
+            .or_else(|| {
+                if uri.starts_with("/api/bots/") && !uri.ends_with("/run") {
+                    Some(&uri[10..])
+                } else {
+                    None
+                }
+            })
+            .unwrap_or("ntx-bot-concierge-prime");
+
+        let prompt = req_val["prompt"].as_str().unwrap_or("Audit workspace health");
+        let user_name = req_val["user_name"].as_str().unwrap_or("simha");
+        let workspace_root = req_val["workspace_root"].as_str().unwrap_or("/root/install");
+        let domain_context = req_val["domain_context"].as_str().unwrap_or("production");
+
+        if let Some(bot) = engine.relational.get_bot(bot_id) {
+            let mut vars = HashMap::new();
+            vars.insert("user_name".to_string(), user_name.to_string());
+            vars.insert("workspace_root".to_string(), workspace_root.to_string());
+            vars.insert("domain_context".to_string(), domain_context.to_string());
+
+            let hydrated_sys = DynamicPromptWrapper::hydrate(
+                &bot.system_prompt_template,
+                &vars,
+                &bot.allowed_tools,
+                &bot.sandbox_policy,
+            );
+
+            let execution_output = MultiModelGateway::dispatch(
+                &bot.model_tier,
+                prompt,
+                Some(&hydrated_sys),
+                bot.temperature,
+                &vars,
+            );
+
+            let payload = serde_json::json!({
+                "bot_id": bot.id,
+                "bot_name": bot.name,
+                "model_tier": bot.model_tier,
+                "hydrated_system_prompt": hydrated_sys,
+                "output": execution_output,
+            });
+            send_json(&mut stream, 200, &payload)?;
+            return Ok(());
+        } else {
+            let payload = serde_json::json!({ "error": format!("Bot '{}' not found", bot_id) });
+            send_json(&mut stream, 404, &payload)?;
+            return Ok(());
+        }
+    }
+
+    // --- Workflow DAG Graph Engine API ---
+    if method == "GET" && (uri == "/api/workflows" || uri.starts_with("/api/workflows?")) {
+        let id_opt = if let Some(idx) = uri.find("id=") {
+            Some(uri[idx + 3..].split('&').next().unwrap_or("").to_string())
+        } else {
+            None
+        };
+
+        if let Some(wf_id) = id_opt {
+            if let Some(wf) = engine.relational.get_workflow(&wf_id) {
+                let payload = serde_json::to_value(wf).unwrap_or_default();
+                send_json(&mut stream, 200, &payload)?;
+                return Ok(());
+            } else {
+                let payload = serde_json::json!({ "error": "Workflow not found" });
+                send_json(&mut stream, 404, &payload)?;
+                return Ok(());
+            }
+        }
+
+        let wfs = engine.relational.list_workflows();
+        let payload = serde_json::to_value(wfs).unwrap_or_default();
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/workflows/execute" {
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let wf_id = req_val["workflow_id"].as_str().unwrap_or("wf-code-security-pipeline");
+        
+        let mut custom_inputs = HashMap::new();
+        if let Some(obj) = req_val["inputs"].as_object() {
+            for (k, v) in obj {
+                if let Some(s) = v.as_str() {
+                    custom_inputs.insert(k.clone(), s.to_string());
+                }
+            }
+        }
+
+        if let Some(wf) = engine.relational.get_workflow(wf_id) {
+            match GraphRunner::init_execution(&wf, custom_inputs) {
+                Ok(mut exec) => {
+                    GraphRunner::run_to_completion_or_suspend(&mut exec, &wf, &engine, &sandbox);
+                    let _ = engine.relational.save_execution(exec.clone());
+                    let payload = serde_json::to_value(exec).unwrap_or_default();
+                    send_json(&mut stream, 200, &payload)?;
+                    return Ok(());
+                }
+                Err(err) => {
+                    let payload = serde_json::json!({ "error": err });
+                    send_json(&mut stream, 400, &payload)?;
+                    return Ok(());
+                }
+            }
+        } else {
+            let payload = serde_json::json!({ "error": format!("Workflow '{}' not found", wf_id) });
+            send_json(&mut stream, 404, &payload)?;
+            return Ok(());
+        }
+    }
+
+    if method == "GET" && uri.starts_with("/api/workflows/executions") {
+        let id_opt = if let Some(idx) = uri.find("id=") {
+            Some(uri[idx + 3..].split('&').next().unwrap_or("").to_string())
+        } else {
+            None
+        };
+
+        if let Some(exec_id) = id_opt {
+            if let Some(exec) = engine.relational.get_execution(&exec_id) {
+                let payload = serde_json::to_value(exec).unwrap_or_default();
+                send_json(&mut stream, 200, &payload)?;
+                return Ok(());
+            } else {
+                let payload = serde_json::json!({ "error": "Execution not found" });
+                send_json(&mut stream, 404, &payload)?;
+                return Ok(());
+            }
+        }
+
+        let execs = engine.relational.list_executions();
+        let payload = serde_json::to_value(execs).unwrap_or_default();
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/workflows/executions/approve" {
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let exec_id = req_val["id"].as_str().unwrap_or("");
+        let token = req_val["token"].as_str().unwrap_or("");
+
+        if let Some(mut exec) = engine.relational.get_execution(exec_id) {
+            if let Some(wf) = engine.relational.get_workflow(&exec.workflow_id) {
+                match GraphRunner::approve_hitl(&mut exec, token) {
+                    Ok(_) => {
+                        // Resume execution after approval
+                        GraphRunner::run_to_completion_or_suspend(&mut exec, &wf, &engine, &sandbox);
+                        let _ = engine.relational.save_execution(exec.clone());
+                        let payload = serde_json::to_value(exec).unwrap_or_default();
+                        send_json(&mut stream, 200, &payload)?;
+                        return Ok(());
+                    }
+                    Err(err) => {
+                        let payload = serde_json::json!({ "error": err });
+                        send_json(&mut stream, 400, &payload)?;
+                        return Ok(());
+                    }
+                }
+            } else {
+                let payload = serde_json::json!({ "error": "Workflow definition missing for execution" });
+                send_json(&mut stream, 500, &payload)?;
+                return Ok(());
+            }
+        } else {
+            let payload = serde_json::json!({ "error": format!("Execution '{}' not found", exec_id) });
+            send_json(&mut stream, 404, &payload)?;
+            return Ok(());
+        }
     }
 
     // 404 Fallback

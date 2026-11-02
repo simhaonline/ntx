@@ -1,5 +1,6 @@
 //! Embedded Single-Page Workstation WebUI for Nityaksha
 //! Brand Kit Compliant: Deep Navy (#0D2340), Rust Orange (#C05A28), Default Light Mode with Dark Mode Toggle.
+//! Features Bot App Store, Workflow DAG Graph Engine, Memory RAG, Sandbox, and Governance.
 
 pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
 <html lang="en">
@@ -45,13 +46,13 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-sans); }
     body { background-color: var(--bg-canvas); color: var(--text-body); display: flex; height: 100vh; overflow: hidden; transition: background 0.3s, color 0.3s; }
     
-    #sidebar { width: 280px; background-color: var(--bg-surface); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; transition: all 0.3s; }
+    #sidebar { width: 290px; background-color: var(--bg-surface); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; transition: all 0.3s; }
     .brand-box { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
     .brand-logo { width: 34px; height: 34px; object-fit: contain; }
     .brand-title { font-size: 1.15rem; font-weight: 800; color: var(--text-heading); letter-spacing: -0.02em; }
     .brand-pill { font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.45rem; border-radius: 9999px; background: rgba(192, 90, 40, 0.12); color: var(--color-brand-accent); border: 1px solid rgba(192, 90, 40, 0.3); }
 
-    .nav { list-style: none; padding: 1.25rem 0; flex: 1; }
+    .nav { list-style: none; padding: 1.25rem 0; flex: 1; overflow-y: auto; }
     .nav li { padding: 0.85rem 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 0.85rem; font-size: 0.92rem; font-weight: 600; color: var(--text-muted); transition: all 0.2s; border-left: 3px solid transparent; }
     .nav li:hover, .nav li.active { background-color: rgba(192, 90, 40, 0.08); color: var(--color-brand-accent); border-left: 3px solid var(--color-brand-accent); }
 
@@ -73,12 +74,50 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
     button, input, select, textarea { background-color: var(--bg-canvas); border: 1px solid var(--border-subtle); color: var(--text-heading); padding: 0.55rem 1rem; border-radius: 6px; font-size: 0.9rem; }
     button.btn-primary { background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%); color: #FFFFFF; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(192, 90, 40, 0.3); }
     button.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(192, 90, 40, 0.45); }
+    button.btn-secondary { background: var(--bg-canvas); color: var(--text-heading); border: 1px solid var(--border-subtle); font-weight: 600; cursor: pointer; }
+    button.btn-secondary:hover { border-color: var(--color-brand-accent); color: var(--color-brand-accent); }
     
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.88rem; }
     th, td { text-align: left; padding: 0.85rem 1rem; border-bottom: 1px solid var(--border-subtle); }
     th { color: var(--text-heading); background-color: var(--bg-canvas); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
     .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-family: var(--font-mono); font-weight: 700; background: rgba(192, 90, 40, 0.12); color: var(--color-brand-accent); border: 1px solid rgba(192, 90, 40, 0.25); }
     .badge-green { background: rgba(16, 185, 129, 0.12); color: #10B981; border-color: rgba(16, 185, 129, 0.25); }
+    .badge-blue { background: rgba(14, 165, 233, 0.12); color: #0EA5E9; border-color: rgba(14, 165, 233, 0.25); }
+    .badge-purple { background: rgba(168, 85, 247, 0.12); color: #A855F7; border-color: rgba(168, 85, 247, 0.25); }
+    .badge-amber { background: rgba(245, 158, 11, 0.12); color: #F59E0B; border-color: rgba(245, 158, 11, 0.25); }
+
+    /* Bot Card Styles */
+    .bot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1rem; }
+    .bot-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s; box-shadow: 0 2px 8px rgba(13, 35, 64, 0.03); }
+    .bot-card:hover { border-color: var(--color-brand-accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(192, 90, 40, 0.12); }
+    .bot-header { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.85rem; }
+    .bot-avatar { font-size: 1.8rem; background: var(--bg-canvas); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--border-subtle); }
+    .bot-meta h3 { font-size: 1.05rem; font-weight: 700; color: var(--text-heading); }
+    .bot-meta span { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
+    .bot-desc { font-size: 0.88rem; color: var(--text-body); margin-bottom: 1rem; line-height: 1.5; flex: 1; }
+    .bot-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
+    .bot-starters { background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; }
+    .starter-btn { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.35rem 0; color: var(--color-brand-accent); cursor: pointer; font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .starter-btn:hover { text-decoration: underline; }
+
+    /* Workflow DAG Styles */
+    .wf-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem; }
+    .wf-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+    .wf-nodes { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin: 1.25rem 0; padding: 1rem; background: var(--bg-canvas); border-radius: 8px; border: 1px solid var(--border-subtle); }
+    .dag-node { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.6rem 0.9rem; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+    .dag-node.status-completed { border-color: #10B981; background: rgba(16, 185, 129, 0.08); color: #10B981; }
+    .dag-node.status-running { border-color: var(--color-brand-accent); background: rgba(192, 90, 40, 0.08); color: var(--color-brand-accent); animation: pulse 1.5s infinite; }
+    .dag-node.status-hitl { border-color: #F59E0B; background: rgba(245, 158, 11, 0.12); color: #F59E0B; font-weight: 700; }
+    .dag-arrow { color: var(--text-muted); font-weight: 800; font-size: 1rem; }
+    
+    .hitl-banner { background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 1.25rem; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .hitl-banner h4 { color: #B45309; font-size: 0.95rem; font-weight: 700; }
+    
+    @keyframes pulse {
+      0% { opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { opacity: 0.7; }
+    }
   </style>
 </head>
 <body>
@@ -92,6 +131,8 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
     </a>
     <ul class="nav">
       <li class="active" onclick="showTab('dashboard')">📊 Dashboard & Runtimes</li>
+      <li onclick="showTab('bots')">🤖 Bot App Store</li>
+      <li onclick="showTab('workflows')">⚡ Workflow DAG Engine</li>
       <li onclick="showTab('catalog')">📦 Capability Catalog</li>
       <li onclick="showTab('memory')">🧠 Agent Memory & Vectors</li>
       <li onclick="showTab('sandbox')">🛡️ POSIX Sandbox Runner</li>
@@ -122,12 +163,12 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
           <div class="stat-val" id="stat-skills">87</div>
         </div>
         <div class="stat-card">
-          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Agent Personas</div>
-          <div class="stat-val" id="stat-agents">13</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Pre-Configured Bots</div>
+          <div class="stat-val" id="stat-bots">7</div>
         </div>
         <div class="stat-card">
-          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">MCP & Plugins</div>
-          <div class="stat-val" id="stat-mcps">22</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Workflow DAGs</div>
+          <div class="stat-val" id="stat-workflows">4</div>
         </div>
         <div class="stat-card">
           <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">SIMD Vectors Cached</div>
@@ -144,7 +185,75 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
           ✓ Content-Addressed Storage CAS (/var/lib/nityaksha/cas-cache) - READY<br>
           ✓ Nonprivileged Service User (nityaksha) - VERIFIED<br>
           ✓ Cgroups v2 Quota Hierarchy (/sys/fs/cgroup) - ENFORCED<br>
-          ✓ IBAC Security Gate Invariants - PASS
+          ✓ IBAC Security Gate Invariants - PASS<br>
+          ✓ Kahn's DAG Cycle Detection - VERIFIED 0 CYCLES
+        </div>
+      </div>
+    </div>
+
+    <!-- Bots Tab -->
+    <div id="tab-bots" class="tab-content" style="display: none;">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div class="card-title" style="margin-bottom: 0.25rem;">🤖 Sovereign Bot Catalog & App Store</div>
+            <p style="color: var(--text-muted); font-size: 0.88rem;">Pre-configured personas with dynamic prompt hydration, allowed tools whitelist, and sandbox policies.</p>
+          </div>
+          <div>
+            <input type="text" id="bot-filter" placeholder="Filter bots by category or name..." onkeyup="filterBots()" style="width: 260px;">
+          </div>
+        </div>
+        
+        <div id="bots-container" class="bot-grid">
+          <!-- Dynamically Loaded -->
+        </div>
+      </div>
+
+      <!-- Bot Execution Modal/Card -->
+      <div id="bot-runner-panel" class="card" style="display: none; border-color: var(--color-brand-accent);">
+        <div class="card-title" id="bot-runner-title">Run Bot Persona</div>
+        <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
+          <input type="text" id="bot-prompt-input" placeholder="Enter prompt or select a starter prompt..." style="flex: 1;">
+          <button class="btn-primary" onclick="submitBotRun()">Dispatch to Bot</button>
+          <button class="btn-secondary" onclick="closeBotRunner()">Close</button>
+        </div>
+        <div id="bot-runner-status" style="font-family: var(--font-mono); font-size: 0.88rem; color: var(--text-muted); background: var(--bg-canvas); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-subtle); max-height: 350px; overflow-y: auto; white-space: pre-wrap;">Awaiting dispatch...</div>
+      </div>
+    </div>
+
+    <!-- Workflows Tab -->
+    <div id="tab-workflows" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">⚡ Directed Acyclic Graph (DAG) Workflow Engine</div>
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">
+          Structured multi-agent graph orchestrations with Kahn's cycle detection, multi-model dispatch, and Human-in-the-Loop (HITL) merge gates.
+        </p>
+        <div id="workflows-container">
+          <!-- Dynamically Loaded -->
+        </div>
+      </div>
+
+      <!-- Workflow Live Execution Tracker -->
+      <div id="wf-exec-panel" class="card" style="display: none; border-color: var(--color-brand-accent);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div class="card-title" id="wf-exec-title" style="margin: 0;">Workflow Execution Tracker</div>
+          <span id="wf-exec-badge" class="badge">Running</span>
+        </div>
+        
+        <div id="wf-exec-nodes" class="wf-nodes"></div>
+
+        <div id="wf-hitl-box" class="hitl-banner" style="display: none;">
+          <h4>⚠️ Mandatory Human-in-the-Loop Approval Required</h4>
+          <p id="wf-hitl-prompt" style="font-size: 0.88rem; color: var(--text-heading);"></p>
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <input type="text" id="wf-hitl-token" placeholder="Enter approval token..." style="flex: 1;">
+            <button class="btn-primary" onclick="submitHitlApproval()">Authorize & Resume DAG</button>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.25rem;">
+          <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--text-heading); margin-bottom: 0.5rem;">Execution Trace Logs:</h4>
+          <pre id="wf-exec-logs" style="background: var(--bg-canvas); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 0.82rem; max-height: 250px; overflow-y: auto;">Waiting for steps...</pre>
         </div>
       </div>
     </div>
@@ -219,6 +328,12 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
   </div>
 
   <script>
+    let activeBots = [];
+    let activeWorkflows = [];
+    let currentBotId = null;
+    let currentExecId = null;
+    let pollInterval = null;
+
     function initDashboardTheme() {
       const savedTheme = localStorage.getItem('nityaksha-theme');
       if (savedTheme === 'dark') {
@@ -244,10 +359,260 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
     function showTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
       document.querySelectorAll('.nav li').forEach(el => el.classList.remove('active'));
-      document.getElementById('tab-' + tab).style.display = 'block';
-      event.currentTarget.classList.add('active');
+      const activeEl = document.getElementById('tab-' + tab);
+      if (activeEl) activeEl.style.display = 'block';
+      if (window.event && window.event.currentTarget) {
+        window.event.currentTarget.classList.add('active');
+      }
+
+      if (tab === 'bots') loadBots();
+      if (tab === 'workflows') loadWorkflows();
     }
 
+    // --- Bot App Store Functions ---
+    function loadBots() {
+      fetch('/api/bots')
+        .then(r => r.json())
+        .then(bots => {
+          activeBots = bots;
+          renderBots(bots);
+          document.getElementById('stat-bots').textContent = bots.length;
+        })
+        .catch(err => console.error("Error loading bots:", err));
+    }
+
+    function renderBots(bots) {
+      const c = document.getElementById('bots-container');
+      c.innerHTML = '';
+      bots.forEach(b => {
+        const startersHtml = (b.starter_prompts || []).map(p => 
+          `<button class="starter-btn" onclick="openBotRunner('${b.id}', '${escapeAttr(p)}')">⚡ "${escapeHtml(p)}"</button>`
+        ).join('');
+
+        const toolsHtml = (b.allowed_tools || []).map(t => 
+          `<span class="badge badge-blue" style="font-size: 0.68rem;">${escapeHtml(t)}</span>`
+        ).join('');
+
+        const card = document.createElement('div');
+        card.className = 'bot-card';
+        card.innerHTML = `
+          <div>
+            <div class="bot-header">
+              <div class="bot-avatar">${b.avatar || '🤖'}</div>
+              <div class="bot-meta">
+                <h3>${escapeHtml(b.name)}</h3>
+                <span>${escapeHtml(b.category)} • v${escapeHtml(b.version)}</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
+              <span class="badge">${escapeHtml(b.model_tier)}</span>
+              <span class="badge badge-purple">${escapeHtml(b.sandbox_policy)}</span>
+            </div>
+            <div class="bot-desc">${escapeHtml(b.description)}</div>
+            <div class="bot-chips">${toolsHtml}</div>
+            <div class="bot-starters">
+              <div style="color: var(--text-muted); font-size: 0.72rem; font-weight: 700; margin-bottom: 0.35rem; text-transform: uppercase;">Starter Prompts</div>
+              ${startersHtml}
+            </div>
+          </div>
+          <button class="btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="openBotRunner('${b.id}')">Activate Persona</button>
+        `;
+        c.appendChild(card);
+      });
+    }
+
+    function filterBots() {
+      const q = document.getElementById('bot-filter').value.toLowerCase();
+      const filtered = activeBots.filter(b => 
+        b.name.toLowerCase().includes(q) || 
+        b.category.toLowerCase().includes(q) || 
+        b.description.toLowerCase().includes(q)
+      );
+      renderBots(filtered);
+    }
+
+    function openBotRunner(botId, starterPrompt) {
+      currentBotId = botId;
+      const bot = activeBots.find(b => b.id === botId);
+      document.getElementById('bot-runner-panel').style.display = 'block';
+      document.getElementById('bot-runner-title').textContent = `${bot ? bot.avatar + ' ' + bot.name : botId} — Interactive Session`;
+      if (starterPrompt) {
+        document.getElementById('bot-prompt-input').value = starterPrompt;
+      }
+      document.getElementById('bot-runner-panel').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function closeBotRunner() {
+      document.getElementById('bot-runner-panel').style.display = 'none';
+    }
+
+    function submitBotRun() {
+      const prompt = document.getElementById('bot-prompt-input').value;
+      const statusEl = document.getElementById('bot-runner-status');
+      statusEl.textContent = 'Hydrating prompt variables and dispatching to pure Rust MultiModelGateway...';
+
+      fetch('/api/bots/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bot_id: currentBotId, prompt: prompt })
+      })
+      .then(r => r.json())
+      .then(res => {
+        statusEl.textContent = `[SYSTEM INVARIANT LOADED]:\n${res.hydrated_system_prompt}\n\n=======================================================\n[EXECUTION RESPONSE]:\n${res.output}`;
+      })
+      .catch(err => {
+        statusEl.textContent = 'Error executing bot: ' + err;
+      });
+    }
+
+    // --- Workflow DAG Functions ---
+    function loadWorkflows() {
+      fetch('/api/workflows')
+        .then(r => r.json())
+        .then(wfs => {
+          activeWorkflows = wfs;
+          renderWorkflows(wfs);
+          document.getElementById('stat-workflows').textContent = wfs.length;
+        })
+        .catch(err => console.error("Error loading workflows:", err));
+    }
+
+    function renderWorkflows(wfs) {
+      const c = document.getElementById('workflows-container');
+      c.innerHTML = '';
+      wfs.forEach(wf => {
+        const nodesHtml = wf.nodes.map((node, i) => {
+          const arrow = i < wf.nodes.length - 1 ? '<span class="dag-arrow">→</span>' : '';
+          const isHitl = node.kind && node.kind.type === 'HitlGate';
+          const badgeClass = isHitl ? 'badge-amber' : 'badge';
+          return `
+            <div class="dag-node">
+              <span>${escapeHtml(node.name)}</span>
+              <span class="badge ${badgeClass}">${escapeHtml(node.kind ? node.kind.type : 'Task')}</span>
+            </div>
+            ${arrow}
+          `;
+        }).join('');
+
+        const card = document.createElement('div');
+        card.className = 'wf-card';
+        card.innerHTML = `
+          <div class="wf-header">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-heading);">${escapeHtml(wf.name)}</h3>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">${escapeHtml(wf.category)} • ${wf.nodes.length} Graph Steps • v${escapeHtml(wf.version)}</span>
+            </div>
+            <button class="btn-primary" onclick="launchWorkflow('${wf.id}')">Execute DAG Workflow</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-body);">${escapeHtml(wf.description)}</p>
+          <div class="wf-nodes">${nodesHtml}</div>
+        `;
+        c.appendChild(card);
+      });
+    }
+
+    function launchWorkflow(wfId) {
+      const execPanel = document.getElementById('wf-exec-panel');
+      execPanel.style.display = 'block';
+      execPanel.scrollIntoView({ behavior: 'smooth' });
+
+      fetch('/api/workflows/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: wfId })
+      })
+      .then(r => r.json())
+      .then(exec => {
+        currentExecId = exec.id;
+        updateExecDisplay(exec);
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(() => pollExecution(currentExecId), 1500);
+      })
+      .catch(err => {
+        alert("Workflow execution launch failed: " + err);
+      });
+    }
+
+    function pollExecution(execId) {
+      fetch('/api/workflows/executions?id=' + encodeURIComponent(execId))
+        .then(r => r.json())
+        .then(exec => {
+          updateExecDisplay(exec);
+          if (exec.status === 'Completed' || exec.status === 'Failed') {
+            clearInterval(pollInterval);
+          }
+        })
+        .catch(err => console.error("Poll error:", err));
+    }
+
+    function updateExecDisplay(exec) {
+      document.getElementById('wf-exec-title').textContent = `Execution: ${exec.workflow_name} (${exec.id})`;
+      const badge = document.getElementById('wf-exec-badge');
+      badge.textContent = exec.status;
+
+      if (exec.status === 'Completed') {
+        badge.className = 'badge badge-green';
+      } else if (exec.status === 'SuspendedWaitingHitl') {
+        badge.className = 'badge badge-amber';
+      } else {
+        badge.className = 'badge badge-blue';
+      }
+
+      // Render Nodes Progress
+      const nodesContainer = document.getElementById('wf-exec-nodes');
+      const wf = activeWorkflows.find(w => w.id === exec.workflow_id);
+      if (wf) {
+        nodesContainer.innerHTML = wf.nodes.map((node, i) => {
+          const state = exec.node_states[node.id];
+          const status = state ? state.status : 'Pending';
+          let cls = '';
+          if (status === 'Completed') cls = 'status-completed';
+          if (status === 'Running') cls = 'status-running';
+          if (status === 'SuspendedWaitingHitl') cls = 'status-hitl';
+          const arrow = i < wf.nodes.length - 1 ? '<span class="dag-arrow">→</span>' : '';
+          return `
+            <div class="dag-node ${cls}">
+              <span>${escapeHtml(node.name)}</span>
+              <span class="badge">${escapeHtml(status)}</span>
+            </div>
+            ${arrow}
+          `;
+        }).join('');
+      }
+
+      // Check HITL Banner
+      const hitlBox = document.getElementById('wf-hitl-box');
+      if (exec.status === 'SuspendedWaitingHitl' && exec.pending_hitl) {
+        hitlBox.style.display = 'block';
+        document.getElementById('wf-hitl-prompt').textContent = `${exec.pending_hitl.prompt} (Token Required: ${exec.pending_hitl.token_name})`;
+        document.getElementById('wf-hitl-token').value = exec.pending_hitl.token_name;
+      } else {
+        hitlBox.style.display = 'none';
+      }
+
+      // Update Logs
+      const logsEl = document.getElementById('wf-exec-logs');
+      logsEl.textContent = (exec.logs || []).join('\n');
+      logsEl.scrollTop = logsEl.scrollHeight;
+    }
+
+    function submitHitlApproval() {
+      const token = document.getElementById('wf-hitl-token').value;
+      fetch('/api/workflows/executions/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentExecId, token: token })
+      })
+      .then(r => r.json())
+      .then(exec => {
+        updateExecDisplay(exec);
+      })
+      .catch(err => {
+        alert("HITL Approval failed: " + err);
+      });
+    }
+
+    // --- Search & Memory Functions ---
     function searchCatalog() {
       const q = document.getElementById('catalog-search').value;
       fetch('/api/catalog?q=' + encodeURIComponent(q))
@@ -312,7 +677,11 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
     }
 
     function escapeHtml(t) {
-      return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return String(t || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function escapeAttr(t) {
+      return String(t || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
     }
 
     // Load initial stats
@@ -321,8 +690,6 @@ pub const EMBEDDED_WEBUI_HTML: &str = r#"<!DOCTYPE html>
       .then(data => {
         if (data.capabilities_cached) {
           document.getElementById('stat-skills').textContent = data.capabilities_cached.skill || 87;
-          document.getElementById('stat-agents').textContent = data.capabilities_cached.agent || 13;
-          document.getElementById('stat-mcps').textContent = (data.capabilities_cached.mcp || 11) + (data.capabilities_cached.plugin || 11);
         }
       })
       .catch(() => {});

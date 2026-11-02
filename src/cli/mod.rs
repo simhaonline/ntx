@@ -4,6 +4,7 @@
 
 use crate::anti_slop::AntiSlopFilter;
 use crate::arena::ArenaRanker;
+use crate::bot::DynamicPromptWrapper;
 use crate::db::relational::AgentSessionRow;
 use crate::db::MemoryEngine;
 use crate::harness::eval_judge::EvalJudgeEngine;
@@ -15,6 +16,8 @@ use crate::sandbox::ibac::IbacGate;
 use crate::sandbox::SandboxManager;
 use crate::server::HttpServer;
 use crate::sre::SreEngine;
+use crate::workflow::{ExecutionStatus, GraphRunner, MultiModelGateway, NodeKind};
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::Path;
@@ -163,6 +166,8 @@ impl CliHandler {
             "mcp" => self.cmd_mcp(&sub_args),
             "prompt" | "prompts" => self.cmd_prompt(&sub_args),
             "plugin" | "plugins" => self.cmd_plugin(&sub_args),
+            "bot" | "bots" => self.cmd_bot(&sub_args),
+            "workflow" | "workflows" | "wf" => self.cmd_workflow(&sub_args),
             "db" | "memory" => self.cmd_memory(&sub_args),
             "sandbox" | "gate" => self.cmd_sandbox(&sub_args),
             "serve" | "daemon" | "ui" => self.cmd_serve(&options, &sub_args),
@@ -1200,6 +1205,292 @@ complete -F _ntx_completions ntx"#);
         }
     }
 
+    pub fn cmd_bot(&self, args: &[String]) {
+        let action = if args.is_empty() { "list" } else { args[0].as_str() };
+        match action {
+            "list" => {
+                let mut bots = self.engine.relational.list_bots();
+                bots.sort_by(|a, b| a.id.cmp(&b.id));
+                println!("=================================================================================================================");
+                println!("          Nityaksha Sovereign Bot Catalog & App Store ({} pre-configured personas)          ", bots.len());
+                println!("=================================================================================================================");
+                println!("  {:<28} {:<20} {:<15} {}", "BOT ID", "CATEGORY", "MODEL TIER", "DESCRIPTION");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for b in &bots {
+                    let desc = clean_terminal_text(&b.description, 48);
+                    println!("  {:<28} {:<20} {:<15} {}", b.id, b.category, b.model_tier, desc);
+                }
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                println!("Tip: Run 'ntx bot inspect <id>' or 'ntx bot run <id> [prompt]' to launch.");
+            }
+            "inspect" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx bot inspect <bot-id>");
+                    return;
+                }
+                let id = &args[1];
+                if let Some(b) = self.engine.relational.get_bot(id) {
+                    println!("=================================================================================================================");
+                    println!("  Bot Profile: {} {} (v{})", b.avatar, b.name, b.version);
+                    println!("=================================================================================================================");
+                    println!("  ID             : {}", b.id);
+                    println!("  Category       : {}", b.category);
+                    println!("  Author         : {}", b.author);
+                    println!("  Model Tier     : {}", b.model_tier);
+                    println!("  Temperature    : {:.1}", b.temperature);
+                    println!("  Sandbox Policy : {}", b.sandbox_policy);
+                    println!("  Allowed Tools  : {}", b.allowed_tools.join(", "));
+                    println!("  Tags           : {}", b.tags.join(", "));
+                    println!("  Description    : {}", b.description);
+                    println!("\n  [System Prompt Template]:");
+                    println!("  {}", b.system_prompt_template);
+                    println!("\n  [Starter Prompts]:");
+                    for sp in &b.starter_prompts {
+                        println!("  * \"{}\"", sp);
+                    }
+                    println!("=================================================================================================================");
+                } else {
+                    eprintln!("Error: Bot '{}' not found in registry.", id);
+                }
+            }
+            "run" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx bot run <bot-id> [prompt]");
+                    return;
+                }
+                let id = &args[1];
+                let prompt = if args.len() > 2 {
+                    args[2..].join(" ")
+                } else {
+                    "Audit workspace health and report status.".to_string()
+                };
+
+                if let Some(b) = self.engine.relational.get_bot(id) {
+                    println!("=================================================================================================================");
+                    println!("  Bot Dispatch: {} {} ({})", b.avatar, b.name, b.id);
+                    println!("=================================================================================================================");
+                    let mut vars = HashMap::new();
+                    vars.insert("user_name".to_string(), "simha".to_string());
+                    vars.insert("workspace_root".to_string(), "/root/install".to_string());
+                    vars.insert("domain_context".to_string(), "production".to_string());
+
+                    let hydrated_sys = DynamicPromptWrapper::hydrate(
+                        &b.system_prompt_template,
+                        &vars,
+                        &b.allowed_tools,
+                        &b.sandbox_policy,
+                    );
+
+                    println!("[SYSTEM INVARIANT]: Model Tier = {}, Sandbox = {}", b.model_tier, b.sandbox_policy);
+                    println!("[USER PROMPT]     : {}", prompt);
+                    println!("-----------------------------------------------------------------------------------------------------------------");
+                    let output = MultiModelGateway::dispatch(
+                        &b.model_tier,
+                        &prompt,
+                        Some(&hydrated_sys),
+                        b.temperature,
+                        &vars,
+                    );
+                    println!("{}", output);
+                    println!("=================================================================================================================");
+                } else {
+                    eprintln!("Error: Bot '{}' not found.", id);
+                }
+            }
+            _ => eprintln!("Usage: ntx bot [list|inspect|run] [id] [prompt]"),
+        }
+    }
+
+    pub fn cmd_workflow(&self, args: &[String]) {
+        let action = if args.is_empty() { "list" } else { args[0].as_str() };
+        match action {
+            "list" => {
+                let mut wfs = self.engine.relational.list_workflows();
+                wfs.sort_by(|a, b| a.id.cmp(&b.id));
+                println!("=================================================================================================================");
+                println!("          Nityaksha Directed Acyclic Graph (DAG) Workflow Engine ({} templates)          ", wfs.len());
+                println!("=================================================================================================================");
+                println!("  {:<28} {:<24} {:<8} {}", "WORKFLOW ID", "CATEGORY", "NODES", "DESCRIPTION");
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                for wf in &wfs {
+                    let desc = clean_terminal_text(&wf.description, 48);
+                    println!("  {:<28} {:<24} {:<8} {}", wf.id, wf.category, wf.nodes.len(), desc);
+                }
+                println!("-----------------------------------------------------------------------------------------------------------------");
+                println!("Tip: Run 'ntx workflow inspect <id>' or 'ntx workflow run <id>' to execute.");
+            }
+            "inspect" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx workflow inspect <workflow-id>");
+                    return;
+                }
+                let id = &args[1];
+                if let Some(wf) = self.engine.relational.get_workflow(id) {
+                    println!("=================================================================================================================");
+                    println!("  DAG Workflow Graph: {} (v{})", wf.name, wf.version);
+                    println!("=================================================================================================================");
+                    println!("  ID          : {}", wf.id);
+                    println!("  Category    : {}", wf.category);
+                    println!("  Author      : {}", wf.author);
+                    println!("  Description : {}", wf.description);
+                    println!("\n  [Execution Nodes ({} in DAG)]:", wf.nodes.len());
+                    for (i, node) in wf.nodes.iter().enumerate() {
+                        let kind_str = match &node.kind {
+                            NodeKind::LlmTask { model_tier, .. } => format!("LlmTask ({})", model_tier),
+                            NodeKind::ToolCall { tool_name, .. } => format!("ToolCall ({})", tool_name),
+                            NodeKind::HitlGate { approval_token_name, .. } => format!("HITL Gate (Token: {})", approval_token_name),
+                            NodeKind::Transform { output_variable, .. } => format!("Transform (-> {})", output_variable),
+                            NodeKind::SyncMemory { target_drawer, .. } => format!("SyncMemory (Drawer: {})", target_drawer),
+                            NodeKind::BranchCondition { condition_expr, .. } => format!("Branch ({})", condition_expr),
+                        };
+                        let deps = if node.dependencies.is_empty() {
+                            "(Root node)".to_string()
+                        } else {
+                            format!("Depends on: {}", node.dependencies.join(", "))
+                        };
+                        println!("    {}. [{}] {} | {}", i + 1, node.id, node.name, kind_str);
+                        println!("       {}", deps);
+                    }
+                    println!("\n  [Dependency Edges]:");
+                    for edge in &wf.edges {
+                        let cond = edge.condition.as_deref().unwrap_or("unconditional");
+                        println!("    {} ---> {} [{}]", edge.from_node, edge.to_node, cond);
+                    }
+                    println!("=================================================================================================================");
+                } else {
+                    eprintln!("Error: Workflow '{}' not found.", id);
+                }
+            }
+            "run" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx workflow run <workflow-id> [key=value ...]");
+                    return;
+                }
+                let id = &args[1];
+                if let Some(wf) = self.engine.relational.get_workflow(id) {
+                    let mut custom_inputs = HashMap::new();
+                    for param in &args[2..] {
+                        if let Some((k, v)) = param.split_once('=') {
+                            custom_inputs.insert(k.to_string(), v.to_string());
+                        }
+                    }
+
+                    println!("=================================================================================================================");
+                    println!("  Launching Workflow Execution: {}", wf.name);
+                    println!("=================================================================================================================");
+                    match GraphRunner::init_execution(&wf, custom_inputs) {
+                        Ok(mut exec) => {
+                            println!("[DAG VERIFIED]: Kahn's topological sort resolved with 0 cycles.");
+                            println!("[EXECUTION ID]: {}", exec.id);
+                            println!("-----------------------------------------------------------------------------------------------------------------");
+
+                            GraphRunner::run_to_completion_or_suspend(&mut exec, &wf, &self.engine, &self.sandbox);
+                            let _ = self.engine.relational.save_execution(exec.clone());
+
+                            for log in &exec.logs {
+                                println!("  {}", log);
+                            }
+
+                            println!("-----------------------------------------------------------------------------------------------------------------");
+                            match exec.status {
+                                ExecutionStatus::Completed => {
+                                    println!("[STATUS]: COMPLETED successfully.");
+                                }
+                                ExecutionStatus::SuspendedWaitingHitl => {
+                                    if let Some(ref hitl) = exec.pending_hitl {
+                                        println!("[STATUS]: SUSPENDED - WAITING FOR HUMAN-IN-THE-LOOP APPROVAL");
+                                        println!("  Node       : {}", hitl.node_id);
+                                        println!("  Prompt     : {}", hitl.prompt);
+                                        println!("  Required   : {}", hitl.token_name);
+                                        println!("\n  To approve and resume execution, run:");
+                                        println!("    ntx workflow approve {} {}", exec.id, hitl.token_name);
+                                    }
+                                }
+                                ExecutionStatus::Failed => {
+                                    println!("[STATUS]: FAILED. Inspect error traces above.");
+                                }
+                                _ => {
+                                    println!("[STATUS]: {:?}", exec.status);
+                                }
+                            }
+                            println!("=================================================================================================================");
+                        }
+                        Err(err) => {
+                            eprintln!("Error initializing workflow: {}", err);
+                        }
+                    }
+                } else {
+                    eprintln!("Error: Workflow '{}' not found.", id);
+                }
+            }
+            "status" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx workflow status <execution-id>");
+                    return;
+                }
+                let exec_id = &args[1];
+                if let Some(exec) = self.engine.relational.get_execution(exec_id) {
+                    println!("=================================================================================================================");
+                    println!("  Workflow Execution Status: {}", exec.id);
+                    println!("=================================================================================================================");
+                    println!("  Workflow : {} ({})", exec.workflow_name, exec.workflow_id);
+                    println!("  Status   : {:?}", exec.status);
+                    println!("  Started  : {}", exec.started_at);
+                    if let Some(ref c) = exec.completed_at {
+                        println!("  Finished : {}", c);
+                    }
+                    if let Some(ref hitl) = exec.pending_hitl {
+                        println!("  Pending  : HITL Gate '{}' awaiting token '{}'", hitl.node_id, hitl.token_name);
+                    }
+                    println!("\n  [Node Execution States]:");
+                    for (node_id, state) in &exec.node_states {
+                        println!("    * {:<24} [{:?}]", node_id, state.status);
+                    }
+                    println!("\n  [Recent Logs (last 5)]:");
+                    let start_idx = exec.logs.len().saturating_sub(5);
+                    for log in &exec.logs[start_idx..] {
+                        println!("    {}", log);
+                    }
+                    println!("=================================================================================================================");
+                } else {
+                    eprintln!("Error: Execution '{}' not found.", exec_id);
+                }
+            }
+            "approve" => {
+                if args.len() < 3 {
+                    eprintln!("Usage: ntx workflow approve <execution-id> <token>");
+                    return;
+                }
+                let exec_id = &args[1];
+                let token = &args[2];
+                if let Some(mut exec) = self.engine.relational.get_execution(exec_id) {
+                    if let Some(wf) = self.engine.relational.get_workflow(&exec.workflow_id) {
+                        match GraphRunner::approve_hitl(&mut exec, token) {
+                            Ok(msg) => {
+                                println!("[HITL RESOLVED]: {}", msg);
+                                println!("Resuming DAG execution to completion...");
+                                GraphRunner::run_to_completion_or_suspend(&mut exec, &wf, &self.engine, &self.sandbox);
+                                let _ = self.engine.relational.save_execution(exec.clone());
+                                for log in &exec.logs[exec.logs.len().saturating_sub(4)..] {
+                                    println!("  {}", log);
+                                }
+                                println!("[FINAL STATUS]: {:?}", exec.status);
+                            }
+                            Err(err) => {
+                                eprintln!("Error approving HITL gate: {}", err);
+                            }
+                        }
+                    } else {
+                        eprintln!("Error: Workflow definition '{}' not found.", exec.workflow_id);
+                    }
+                } else {
+                    eprintln!("Error: Execution '{}' not found.", exec_id);
+                }
+            }
+            _ => eprintln!("Usage: ntx workflow [list|inspect|run|status|approve] [id] [args...]"),
+        }
+    }
+
     pub fn cmd_memory(&self, args: &[String]) {
         let action = if args.is_empty() { "stats" } else { args[0].as_str() };
         match action {
@@ -1611,6 +1902,8 @@ complete -F _ntx_completions ntx"#);
         println!("  mcp [list|test]                 Manage Model Context Protocol servers");
         println!("  prompt [list|test]              Browse injection-hardened system prompts");
         println!("  plugin [list]                   Manage drop-in runtime plugins");
+        println!("  bot [list|inspect|run]          Sovereign Bot App Store and personas");
+        println!("  workflow [list|inspect|run|approve] DAG Workflow Graph Engine and orchestration");
         println!("  memory | db [query|stats]       Query hybrid dense SIMD + BM25 vector memory");
         println!("  sandbox [run|eval]              Run commands in POSIX namespaces and cgroups");
         println!("  harness [status|eval|gate]      Inspect AI Harness guardrails and HITL gates");
