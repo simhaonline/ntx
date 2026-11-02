@@ -387,21 +387,20 @@ eval "$(ntx completion bash)"
 
 ---
 
-## 9. Single-Page Landing Page & Plesk Hosting
+## 9. Single-Page Sovereign Landing Page & Static Web Serving
 
-Nityaksha includes a self-contained, responsive single-page landing page (`index.html`) at the repository root.
+Nityaksha includes a self-contained, responsive single-page landing page (`index.html`) at the repository root, ready for immediate deployment on any web server, edge CDN, Nginx, or Caddy reverse proxy.
 
-### Hosting on Plesk via Git:
-1. In the **Plesk Control Panel**, add a Git repository targeting `https://github.com/simhaonline/ntx.git`.
-2. Set the deployment destination path to your domain's document root (e.g. `/httpdocs` or `/public_html`).
-3. Enable **Automatic Deployment**. When changes are pushed to `main`, Plesk pulls `index.html` and immediately serves the AI Concierge Platform landing page at `https://simhaonline.ai`.
-4. Zero NPM or Node build steps required—pure inline CSS, inlined SVG icons, and vanilla JavaScript.
+### Deployment:
+1. Clone or pull the repository to your web root: `git clone https://github.com/simhaonline/ntx.git`.
+2. Point your reverse proxy or static web server (Nginx, Caddy, or Edge CDN) to serve `index.html`.
+3. Zero build steps, zero node_modules, and zero NPM tooling required—pure inline CSS, inlined SVG icons, and vanilla JavaScript.
 
 ### Embedded Web Server Endpoints (:8080):
 
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/` or `/index.html` | High-converting single-page landing page (matching Plesk) |
+| `GET` | `/` or `/index.html` | High-converting single-page landing page |
 | `GET` | `/app` or `/dashboard` | Reactive single-page workstation dashboard |
 | `GET` | `/install.sh` | Serves Linux / macOS universal installer script |
 | `GET` | `/install.ps1` | Serves Windows PowerShell installer script |
