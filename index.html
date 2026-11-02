@@ -1373,6 +1373,7 @@
       <div class="install-tabs">
         <button class="install-tab active" onclick="switchInstallTab('linux')">Linux & macOS</button>
         <button class="install-tab" onclick="switchInstallTab('windows')">Windows (PS)</button>
+        <button class="install-tab" onclick="switchInstallTab('winexe')">Windows Binary (.exe)</button>
         <button class="install-tab" onclick="switchInstallTab('ios')">iOS (iSH)</button>
         <button class="install-tab" onclick="switchInstallTab('cargo')">Cargo Crate</button>
         <button class="install-tab" onclick="switchInstallTab('github')">GitHub Source</button>
@@ -1389,8 +1390,8 @@
       </div>
       <div class="install-meta">
         <span>✓ 100% Native Pure Rust</span>
-        <span>✓ POSIX Atomic Update (No ETXTBSY)</span>
-        <span>✓ Standalone Binary: /usr/local/bin/ntx</span>
+        <span>✓ Direct Windows PE: <a href="/ntx.exe" style="color:var(--color-brand-accent);font-weight:700;text-decoration:none;">Download ntx.exe (1.8 MB)</a></span>
+        <span>✓ Interactive REPL with Folder Trust & Color Themes</span>
       </div>
     </div>
 
@@ -1403,7 +1404,8 @@
           <span class="dot dot-green"></span>
         </div>
         <div class="terminal-tabs">
-          <button class="term-tab active" onclick="setTerminalOutput('status')">ntx status</button>
+          <button class="term-tab active" onclick="setTerminalOutput('interactive')">ntx (Interactive Shell)</button>
+          <button class="term-tab" onclick="setTerminalOutput('status')">ntx status</button>
           <button class="term-tab" onclick="setTerminalOutput('providers')">ntx provider list</button>
           <button class="term-tab" onclick="setTerminalOutput('oauth')">ntx auth status</button>
           <button class="term-tab" onclick="setTerminalOutput('bots')">ntx bot list</button>
@@ -1988,6 +1990,7 @@
           <ul>
             <li><a href="/install.sh">Linux & macOS (bash)</a></li>
             <li><a href="/install.ps1">Windows (PowerShell)</a></li>
+            <li><a href="/ntx.exe">Windows Binary (ntx.exe)</a></li>
             <li><a href="/install-ios.sh">iOS (iSH / a-Shell)</a></li>
             <li><a href="https://github.com/simhaonline/ntx" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
           </ul>
@@ -2036,6 +2039,7 @@
     const installCommands = {
       linux: 'curl -fsSL https://simhaonline.ai/install.sh | bash',
       windows: 'irm https://simhaonline.ai/install.ps1 | iex',
+      winexe: 'curl -LO https://simhaonline.ai/ntx.exe && .\\ntx.exe',
       ios: 'curl -fsSL https://simhaonline.ai/install-ios.sh | sh',
       cargo: 'cargo install --git https://github.com/simhaonline/ntx.git ntx',
       github: 'git clone https://github.com/simhaonline/ntx.git && cd ntx && cargo build --release'
@@ -2062,6 +2066,41 @@
 
     // --- Live Terminal Simulator with Custom Outputs ---
     const terminalData = {
+      interactive: `┌────────────────────────────────────────────────────────────────────────┐
+│ 🛡️  WORKSPACE TRUST VERIFICATION                                       │
+├────────────────────────────────────────────────────────────────────────┤
+│ Directory: /root/install                                              │
+│                                                                        │
+│ Do you trust the authors and scripts in this directory?                │
+│ Trusting this workspace permits Nityaksha to inspect repository AST,   │
+│ execute isolated tools, and apply code diffs within security gates.    │
+│                                                                        │
+│   [Y] Yes, trust this folder (Recommended)                             │
+│   [N] No, run in strictly read-only mode                               │
+└────────────────────────────────────────────────────────────────────────┘
+Trust this directory? [Y/n]: y
+✓ Directory marked as trusted.
+
+================================================================================
+  NITYAKSHA — An AI Concierge Platform (v1.0.0 Pure Rust Native)
+================================================================================
+  Session ID  : sess-1793663151218
+  Workspace   : /root/install (TRUSTED ✓)
+  AI Provider : Google Gemini (gemini-2.0-flash)
+  Auth State  : Google OAuth 2.0 Authenticated
+  Theme       : 🦀 Rust Orange & Deep Navy (Official Nityaksha Brand)
+--------------------------------------------------------------------------------
+  Type your prompt to chat, or use slash commands:
+  /help • /provider • /auth • /theme • /model • /bot • /doctor • /exit
+================================================================================
+
+[dir: /root/install | git: main | TRUSTED ✓] [gemini-2.0-flash]
+🦀 ntx ❯ audit AST for security leaks and optimize ring buffer
+Dispatching turn #1 to Google Gemini (gemini-2.0-flash)...
+✓ Memory search completed (133 vectors scanned)
+✓ AST pruned 47 unused functions
+✓ Ring buffer memory verified zero-copy
+─── [gemini | model=gemini-2.0-flash | 114ms | session=sess-1793663151218] ───`,
       status: `=================================================================================================================
           NITYAKSHA - An AI Concierge Platform (v1.0.0 Pure Rust Native)
           Engineered for high-velocity, deterministic AI in pure Rust.
@@ -2190,7 +2229,7 @@ Nityaksha AI Harness Governance Engine:
       }
     }
 
-    setTerminalOutput('status');
+    setTerminalOutput('interactive');
 
     // --- Blueprint Modal Functions ---
     function openBlueprintModal() {

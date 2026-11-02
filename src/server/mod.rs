@@ -220,6 +220,29 @@ fn handle_connection(
         return Ok(());
     }
 
+    if (method == "GET" || method == "HEAD") && (uri == "/ntx.exe" || uri == "/download/ntx.exe") {
+        let p1 = std::path::Path::new("ntx.exe");
+        let p2 = std::path::Path::new("/root/install/nityaksha-core/ntx.exe");
+        let bytes = if p1.exists() {
+            std::fs::read(p1).unwrap_or_default()
+        } else if p2.exists() {
+            std::fs::read(p2).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if !bytes.is_empty() {
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.microsoft.portable-executable\r\nContent-Disposition: attachment; filename=\"ntx.exe\"\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
+                bytes.len()
+            );
+            stream.write_all(resp.as_bytes())?;
+            if method == "GET" {
+                stream.write_all(&bytes)?;
+            }
+            return Ok(());
+        }
+    }
+
     if method == "GET" && (uri == "/api/status" || uri == "/api/health") {
         let payload = serde_json::json!({
             "status": "healthy",

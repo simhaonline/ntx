@@ -2,6 +2,8 @@
 //! Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.
 //! Comprehensive options, execution modes, sessions, daemon, and AI Harness lifecycle.
 
+pub mod interactive;
+
 use crate::anti_slop::AntiSlopFilter;
 use crate::arena::ArenaRanker;
 use crate::bot::DynamicPromptWrapper;
@@ -19,7 +21,7 @@ use crate::sre::SreEngine;
 use crate::workflow::{ExecutionStatus, GraphRunner, MultiModelGateway, NodeKind};
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
@@ -1954,61 +1956,8 @@ complete -F _ntx_completions ntx"#);
     }
 
     pub fn interactive_repl(&self, session_id: Option<String>) {
-        let sid = session_id.unwrap_or_else(|| format!("sess-{}", chrono::Utc::now().timestamp_millis()));
-        println!("================================================================================");
-        println!("     NITYAKSHA - An AI Concierge Platform Interactive Shell (Pure Rust)       ");
-        println!("     Session: {} | Type /help, /status, /memory, /sandbox, or /exit      ", sid);
-        println!("================================================================================");
-
-        loop {
-            print!("ntx [{}]> ", &sid[..sid.len().min(12)]);
-            let _ = io::stdout().flush();
-            let mut line = String::new();
-            if io::stdin().read_line(&mut line).is_err() || line.trim() == "/exit" || line.trim() == "exit" {
-                break;
-            }
-            let input = line.trim();
-            if input.is_empty() {
-                continue;
-            }
-
-            if input.starts_with('/') {
-                match input {
-                    "/help" => {
-                        println!("REPL Slash Commands:");
-                        println!("  /status        - Check framework health & doctor invariants");
-                        println!("  /doctor        - Run security and cgroup sandbox audit");
-                        println!("  /catalog       - Browse proprietary capability catalog");
-                        println!("  /memory        - Query pure Rust hybrid vector engine");
-                        println!("  /compact       - Compact context window and episodic memories");
-                        println!("  /ps            - List active sessions and runtimes");
-                        println!("  /sandbox <cmd> - Execute command inside confined sandbox");
-                        println!("  /slop <text>   - Run text through streaming anti-slop filter");
-                        println!("  /exit          - Exit REPL");
-                    }
-                    "/status" => self.cmd_status(),
-                    "/doctor" => self.cmd_doctor(),
-                    "/catalog" => self.cmd_catalog(&["search".to_string()]),
-                    "/memory" => self.cmd_memory(&["stats".to_string()]),
-                    "/compact" => self.cmd_compact(&[]),
-                    "/ps" => self.cmd_ps(),
-                    s if s.starts_with("/sandbox ") => {
-                        let cmd = s["/sandbox ".len()..].trim();
-                        self.cmd_sandbox(&["run".to_string(), cmd.to_string()]);
-                    }
-                    s if s.starts_with("/slop ") => {
-                        let text = s["/slop ".len()..].trim();
-                        self.cmd_slop(&[text.to_string()]);
-                    }
-                    _ => println!("Unknown slash command. Type /help for available commands."),
-                }
-            } else {
-                let parts: Vec<String> = input.split_whitespace().map(|s| s.to_string()).collect();
-                let mut full_args = vec!["ntx".to_string()];
-                full_args.extend(parts);
-                self.dispatch(&full_args);
-            }
-        }
+        let mut shell = interactive::InteractiveShell::new(self.engine.clone());
+        shell.run_interactive_loop(session_id);
     }
 
     pub fn cmd_help(&self) {

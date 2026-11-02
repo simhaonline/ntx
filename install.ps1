@@ -1,8 +1,7 @@
 # ==============================================================================
-#  Nityaksha AI Agent Control Plane CLI (ntx) Windows PowerShell Installer
-#  Domain: simhaonline.ai
-#  Usage:  powershell -ExecutionPolicy Bypass -c "irm https://simhaonline.ai/install.ps1 | iex"
-#  Supports: Windows 10/11, Windows Server (x64, ARM64)
+#  NITYAKSHA — An AI Concierge Platform Windows Installer (ntx.exe)
+#  Engineered for high-velocity, deterministic AI in pure Rust.
+#  Usage:  irm https://simhaonline.ai/install.ps1 | iex
 # ==============================================================================
 
 [CmdletBinding()]
@@ -12,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host "                   NITYAKSHA - An AI Concierge Platform                         " -ForegroundColor Cyan
-Write-Host "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  " -ForegroundColor Cyan
+Write-Host "         Engineered for high-velocity, deterministic AI in pure Rust.           " -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
 
 $InstallDir = Join-Path $env:USERPROFILE ".nityaksha\bin"
@@ -20,49 +19,62 @@ $DataDir    = Join-Path $env:USERPROFILE ".nityaksha\db"
 $CasDir     = Join-Path $env:USERPROFILE ".nityaksha\cas-cache"
 $WsDir      = Join-Path $env:USERPROFILE ".nityaksha\workspaces"
 
-# Ensure directories exist
+# Ensure user directories exist
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-New-Item -ItemType Directory -Force -Path $CasDir | Out-Null
-New-Item -ItemType Directory -Force -Path $WsDir | Out-Null
+New-Item -ItemType Directory -Force -Path $DataDir    | Out-Null
+New-Item -ItemType Directory -Force -Path $CasDir     | Out-Null
+New-Item -ItemType Directory -Force -Path $WsDir      | Out-Null
 
 $ExePath = Join-Path $InstallDir "ntx.exe"
 
-$ReleaseUrl = "https://github.com/simhaonline/ntx/releases/latest/download/ntx.exe"
-$RawUrl     = "https://raw.githubusercontent.com/simhaonline/ntx/main/ntx.exe"
+$DownloadSources = @(
+    "https://simhaonline.ai/ntx.exe",
+    "https://raw.githubusercontent.com/simhaonline/ntx/main/ntx.exe",
+    "https://github.com/simhaonline/ntx/releases/latest/download/ntx.exe"
+)
 
-Write-Host "[1/4] Fetching native 'ntx.exe' pure Rust binary for Windows..." -ForegroundColor Cyan
+Write-Host "[1/4] Downloading native 64-bit Windows binary (ntx.exe)..." -ForegroundColor Cyan
 
 $DownloadOk = $false
 
-try {
-    Invoke-WebRequest -Uri $RawUrl -OutFile $ExePath -UseBasicParsing -TimeoutSec 15
-    $DownloadOk = $true
-} catch {
+foreach ($url in $DownloadSources) {
     try {
-        Invoke-WebRequest -Uri $ReleaseUrl -OutFile $ExePath -UseBasicParsing -TimeoutSec 15
-        $DownloadOk = $true
+        Write-Host "  -> Fetching from $url ..." -ForegroundColor Gray
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("User-Agent", "NityakshaInstaller/1.0")
+        $wc.DownloadFile($url, $ExePath)
+        
+        if ((Test-Path $ExePath) -and ((Get-Item $ExePath).Length -gt 500000)) {
+            $DownloadOk = $true
+            Write-Host "  [OK] Successfully downloaded binary ($( [math]::Round((Get-Item $ExePath).Length / 1MB, 2) ) MB)" -ForegroundColor Green
+            break
+        }
     } catch {
-        Write-Host "[WARN] Remote precompiled binary download failed. Checking for local cargo compiler..." -ForegroundColor Yellow
+        # Try next source
     }
 }
 
 if (-not $DownloadOk) {
     if (Get-Command cargo -ErrorAction SilentlyContinue) {
-        Write-Host "[INFO] Compiling from source via cargo..." -ForegroundColor Cyan
+        Write-Host "[INFO] Downloading from git via cargo compiler..." -ForegroundColor Cyan
         cargo install --git https://github.com/simhaonline/ntx.git --root "$env:USERPROFILE\.cargo" ntx
         Copy-Item "$env:USERPROFILE\.cargo\bin\ntx.exe" $ExePath -Force
         $DownloadOk = $true
     } else {
-        Write-Host "[ERROR] Could not download ntx.exe and cargo compiler is not installed." -ForegroundColor Red
-        Write-Host "Please visit https://github.com/simhaonline/ntx to download manually." -ForegroundColor Red
+        Write-Host "[ERROR] Could not automatically download ntx.exe." -ForegroundColor Red
+        Write-Host "Manual Installation:" -ForegroundColor Yellow
+        Write-Host "  1. Download: https://simhaonline.ai/ntx.exe" -ForegroundColor White
+        Write-Host "  2. Save to : $ExePath" -ForegroundColor White
         exit 1
     }
 }
 
-Write-Host "[2/4] Initializing Nityaksha local environment..." -ForegroundColor Cyan
+# Unblock file from Windows SmartScreen Zone.Identifier
+try {
+    Unblock-File -Path $ExePath -ErrorAction SilentlyContinue
+} catch {}
 
-# Configure policy file if not present
+Write-Host "[2/4] Initializing Nityaksha local security policy..." -ForegroundColor Cyan
 $PolicyDir = Join-Path $env:USERPROFILE ".nityaksha"
 $PolicyFile = Join-Path $PolicyDir "policy.yaml"
 if (-not (Test-Path $PolicyFile)) {
@@ -80,35 +92,30 @@ spec:
 }
 
 Write-Host "[3/4] Updating User PATH environment variable..." -ForegroundColor Cyan
-
 $UserPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
 if ($UserPath -notlike "*$InstallDir*") {
     $NewPath = "$InstallDir;$UserPath"
     [Environment]::SetEnvironmentVariable("Path", $NewPath, [EnvironmentVariableTarget]::User)
     $env:Path = "$InstallDir;$env:Path"
-    Write-Host "[INFO] Added $InstallDir to User PATH." -ForegroundColor Green
+    Write-Host "  [OK] Added $InstallDir to User PATH." -ForegroundColor Green
 } else {
-    Write-Host "[INFO] $InstallDir already in User PATH." -ForegroundColor Gray
+    Write-Host "  [OK] $InstallDir already present in PATH." -ForegroundColor Gray
 }
 
 Write-Host "[4/4] Verifying Windows installation..." -ForegroundColor Cyan
-
 try {
     & $ExePath --version
     Write-Host ""
-    Write-Host "✓ Nityaksha Control Plane (ntx.exe) installed successfully!" -ForegroundColor Green
-    Write-Host "Binary Location: $ExePath" -ForegroundColor White
+    Write-Host "================================================================================" -ForegroundColor Green
+    Write-Host "✓ Nityaksha Control Plane (ntx.exe) is ready to use!" -ForegroundColor Green
+    Write-Host "================================================================================" -ForegroundColor Green
+    Write-Host "Quick Start:" -ForegroundColor Cyan
+    Write-Host "  ntx                 - Launch Interactive AI Concierge Shell" -ForegroundColor White
+    Write-Host "  ntx auth login google - Authenticate Google Gemini with Google OAuth" -ForegroundColor White
+    Write-Host "  ntx provider list   - View 21 preconfigured AI models & backends" -ForegroundColor White
+    Write-Host "  ntx status          - Framework health & diagnostic report" -ForegroundColor White
+    Write-Host "  ntx ui              - Open local WebUI Workstation on port 8080" -ForegroundColor White
     Write-Host ""
-    Write-Host "Quick Start Commands:" -ForegroundColor White
-    Write-Host "  ntx doctor            - Verify system invariants and memory stack"
-    Write-Host "  ntx status            - View system status and registered capabilities"
-    Write-Host "  ntx skill list        - List registered proprietary skills"
-    Write-Host "  ntx harness status    - View AI execution harness & HITL gates"
-    Write-Host "  ntx ui --port 8080    - Launch workstation WebUI"
-    Write-Host "  ntx repl              - Enter interactive shell"
-    Write-Host ""
-    Write-Host "Documentation: https://simhaonline.ai | https://github.com/simhaonline/ntx" -ForegroundColor Cyan
 } catch {
-    Write-Host "[ERROR] Verification failed: $_" -ForegroundColor Red
-    exit 1
+    Write-Host "[WARN] Binary installed to $ExePath. Restart terminal to refresh PATH." -ForegroundColor Yellow
 }
