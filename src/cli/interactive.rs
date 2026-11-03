@@ -399,6 +399,7 @@ impl InteractiveShell {
         println!("│    {accent}/bot{reset} [id]            Switch autonomous persona (concierge, engineer, quant...)", accent = theme.accent, reset = theme.reset);
         println!("│    {accent}/workflow{reset} [id]       Trigger or inspect registered DAG workflow pipelines", accent = theme.accent, reset = theme.reset);
         println!("│    {accent}/doctor{reset}              In-process security, sandboxes, and connectivity audit", accent = theme.accent, reset = theme.reset);
+        println!("│    {accent}/update{reset} [--force]    Check & install latest release from GitHub", accent = theme.accent, reset = theme.reset);
         println!("│    {accent}/theme{reset}               Select CLI color palette", accent = theme.accent, reset = theme.reset);
         println!("│    {accent}/help{reset}                Comprehensive reference manual", accent = theme.accent, reset = theme.reset);
         println!("│    {accent}/exit{reset}                Safely exit concierge session", accent = theme.accent, reset = theme.reset);
@@ -425,6 +426,7 @@ impl InteractiveShell {
             "bot" | "bots" | "persona" |
             "workflow" | "workflows" |
             "doctor" | "status" |
+            "update" | "upgrade" |
             "clear" | "cls" |
             "exit" | "quit" | ":q" |
             "memory" => {
@@ -464,6 +466,7 @@ impl InteractiveShell {
                 println!("  {accent}/workflow [id]{reset}          - List or trigger registered DAG workflows", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/status{reset}                 - Live system status, database stats, and engine state", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/doctor{reset}                 - Security, cgroup namespace, and connectivity audit", accent = theme.accent, reset = theme.reset);
+                println!("  {accent}/update [--force]{reset}       - Check & install latest release from GitHub", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/clear{reset}                  - Clear screen and reprint welcome dashboard", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/exit{reset} or {accent}/quit{reset}          - Safely close interactive concierge session", accent = theme.accent, reset = theme.reset);
                 println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
@@ -757,6 +760,10 @@ impl InteractiveShell {
             }
             "status" => {
                 self.run_status();
+            }
+            "update" | "upgrade" => {
+                let string_args: Vec<String> = parts.iter().skip(1).map(|s| s.to_string()).collect();
+                crate::cli::run_self_update(&string_args);
             }
             "clear" | "cls" => {
                 print!("\x1b[2J\x1b[H");
