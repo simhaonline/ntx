@@ -89,12 +89,14 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-sans); }
-    body { background-color: var(--bg-canvas); color: var(--text-body); display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+    body { background-color: var(--bg-canvas); color: var(--text-body); display: flex; height: 100vh; width: 100vw; overflow: hidden; font-size: 14px; }
 
     /* --- Sidebar --- */
     #sidebar {
-      width: 270px;
-      min-width: 270px;
+      width: 250px;
+      min-width: 250px;
+      max-width: 250px;
+      flex-shrink: 0;
       background-color: var(--bg-sidebar);
       border-right: 1px solid var(--border-subtle);
       display: flex;
@@ -272,16 +274,20 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
 
     /* --- Main Content Area --- */
     #main {
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
+      width: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      position: relative;
     }
 
     /* --- Top Header Bar --- */
     .top-header {
       height: 60px;
       min-height: 60px;
+      flex-shrink: 0;
       background-color: var(--bg-sidebar);
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
@@ -343,18 +349,20 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
     }
 
     .content-scroll {
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
       overflow-y: auto;
-      padding: 1.75rem 2rem;
+      overflow-x: hidden;
+      padding: 1.25rem 1.5rem;
     }
 
     /* --- Shared UI Components --- */
-    .section-view { display: none; }
+    .section-view { display: none; width: 100%; min-width: 0; }
     .section-view.active { display: block; animation: fadeIn 0.2s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
-    .view-title-block { margin-bottom: 1.5rem; }
-    .view-title-block h1 { font-size: 1.45rem; font-weight: 800; color: var(--text-heading); letter-spacing: -0.02em; }
+    .view-title-block { margin-bottom: 1.25rem; }
+    .view-title-block h1 { font-size: 1.35rem; font-weight: 800; color: var(--text-heading); letter-spacing: -0.02em; }
     .view-title-block p { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
 
     .card {
@@ -379,9 +387,9 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
     /* KPI Grid */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 1rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
     }
     .kpi-card {
       background: var(--bg-surface);
@@ -406,14 +414,16 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
     /* Tables */
     .table-container {
       width: 100%;
+      max-width: 100%;
       overflow-x: auto;
       border: 1px solid var(--border-subtle);
       border-radius: 10px;
       background: var(--bg-surface);
       box-shadow: var(--card-shadow);
+      -webkit-overflow-scrolling: touch;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
-    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-subtle); }
+    table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { padding: 0.65rem 0.85rem; text-align: left; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
     th {
       background-color: var(--bg-surface-elevated);
       color: var(--text-dim);
@@ -447,7 +457,33 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
 
     /* Buttons & Inputs */
     button {
-      padding: 0.45rem 0.85rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      transition: all 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-brand {
+      background: linear-gradient(135deg, #C05A28 0%, #A3481D 100%);
+      color: #FFFFFF;
+      border: none;
+      box-shadow: 0 1px 4px rgba(192, 90, 40, 0.25);
+    }
+    .btn-brand:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(192, 90, 40, 0.4); }
+    .btn-outline {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-body);
+    }
+    .btn-outline:hover { background: var(--bg-surface-elevated); border-color: var(--border-accent); color: var(--text-heading); }
+    .btn-sm { padding: 0.22rem 0.45rem; font-size: 0.74rem; border-radius: 5px; line-height: 1.2; }
       border-radius: 6px;
       font-size: 0.82rem;
       font-weight: 600;
@@ -772,12 +808,12 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
             <table>
               <thead>
                 <tr>
-                  <th>Target Provider</th>
-                  <th>Circuit Breaker</th>
-                  <th>Success</th>
-                  <th>Failures</th>
-                  <th>Avg Latency</th>
-                  <th>Status / Notes</th>
+                  <th style="min-width:180px;">Target Provider</th>
+                  <th style="width:130px; text-align:center;">Circuit Breaker</th>
+                  <th style="width:90px; text-align:right;">Success</th>
+                  <th style="width:90px; text-align:right;">Failures</th>
+                  <th style="width:110px; text-align:right;">Avg Latency</th>
+                  <th style="min-width:140px;">Status / Notes</th>
                 </tr>
               </thead>
               <tbody id="overview-breakers-table">
@@ -811,13 +847,13 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
           <table>
             <thead>
               <tr>
-                <th style="width:50px;">#</th>
-                <th>Provider Name</th>
-                <th>Category</th>
-                <th>Default Model</th>
-                <th>Status</th>
-                <th>Auth / Credentials</th>
-                <th style="text-align:right;">Actions</th>
+                <th style="width:38px; text-align:center;">#</th>
+                <th style="width:190px;">Provider Name</th>
+                <th style="width:115px; text-align:center;">Category</th>
+                <th style="width:200px;">Default Model</th>
+                <th style="width:105px; text-align:center;">Status</th>
+                <th style="width:155px;">Auth / Credentials</th>
+                <th style="width:170px; text-align:right;">Actions</th>
               </tr>
             </thead>
             <tbody id="providers-table-body">
@@ -894,13 +930,13 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
             <table>
               <thead>
                 <tr>
-                  <th>Target Provider</th>
-                  <th>Current State</th>
-                  <th>Total Requests</th>
-                  <th>Successes</th>
-                  <th>Failures</th>
-                  <th>Avg Latency</th>
-                  <th>Cooldown Status</th>
+                  <th style="min-width:180px;">Target Provider</th>
+                  <th style="width:130px; text-align:center;">Current State</th>
+                  <th style="width:110px; text-align:right;">Total Requests</th>
+                  <th style="width:90px; text-align:right;">Successes</th>
+                  <th style="width:90px; text-align:right;">Failures</th>
+                  <th style="width:110px; text-align:right;">Avg Latency</th>
+                  <th style="width:140px; text-align:center;">Cooldown Status</th>
                 </tr>
               </thead>
               <tbody id="router-full-table">
@@ -998,12 +1034,12 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
             <table>
               <thead>
                 <tr>
-                  <th>Timestamp</th>
-                  <th>Method & Endpoint</th>
-                  <th>Model / Provider</th>
-                  <th>Status</th>
-                  <th>Latency</th>
-                  <th>Tokens (In/Out)</th>
+                  <th style="width:120px;">Timestamp</th>
+                  <th style="min-width:180px;">Method & Endpoint</th>
+                  <th style="min-width:180px;">Model / Provider</th>
+                  <th style="width:95px; text-align:center;">Status</th>
+                  <th style="width:90px; text-align:right;">Latency</th>
+                  <th style="width:110px; text-align:right;">Tokens (In/Out)</th>
                 </tr>
               </thead>
               <tbody id="logs-table-body">
@@ -1252,28 +1288,42 @@ print(response.choices[0].message.content)</pre>
           ? '<span class="badge badge-orange">SMART ROUTER</span>'
           : `<span class="badge badge-gray">${escapeHtml(p.category)}</span>`;
 
+        const authHtml = isAuto
+          ? '<span style="color:var(--color-emerald); font-weight:600; font-size:0.75rem;">● Free Tier (Built-in)</span>'
+          : (p.is_configured
+              ? '<span style="color:var(--color-emerald); font-weight:600; font-size:0.75rem;">● Key Configured</span>'
+              : `<div style="line-height:1.2;">
+                   <span style="color:var(--text-dim); font-size:0.75rem;">Unconfigured</span>
+                   <div style="font-family:var(--font-mono); font-size:0.67rem; color:var(--text-dim); opacity:0.8;">${escapeHtml(p.auth_summary.replace('Not configured ', ''))}</div>
+                 </div>`);
+
         html += `
           <tr class="${rowClass}">
-            <td style="font-family:var(--font-mono); font-weight:700; color:var(--text-dim);">${idx}</td>
+            <td style="font-family:var(--font-mono); font-weight:700; color:var(--text-dim); text-align:center;">${idx}</td>
             <td>
-              <div style="font-weight:700; color:var(--text-heading); display:flex; align-items:center; gap:0.4rem;">
-                ${isAuto ? '<span style="color:var(--color-brand);">⚡</span>' : ''}
+              <div style="font-weight:700; color:var(--text-heading); display:flex; align-items:center; gap:0.35rem; white-space:nowrap;">
+                ${isAuto ? '<span style="color:var(--color-brand); font-size:0.95rem;">⚡</span>' : ''}
                 <span>${escapeHtml(p.name)}</span>
               </div>
-              <span style="font-size:0.75rem; color:var(--text-dim); font-family:var(--font-mono);">${escapeHtml(p.id)}</span>
+              <span style="font-size:0.72rem; color:var(--text-dim); font-family:var(--font-mono);">${escapeHtml(p.id)}</span>
             </td>
-            <td>${catBadge}</td>
+            <td style="text-align:center;">${catBadge}</td>
             <td>
-              <span style="font-family:var(--font-mono); font-size:0.8rem; color:var(--text-heading);">${escapeHtml(p.default_model)}</span>
+              <span style="font-family:var(--font-mono); font-size:0.78rem; color:var(--text-heading); display:inline-block; max-width:195px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(p.default_model)}">
+                ${escapeHtml(p.default_model)}
+              </span>
             </td>
-            <td>${badgeHtml}</td>
-            <td>
-              <span style="font-size:0.78rem; color:var(--text-muted);">${escapeHtml(p.auth_summary)}</span>
-            </td>
+            <td style="text-align:center;">${badgeHtml}</td>
+            <td>${authHtml}</td>
             <td style="text-align:right; white-space:nowrap;">
-              ${!p.is_active ? `<button class="btn-brand btn-sm" onclick="setActiveProvider('${p.id}')">Select</button>` : '<span class="badge badge-green">CURRENT</span>'}
-              <button class="btn-outline btn-sm" onclick="testProviderPing('${p.id}', this)">Ping</button>
-              <button class="btn-outline btn-sm" onclick="openConfigModal('${p.id}')">Config</button>
+              <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap:0.35rem;">
+                ${!p.is_active 
+                  ? `<button class="btn-brand btn-sm" onclick="setActiveProvider('${p.id}')">Select</button>` 
+                  : '<span class="badge badge-green" style="padding:0.25rem 0.5rem; font-size:0.68rem;">● ACTIVE</span>'
+                }
+                <button class="btn-outline btn-sm" onclick="testProviderPing('${p.id}', this)" title="Test latency">Ping</button>
+                <button class="btn-outline btn-sm" onclick="openConfigModal('${p.id}')" title="Configure credentials">Config</button>
+              </div>
             </td>
           </tr>
         `;
@@ -1469,10 +1519,10 @@ print(response.choices[0].message.content)</pre>
         html += `
           <tr>
             <td><strong>${escapeHtml(r.name)}</strong></td>
-            <td>${stateBadge}</td>
-            <td>${r.successful_requests}</td>
-            <td>${r.failed_requests}</td>
-            <td>${r.avg_latency_ms > 0 ? r.avg_latency_ms + ' ms' : '---'}</td>
+            <td style="text-align:center;">${stateBadge}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${r.successful_requests}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${r.failed_requests}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${r.avg_latency_ms > 0 ? r.avg_latency_ms + ' ms' : '---'}</td>
             <td>${r.cooldown_remaining_secs > 0 ? `<span class="badge badge-amber">${r.cooldown_remaining_secs}s left</span>` : '<span style="color:var(--text-dim);">Ready</span>'}</td>
           </tr>
         `;
@@ -1497,13 +1547,13 @@ print(response.choices[0].message.content)</pre>
 
         html += `
           <tr>
-            <td><strong>${escapeHtml(r.name)}</strong> <span style="font-size:0.75rem; color:var(--text-dim);">(${escapeHtml(r.id)})</span></td>
-            <td>${stateBadge}</td>
-            <td>${r.total_requests}</td>
-            <td>${r.successful_requests}</td>
-            <td>${r.failed_requests}</td>
-            <td>${r.avg_latency_ms > 0 ? r.avg_latency_ms + ' ms' : '---'}</td>
-            <td>${r.cooldown_remaining_secs > 0 ? `<span class="badge badge-amber">${r.cooldown_remaining_secs}s cooldown</span>` : '<span style="color:var(--color-emerald);">Normal</span>'}</td>
+            <td><strong>${escapeHtml(r.name)}</strong> <span style="font-size:0.75rem; color:var(--text-dim); font-family:var(--font-mono);">(${escapeHtml(r.id)})</span></td>
+            <td style="text-align:center;">${stateBadge}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${r.total_requests}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${r.successful_requests}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${r.failed_requests}</td>
+            <td style="text-align:right; font-family:var(--font-mono);">${r.avg_latency_ms > 0 ? r.avg_latency_ms + ' ms' : '---'}</td>
+            <td style="text-align:center;">${r.cooldown_remaining_secs > 0 ? `<span class="badge badge-amber">${r.cooldown_remaining_secs}s cooldown</span>` : '<span style="color:var(--color-emerald); font-weight:600;">Normal</span>'}</td>
           </tr>
         `;
       });
