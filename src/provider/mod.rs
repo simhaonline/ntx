@@ -31,6 +31,53 @@ pub struct ProviderDefinition {
     pub auth_summary: String,
     pub api_key: Option<String>,
     pub custom_base_url: Option<String>,
+    #[serde(default = "default_context_window")]
+    pub max_context_window: usize,
+}
+
+fn default_context_window() -> usize {
+    128_000
+}
+
+impl ProviderDefinition {
+    pub fn context_window_for_model(&self, model: &str) -> usize {
+        let m = model.to_lowercase();
+        if m.contains("1.5-pro") {
+            2_097_152
+        } else if m.contains("gemini-2.0") || m.contains("1.5-flash") {
+            1_048_576
+        } else if m.contains("claude-3-7") || m.contains("claude-3-5") || m.contains("claude-3-opus") {
+            200_000
+        } else if m.contains("o1") || m.contains("o3-mini") || m.contains("sonar-pro") {
+            200_000
+        } else if m.contains("codestral") {
+            256_000
+        } else if m.contains("grok-2") {
+            131_072
+        } else if m.contains("gpt-4o") || m.contains("llama-3.3") || m.contains("hermes-3") {
+            128_000
+        } else if m.contains("deepseek") {
+            64_000
+        } else if m.contains("cerebras") || m.contains("sambanova") {
+            64_000
+        } else if m.contains("ollama") || m.contains("local") {
+            32_768
+        } else {
+            self.max_context_window
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptExecutionResult {
+    pub text: String,
+    pub input_tokens: usize,
+    pub output_tokens: usize,
+    pub total_tokens: usize,
+    pub context_limit: usize,
+    pub duration_ms: u128,
+    pub model: String,
+    pub provider: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -118,6 +165,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 1_048_576,
             },
             ProviderDefinition {
                 id: "nous".to_string(),
@@ -140,6 +188,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "openai".to_string(),
@@ -163,6 +212,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "anthropic".to_string(),
@@ -185,6 +235,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 200_000,
             },
             ProviderDefinition {
                 id: "deepseek".to_string(),
@@ -205,6 +256,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 64_000,
             },
             ProviderDefinition {
                 id: "groq".to_string(),
@@ -227,6 +279,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "openrouter".to_string(),
@@ -250,6 +303,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "together".to_string(),
@@ -271,6 +325,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "mistral".to_string(),
@@ -293,6 +348,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "cohere".to_string(),
@@ -314,6 +370,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "perplexity".to_string(),
@@ -335,6 +392,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 200_000,
             },
             ProviderDefinition {
                 id: "xai".to_string(),
@@ -356,6 +414,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 131_072,
             },
             ProviderDefinition {
                 id: "fireworks".to_string(),
@@ -376,6 +435,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "cerebras".to_string(),
@@ -396,6 +456,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
             ProviderDefinition {
                 id: "sambanova".to_string(),
@@ -417,6 +478,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 64_000,
             },
             ProviderDefinition {
                 id: "ollama".to_string(),
@@ -439,6 +501,7 @@ impl ProviderRegistry {
                 auth_summary: "Localhost / No Auth".to_string(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 32_768,
             },
             ProviderDefinition {
                 id: "lmstudio".to_string(),
@@ -456,6 +519,7 @@ impl ProviderRegistry {
                 auth_summary: "Localhost / No Auth".to_string(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 32_768,
             },
             ProviderDefinition {
                 id: "vllm".to_string(),
@@ -473,6 +537,7 @@ impl ProviderRegistry {
                 auth_summary: "Local / Cluster Auth".to_string(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 32_768,
             },
             ProviderDefinition {
                 id: "bedrock".to_string(),
@@ -493,6 +558,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 200_000,
             },
             ProviderDefinition {
                 id: "vertex".to_string(),
@@ -513,6 +579,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 1_048_576,
             },
             ProviderDefinition {
                 id: "azure".to_string(),
@@ -530,6 +597,7 @@ impl ProviderRegistry {
                 auth_summary: String::new(),
                 api_key: None,
                 custom_base_url: None,
+                max_context_window: 128_000,
             },
         ];
 
@@ -631,6 +699,14 @@ impl ProviderRegistry {
         let p = Self::get(id).ok_or_else(|| format!("Unknown provider '{}'", id))?;
         let mut config = Self::load_config();
         config.custom_urls.insert(p.id, url.trim().to_string());
+        Self::save_config(&config)
+    }
+
+    /// Set custom model for provider
+    pub fn set_model(id: &str, model: &str) -> Result<(), String> {
+        let p = Self::get(id).ok_or_else(|| format!("Unknown provider '{}'", id))?;
+        let mut config = Self::load_config();
+        config.custom_models.insert(p.id, model.trim().to_string());
         Self::save_config(&config)
     }
 
@@ -743,59 +819,125 @@ impl ProviderRegistry {
         None
     }
 
-    /// Unified Multi-Model Dispatch
+    /// Unified Multi-Model Dispatch with detailed token and context telemetry
+    pub fn dispatch_prompt_detailed(
+        prompt: &str,
+        system_prompt: Option<&str>,
+        temperature: f32,
+        history: &[(String, String)],
+    ) -> Result<PromptExecutionResult, String> {
+        let active = Self::active();
+        let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
+
+        if active.id == "gemini" {
+            let oauth_token = GoogleOAuthEngine::get_valid_access_token().ok();
+            let raw_key = Self::resolve_raw_key(&active);
+            if oauth_token.is_none() && raw_key.is_none() {
+                return Err("Google Gemini requires authentication. Run '/auth' or 'ntx auth login google' to connect your Google account or provide an API key (from https://aistudio.google.com/app/apikey).".to_string());
+            }
+            return Self::call_gemini(
+                prompt,
+                sys,
+                &active.default_model,
+                temperature,
+                oauth_token.as_deref(),
+                raw_key.as_deref(),
+                history,
+            );
+        }
+
+        if active.id == "anthropic" {
+            let raw_key = Self::resolve_raw_key(&active).ok_or_else(|| {
+                "Anthropic Claude requires an API key. Run '/auth login claude' or set $ANTHROPIC_API_KEY from https://console.anthropic.com/settings/keys.".to_string()
+            })?;
+            return Self::call_anthropic(
+                prompt,
+                sys,
+                &active.default_model,
+                temperature,
+                &raw_key,
+                history,
+            );
+        }
+
+        // OpenAI-compatible providers (OpenAI, Nous, DeepSeek, Groq, OpenRouter, Together, Mistral, Ollama, etc.)
+        let raw_key = if active.auth_type != "none" {
+            let key = Self::resolve_raw_key(&active).ok_or_else(|| {
+                format!(
+                    "{} requires an API key. Run '/auth login {}' to configure your API key from {}.",
+                    active.name, active.id, Self::portal_url(&active.id)
+                )
+            })?;
+            Some(key)
+        } else {
+            None
+        };
+
+        Self::call_openai_compatible(
+            &active,
+            prompt,
+            sys,
+            &active.default_model,
+            temperature,
+            raw_key.as_deref(),
+            history,
+        )
+    }
+
+    /// Backwards-compatible prompt dispatch
     pub fn dispatch_prompt(
         prompt: &str,
         system_prompt: Option<&str>,
         temperature: f32,
     ) -> Result<String, String> {
-        let active = Self::active();
-        let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
-
-        if active.id == "gemini" {
-            if let Ok(token) = GoogleOAuthEngine::get_valid_access_token() {
-                return Self::call_gemini_oauth(prompt, sys, &active.default_model, temperature, &token);
-            }
-            if let Some(key) = Self::resolve_raw_key(&active) {
-                return Self::call_gemini_key(prompt, sys, &active.default_model, temperature, &key);
-            }
-        }
-
-        // If local or other provider has key
-        if active.auth_type == "none" || Self::resolve_raw_key(&active).is_some() {
-            // Clean output via Anti-Slop Filter
-            let filtered = AntiSlopFilter::filter(prompt);
-            return Ok(format!(
-                "[{provider} Gateway | model={model} | temp={temp:.1}]\n{filtered}",
-                provider = active.name,
-                model = active.default_model,
-                temp = temperature
-            ));
-        }
-
-        // Deterministic fallback execution
-        let filtered = AntiSlopFilter::filter(prompt);
-        Ok(format!(
-            "[Nityaksha Pure Rust Gateway | Active: {} ({})]\n{}",
-            active.name, active.default_model, filtered
-        ))
+        Self::dispatch_prompt_detailed(prompt, system_prompt, temperature, &[])
+            .map(|r| r.text)
     }
 
-    fn call_gemini_oauth(
+    fn call_gemini(
         prompt: &str,
         system_prompt: &str,
         model: &str,
         temperature: f32,
-        access_token: &str,
-    ) -> Result<String, String> {
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
-            model
-        );
+        auth_token: Option<&str>,
+        api_key: Option<&str>,
+        history: &[(String, String)],
+    ) -> Result<PromptExecutionResult, String> {
+        let start = Instant::now();
+        let context_limit = if model.contains("1.5-pro") { 2_097_152 } else { 1_048_576 };
+
+        let url = if let Some(key) = api_key {
+            format!(
+                "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+                model, key
+            )
+        } else if auth_token.is_some() {
+            format!(
+                "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+                model
+            )
+        } else {
+            return Err("Google Gemini requires authentication. Run '/auth' or 'ntx auth login google'.".to_string());
+        };
+
+        let mut contents = Vec::new();
+        for (u, a) in history {
+            contents.push(serde_json::json!({
+                "role": "user",
+                "parts": [{ "text": u }]
+            }));
+            contents.push(serde_json::json!({
+                "role": "model",
+                "parts": [{ "text": a }]
+            }));
+        }
+        contents.push(serde_json::json!({
+            "role": "user",
+            "parts": [{ "text": prompt }]
+        }));
+
         let payload = serde_json::json!({
-            "contents": [
-                { "role": "user", "parts": [{ "text": prompt }] }
-            ],
+            "contents": contents,
             "systemInstruction": {
                 "parts": [{ "text": system_prompt }]
             },
@@ -805,89 +947,266 @@ impl ProviderRegistry {
             }
         });
 
-        let auth_header = format!("Authorization: Bearer {}", access_token);
-        let output = Command::new("curl")
-            .arg("-s")
-            .arg("--max-time")
-            .arg("30")
-            .arg("-X")
-            .arg("POST")
-            .arg(&url)
-            .arg("-H")
-            .arg("Content-Type: application/json")
-            .arg("-H")
-            .arg(&auth_header)
-            .arg("-d")
-            .arg(payload.to_string())
-            .output()
-            .map_err(|e| format!("Failed to call Gemini API: {}", e))?;
+        let payload_str = payload.to_string();
+        let mut cmd = Command::new("curl");
+        cmd.arg("-s")
+           .arg("--max-time").arg("60")
+           .arg("-X").arg("POST")
+           .arg(&url)
+           .arg("-H").arg("Content-Type: application/json");
 
-        if !output.status.success() {
-            return Err("Gemini request failed".to_string());
+        if let Some(token) = auth_token {
+            cmd.arg("-H").arg(format!("Authorization: Bearer {}", token));
         }
 
+        cmd.arg("-d").arg("@-")
+           .stdin(std::process::Stdio::piped())
+           .stdout(std::process::Stdio::piped())
+           .stderr(std::process::Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn curl: {}", e))?;
+        if let Some(mut sin) = child.stdin.take() {
+            let _ = sin.write_all(payload_str.as_bytes());
+        }
+
+        let output = child.wait_with_output().map_err(|e| format!("Curl error: {}", e))?;
+        let elapsed = start.elapsed().as_millis();
         let resp_str = String::from_utf8_lossy(&output.stdout);
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
-            if let Some(text) = val
-                .pointer("/candidates/0/content/parts/0/text")
-                .and_then(|t| t.as_str())
-            {
-                return Ok(AntiSlopFilter::filter(text));
-            }
+
+        let val: serde_json::Value = serde_json::from_str(&resp_str)
+            .map_err(|e| format!("Invalid JSON from Gemini API: {}. Raw: {}", e, resp_str))?;
+
+        if let Some(err_msg) = val.pointer("/error/message").and_then(|v| v.as_str()) {
+            return Err(format!("Gemini API Error: {}", err_msg));
         }
 
-        Ok(resp_str.to_string())
+        let text = val.pointer("/candidates/0/content/parts/0/text")
+            .and_then(|t| t.as_str())
+            .ok_or_else(|| {
+                if let Some(block_reason) = val.pointer("/candidates/0/finishReason").and_then(|r| r.as_str()) {
+                    format!("Gemini response finished with reason: {}", block_reason)
+                } else {
+                    format!("No candidate text in Gemini response: {}", resp_str)
+                }
+            })?;
+
+        let in_tok = val.pointer("/usageMetadata/promptTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let out_tok = val.pointer("/usageMetadata/candidatesTokenCount").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let total_tok = val.pointer("/usageMetadata/totalTokenCount").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(in_tok + out_tok);
+
+        let in_tokens = if in_tok > 0 { in_tok } else { (system_prompt.len() + prompt.len()) / 4 };
+        let out_tokens = if out_tok > 0 { out_tok } else { text.len() / 4 };
+        let total_tokens = if total_tok > 0 { total_tok } else { in_tokens + out_tokens };
+
+        Ok(PromptExecutionResult {
+            text: AntiSlopFilter::filter(text),
+            input_tokens: in_tokens,
+            output_tokens: out_tokens,
+            total_tokens,
+            context_limit,
+            duration_ms: elapsed,
+            model: model.to_string(),
+            provider: "Google Gemini".to_string(),
+        })
     }
 
-    fn call_gemini_key(
+    fn call_anthropic(
         prompt: &str,
         system_prompt: &str,
         model: &str,
         temperature: f32,
         api_key: &str,
-    ) -> Result<String, String> {
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-            model, api_key
-        );
+        history: &[(String, String)],
+    ) -> Result<PromptExecutionResult, String> {
+        let start = Instant::now();
+        let context_limit = 200_000;
+        let url = "https://api.anthropic.com/v1/messages";
+
+        let mut messages = Vec::new();
+        for (u, a) in history {
+            messages.push(serde_json::json!({
+                "role": "user",
+                "content": u
+            }));
+            messages.push(serde_json::json!({
+                "role": "assistant",
+                "content": a
+            }));
+        }
+        messages.push(serde_json::json!({
+            "role": "user",
+            "content": prompt
+        }));
+
         let payload = serde_json::json!({
-            "contents": [
-                { "role": "user", "parts": [{ "text": prompt }] }
-            ],
-            "systemInstruction": {
-                "parts": [{ "text": system_prompt }]
-            },
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": 4096
-            }
+            "model": model,
+            "max_tokens": 4096,
+            "system": system_prompt,
+            "messages": messages,
+            "temperature": temperature
         });
 
-        let output = Command::new("curl")
-            .arg("-s")
-            .arg("--max-time")
-            .arg("30")
-            .arg("-X")
-            .arg("POST")
-            .arg(&url)
-            .arg("-H")
-            .arg("Content-Type: application/json")
-            .arg("-d")
-            .arg(payload.to_string())
-            .output()
-            .map_err(|e| format!("Failed to call Gemini API: {}", e))?;
+        let payload_str = payload.to_string();
+        let mut cmd = Command::new("curl");
+        cmd.arg("-s")
+           .arg("--max-time").arg("60")
+           .arg("-X").arg("POST")
+           .arg(url)
+           .arg("-H").arg("Content-Type: application/json")
+           .arg("-H").arg(format!("x-api-key: {}", api_key))
+           .arg("-H").arg("anthropic-version: 2023-06-01")
+           .arg("-d").arg("@-")
+           .stdin(std::process::Stdio::piped())
+           .stdout(std::process::Stdio::piped())
+           .stderr(std::process::Stdio::piped());
 
+        let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn curl: {}", e))?;
+        if let Some(mut sin) = child.stdin.take() {
+            let _ = sin.write_all(payload_str.as_bytes());
+        }
+
+        let output = child.wait_with_output().map_err(|e| format!("Curl error: {}", e))?;
+        let elapsed = start.elapsed().as_millis();
         let resp_str = String::from_utf8_lossy(&output.stdout);
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
-            if let Some(text) = val
-                .pointer("/candidates/0/content/parts/0/text")
-                .and_then(|t| t.as_str())
-            {
-                return Ok(AntiSlopFilter::filter(text));
+
+        let val: serde_json::Value = serde_json::from_str(&resp_str)
+            .map_err(|e| format!("Invalid JSON from Anthropic API: {}. Raw: {}", e, resp_str))?;
+
+        if let Some(err_msg) = val.pointer("/error/message").and_then(|v| v.as_str()) {
+            return Err(format!("Anthropic Claude Error: {}", err_msg));
+        }
+
+        let text = val.pointer("/content/0/text")
+            .and_then(|t| t.as_str())
+            .ok_or_else(|| format!("No text content in Anthropic response: {}", resp_str))?;
+
+        let in_tok = val.pointer("/usage/input_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let out_tok = val.pointer("/usage/output_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let in_tokens = if in_tok > 0 { in_tok } else { (system_prompt.len() + prompt.len()) / 4 };
+        let out_tokens = if out_tok > 0 { out_tok } else { text.len() / 4 };
+        let total_tokens = in_tokens + out_tokens;
+
+        Ok(PromptExecutionResult {
+            text: AntiSlopFilter::filter(text),
+            input_tokens: in_tokens,
+            output_tokens: out_tokens,
+            total_tokens,
+            context_limit,
+            duration_ms: elapsed,
+            model: model.to_string(),
+            provider: "Anthropic Claude".to_string(),
+        })
+    }
+
+    fn call_openai_compatible(
+        provider: &ProviderDefinition,
+        prompt: &str,
+        system_prompt: &str,
+        model: &str,
+        temperature: f32,
+        api_key: Option<&str>,
+        history: &[(String, String)],
+    ) -> Result<PromptExecutionResult, String> {
+        let start = Instant::now();
+        let context_limit = provider.context_window_for_model(model);
+
+        let base = provider.base_url.trim_end_matches('/');
+        let endpoint = if base.ends_with("/chat/completions") {
+            base.to_string()
+        } else if base.ends_with("/v1") {
+            format!("{}/chat/completions", base)
+        } else if provider.id == "ollama" {
+            format!("{}/v1/chat/completions", base)
+        } else {
+            format!("{}/v1/chat/completions", base)
+        };
+
+        let mut messages = Vec::new();
+        if !system_prompt.is_empty() {
+            messages.push(serde_json::json!({
+                "role": "system",
+                "content": system_prompt
+            }));
+        }
+        for (u, a) in history {
+            messages.push(serde_json::json!({
+                "role": "user",
+                "content": u
+            }));
+            messages.push(serde_json::json!({
+                "role": "assistant",
+                "content": a
+            }));
+        }
+        messages.push(serde_json::json!({
+            "role": "user",
+            "content": prompt
+        }));
+
+        let payload = serde_json::json!({
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 4096
+        });
+
+        let payload_str = payload.to_string();
+        let mut cmd = Command::new("curl");
+        cmd.arg("-s")
+           .arg("--max-time").arg("60")
+           .arg("-X").arg("POST")
+           .arg(&endpoint)
+           .arg("-H").arg("Content-Type: application/json");
+
+        if let Some(key) = api_key {
+            if !key.is_empty() {
+                cmd.arg("-H").arg(format!("Authorization: Bearer {}", key));
             }
         }
 
-        Ok(resp_str.to_string())
+        cmd.arg("-d").arg("@-")
+           .stdin(std::process::Stdio::piped())
+           .stdout(std::process::Stdio::piped())
+           .stderr(std::process::Stdio::piped());
+
+        let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn curl: {}", e))?;
+        if let Some(mut sin) = child.stdin.take() {
+            let _ = sin.write_all(payload_str.as_bytes());
+        }
+
+        let output = child.wait_with_output().map_err(|e| format!("Curl error: {}", e))?;
+        let elapsed = start.elapsed().as_millis();
+        let resp_str = String::from_utf8_lossy(&output.stdout);
+
+        let val: serde_json::Value = serde_json::from_str(&resp_str)
+            .map_err(|e| format!("Invalid JSON response from {}: {}. Output: {}", provider.name, e, resp_str))?;
+
+        if let Some(err_msg) = val.pointer("/error/message").and_then(|v| v.as_str()) {
+            return Err(format!("{} API Error: {}", provider.name, err_msg));
+        }
+
+        let text = val.pointer("/choices/0/message/content")
+            .and_then(|t| t.as_str())
+            .ok_or_else(|| format!("No completion content returned by {}: {}", provider.name, resp_str))?;
+
+        let in_tokens = val.pointer("/usage/prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let out_tokens = val.pointer("/usage/completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let total_tokens = val.pointer("/usage/total_tokens").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(in_tokens + out_tokens);
+
+        let in_tok = if in_tokens > 0 { in_tokens } else { (system_prompt.len() + prompt.len()) / 4 };
+        let out_tok = if out_tokens > 0 { out_tokens } else { text.len() / 4 };
+        let tot_tok = if total_tokens > 0 { total_tokens } else { in_tok + out_tok };
+
+        Ok(PromptExecutionResult {
+            text: AntiSlopFilter::filter(text),
+            input_tokens: in_tok,
+            output_tokens: out_tok,
+            total_tokens: tot_tok,
+            context_limit,
+            duration_ms: elapsed,
+            model: model.to_string(),
+            provider: provider.name.clone(),
+        })
     }
 
     pub fn normalize_id(input: &str) -> Option<&'static str> {

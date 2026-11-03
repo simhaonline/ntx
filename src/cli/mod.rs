@@ -12,6 +12,7 @@ use crate::db::MemoryEngine;
 use crate::harness::eval_judge::EvalJudgeEngine;
 use crate::harness::governance::GovernanceManager;
 use crate::harness::prompt_loop::PromptLoopEngine;
+use crate::provider::ProviderRegistry;
 use crate::redteam::RedTeamShield;
 use crate::ring_buffer::LockFreeRingBuffer;
 use crate::sandbox::ibac::IbacGate;
@@ -535,14 +536,18 @@ impl CliHandler {
         // 4. Memory Hybrid Retrieval
         let context_chunks = self.engine.hybrid_rag.search(&input_prompt, None, 3, 0.5);
 
-        // 5. Generate Deterministic Execution Output
-        let response_text = format!(
-            "Execution completed under Nityaksha AI Concierge Engine.\nIntent Tier: {:?}\nSecurity Clearance: Verified (Risk: {:.2})\nContext Injected: {} episodic vector memories\nTask Output: System invariants validated successfully.",
-            tier, redteam.risk_score, context_chunks.len()
-        );
+        // 5. Dispatch Prompt to Active AI Provider
+        let active_p = ProviderRegistry::active();
+        let sys_prompt = "Objective Technical Execution Mode. Pure Rust Native.";
 
-        // 6. Anti-Slop Sanitization
-        let cleaned_response = AntiSlopFilter::filter(&response_text);
+        let (cleaned_response, in_tok, out_tok, tot_tok, ctx_limit, dur_ms) = match ProviderRegistry::dispatch_prompt_detailed(&input_prompt, Some(sys_prompt), 0.7, &[]) {
+            Ok(result) => (result.text, result.input_tokens, result.output_tokens, result.total_tokens, result.context_limit, result.duration_ms),
+            Err(e) => {
+                let err_msg = format!("AI Execution Error: {}\n\nResolution Options:\n  • Run 'ntx auth login <provider>' to configure authentication\n  • Run 'ntx provider' to switch provider (21 backends available)\n  • Run 'ntx provider ollama' for zero-auth local execution", e);
+                let fallback_in = input_prompt.len() / 4;
+                (err_msg, fallback_in, 0, fallback_in, active_p.context_window_for_model(&active_p.default_model), 0)
+            }
+        };
 
         // Persist session if not disabled
         if !opts.no_persistence {
@@ -552,7 +557,7 @@ impl CliHandler {
                 runtime: "pure-rust-cli".into(),
                 workspace: opts.cd.clone().unwrap_or_else(|| ".".into()),
                 status: "completed".into(),
-                tokens_used: input_prompt.len() / 4 + cleaned_response.len() / 4,
+                tokens_used: tot_tok,
                 created_at: chrono::Utc::now().to_rfc3339(),
                 updated_at: chrono::Utc::now().to_rfc3339(),
             });
@@ -564,6 +569,15 @@ impl CliHandler {
                 let json_out = serde_json::json!({
                     "prompt": input_prompt,
                     "response": cleaned_response,
+                    "provider": active_p.name,
+                    "model": active_p.default_model,
+                    "tokens": {
+                        "input": in_tok,
+                        "output": out_tok,
+                        "total": tot_tok,
+                        "context_limit": ctx_limit
+                    },
+                    "duration_ms": dur_ms,
                     "model_tier": format!("{:?}", tier),
                     "syntax_valid": det.syntax_valid,
                     "security_cleared": redteam.safe,
@@ -572,15 +586,19 @@ impl CliHandler {
                 println!("{}", serde_json::to_string_pretty(&json_out).unwrap());
             }
             "stream-json" => {
-                let event1 = serde_json::json!({ "type": "turn_start", "tier": format!("{:?}", tier) });
+                let event1 = serde_json::json!({ "type": "turn_start", "tier": format!("{:?}", tier), "provider": active_p.name, "model": active_p.default_model });
                 let event2 = serde_json::json!({ "type": "message_chunk", "content": cleaned_response });
-                let event3 = serde_json::json!({ "type": "turn_end", "exit_code": 0 });
+                let event3 = serde_json::json!({ "type": "turn_end", "tokens": tot_tok, "duration_ms": dur_ms, "exit_code": 0 });
                 println!("{}", event1);
                 println!("{}", event2);
                 println!("{}", event3);
             }
             _ => {
                 println!("{}", cleaned_response);
+                if opts.verbose {
+                    println!("\n[Tokens: in: {} | out: {} | total: {} | ctx limit: {} | latency: {}ms]",
+                        in_tok, out_tok, tot_tok, ctx_limit, dur_ms);
+                }
             }
         }
     }
