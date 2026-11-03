@@ -48,7 +48,7 @@ impl ProviderDefinition {
             1_048_576
         } else if m.contains("claude-3-7") || m.contains("claude-3-5") || m.contains("claude-3-opus") {
             200_000
-        } else if m.contains("o1") || m.contains("o3-mini") || m.contains("sonar-pro") || m.contains("sonar-reasoning") {
+        } else if m.contains("gpt-6") || m.contains("gpt-5") || m.contains("o4") || m.contains("o3") || m.contains("o1") || m.contains("sonar-pro") || m.contains("sonar-reasoning") {
             200_000
         } else if m.contains("hunyuan") || m.contains("codestral") {
             256_000
@@ -69,9 +69,12 @@ impl ProviderDefinition {
 
     pub fn is_reasoning_capable(&self, model: &str) -> bool {
         let m = model.to_lowercase();
-        m.contains("r1")
-            || m.contains("o1")
+        m.contains("gpt-6")
+            || m.contains("gpt-5")
+            || m.contains("o4")
             || m.contains("o3")
+            || m.contains("o1")
+            || m.contains("r1")
             || m.contains("thinking")
             || m.contains("reason")
             || m.contains("claude-3-7")
@@ -1432,22 +1435,29 @@ impl ProviderRegistry {
             || lower.contains("audio")
             || lower.contains("realtime")
             || lower.contains("transcription")
+            || lower.contains("transcribe")
+            || lower.contains("diarize")
             || lower.contains("search")
             || lower.contains("similarity")
+            || lower.contains("image")
+            || lower.contains("sora")
         {
             return -100;
         }
 
+        if lower.starts_with("gpt-6") || lower.contains("gpt-6") { return 115; }
+        if lower.starts_with("gpt-5") || lower.contains("gpt-5") { return 110; }
+        if lower.starts_with("o4") || lower.contains("o4-") { return 105; }
+        if lower.starts_with("o3") || lower.contains("o3-") { return 102; }
         if lower == "gpt-4o" { return 100; }
         if lower == "gpt-4o-mini" { return 99; }
-        if lower == "o3-mini" || lower.starts_with("o3-mini") { return 98; }
         if lower == "o1" || lower.starts_with("o1-20") { return 97; }
-        if lower == "claude-3-7-sonnet-20250219" || lower.contains("3-7-sonnet") { return 96; }
-        if lower == "gemini-2.5-flash" || lower == "gemini-2.5-pro" { return 95; }
-        if lower == "gemini-2.0-flash" || lower.contains("2.0-flash") { return 94; }
+        if lower.contains("3-7-sonnet") { return 96; }
+        if lower.contains("gemini-2.5") { return 95; }
+        if lower.contains("gemini-2.0") { return 94; }
         if lower == "deepseek-chat" || lower == "deepseek-v3" { return 93; }
         if lower == "deepseek-reasoner" || lower == "deepseek-r1" { return 92; }
-        if lower == "claude-3-5-sonnet-20241022" || lower.contains("3-5-sonnet") { return 91; }
+        if lower.contains("3-5-sonnet") { return 91; }
         if lower.contains("hermes-3-llama-3.1-405b") { return 90; }
         if lower.contains("llama-3.3-70b") || lower.contains("llama3.3:70b") { return 89; }
         if lower.contains("qwen-max") || lower.contains("qwen-plus") { return 88; }
@@ -1464,7 +1474,7 @@ impl ProviderRegistry {
         if lower.contains("mistral-large") || lower.contains("codestral") { return 71; }
         if lower.contains("command-r-plus") { return 70; }
         if lower.contains("instruct") || lower.contains("chat") { return 60; }
-        if lower.contains("gpt-3.5-turbo") { return 45; }
+        if lower.contains("gpt-3.5-turbo") { return 40; }
 
         50
     }
@@ -1585,11 +1595,25 @@ impl ProviderRegistry {
                 return Err(format!("Anthropic API Error: {}", err));
             }
             if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
-                let list: Vec<String> = data.iter()
-                    .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                let mut entries: Vec<(String, i64, i32)> = data.iter()
+                    .filter_map(|m| {
+                        let id = m.get("id").and_then(|v| v.as_str())?.to_string();
+                        let created = m.get("created_at").and_then(|v| v.as_i64()).unwrap_or(0);
+                        let score = Self::score_chat_model_relevance(&id);
+                        if score > 0 {
+                            Some((id, created, score))
+                        } else {
+                            None
+                        }
+                    })
                     .collect();
-                if !list.is_empty() {
-                    return Ok(list);
+                if !entries.is_empty() {
+                    entries.sort_by(|a, b| {
+                        b.1.cmp(&a.1)
+                            .then_with(|| b.2.cmp(&a.2))
+                            .then_with(|| a.0.cmp(&b.0))
+                    });
+                    return Ok(entries.into_iter().map(|(id, _, _)| id).collect());
                 }
             }
             return Err("No models returned by Anthropic API.".to_string());
@@ -1620,16 +1644,30 @@ impl ProviderRegistry {
         }
 
         if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
-            let mut list: Vec<String> = data.iter()
-                .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
-                .filter(|id| Self::score_chat_model_relevance(id) > 0)
+            let mut entries: Vec<(String, i64, i32)> = data.iter()
+                .filter_map(|m| {
+                    let id = m.get("id").and_then(|v| v.as_str())?.to_string();
+                    let created = m.get("created").and_then(|v| v.as_i64())
+                        .or_else(|| m.get("created_at").and_then(|v| v.as_i64()))
+                        .unwrap_or(0);
+                    let score = Self::score_chat_model_relevance(&id);
+                    if score > 0 {
+                        Some((id, created, score))
+                    } else {
+                        None
+                    }
+                })
                 .collect();
-            if !list.is_empty() {
-                list.sort_by(|a, b| {
-                    let sa = Self::score_chat_model_relevance(a);
-                    let sb = Self::score_chat_model_relevance(b);
-                    sb.cmp(&sa).then_with(|| a.cmp(b))
+            if !entries.is_empty() {
+                entries.sort_by(|a, b| {
+                    // Sort descending by created timestamp first (newest release first)
+                    b.1.cmp(&a.1)
+                        // Then sort by relevance score
+                        .then_with(|| b.2.cmp(&a.2))
+                        // Then tie-break alphabetically
+                        .then_with(|| a.0.cmp(&b.0))
                 });
+                let list: Vec<String> = entries.into_iter().map(|(id, _, _)| id).collect();
                 return Ok(list);
             }
         }

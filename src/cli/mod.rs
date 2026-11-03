@@ -2034,7 +2034,20 @@ complete -F _ntx_completions ntx"#);
                     println!("  Active State    : {}", if p.is_active { "ACTIVE" } else { "Inactive" });
                     println!("  Auth Status     : {}", p.auth_summary);
                     println!("  Description     : {}", p.description);
-                    println!("  Available Models: {}", p.available_models.join(", "));
+                    println!("  Curated Models  : {}", p.available_models.join(", "));
+                    if p.is_configured {
+                        match ProviderRegistry::fetch_remote_models_with_key(&p.id, None, None) {
+                            Ok(live) if !live.is_empty() => {
+                                println!("  Live Models ({}) : Top {} newest releases from {} endpoint:", live.len(), live.len().min(12), p.name);
+                                for (idx, m) in live.iter().take(12).enumerate() {
+                                    let is_cur = m == &p.default_model;
+                                    let mark = if is_cur { " * (active default)" } else { "" };
+                                    println!("    [{:>2}] {:<36}{}", idx + 1, m, mark);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                 } else {
                     eprintln!("[ERROR] Provider '{}' not found. Run 'ntx provider list' to view available.", id);
                 }
