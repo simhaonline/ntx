@@ -68,6 +68,7 @@ pub struct CliOptions {
     pub background: bool,
     pub exec_cmd: Option<String>,
     pub swarm: bool,
+    pub view: Option<String>,
     pub multitask: bool,
     pub config_overrides: Vec<String>,
     pub debug: Option<String>,
@@ -185,7 +186,13 @@ impl CliHandler {
             "auth" => self.cmd_auth(&sub_args),
             "install" => self.cmd_install(&sub_args),
             "update" | "upgrade" => self.cmd_update(&sub_args),
-            "repl" => self.interactive_repl(options.session_id.clone()),
+            "repl" | "interactive" | "tui" | "cockpit" | "console" => {
+                let view = options.view.as_deref().or_else(|| sub_args.first().map(|s| s.as_str())).and_then(interactive::CockpitView::parse);
+                self.interactive_repl_with_view(options.session_id.clone(), view);
+            }
+            "swarm" => {
+                self.interactive_repl_with_view(options.session_id.clone(), Some(interactive::CockpitView::Swarm));
+            }
             _ => {
                 // If the command is not a known subcommand, treat it as a prompt or print-mode task
                 if options.print_mode || options.prompt.is_some() || !cmd.starts_with('-') {
@@ -224,6 +231,13 @@ impl CliHandler {
 
         while i < raw.len() {
             let arg = &raw[i];
+
+            if arg == "-h" || arg == "--help" || arg == "help" {
+                return (opts, "help".to_string(), Vec::new());
+            }
+            if arg == "-v" || arg == "-V" || arg == "--version" || arg == "version" {
+                return (opts, "version".to_string(), Vec::new());
+            }
 
             if arg == "-p" || arg == "--print" {
                 opts.print_mode = true;
@@ -405,6 +419,11 @@ impl CliHandler {
                 }
             } else if arg == "--swarm" {
                 opts.swarm = true;
+            } else if arg == "--view" {
+                if i + 1 < raw.len() {
+                    opts.view = Some(raw[i + 1].clone());
+                    i += 1;
+                }
             } else if arg == "--multitask" {
                 opts.multitask = true;
             } else if arg == "-c" || arg == "--config" {
@@ -1940,7 +1959,14 @@ complete -F _ntx_completions ntx"#);
     }
 
     pub fn interactive_repl(&self, session_id: Option<String>) {
+        self.interactive_repl_with_view(session_id, None);
+    }
+
+    pub fn interactive_repl_with_view(&self, session_id: Option<String>, initial_view: Option<interactive::CockpitView>) {
         let mut shell = interactive::InteractiveShell::new(self.engine.clone());
+        if let Some(view) = initial_view {
+            shell.set_view(view);
+        }
         shell.run_interactive_loop(session_id);
     }
 
@@ -1951,6 +1977,7 @@ complete -F _ntx_completions ntx"#);
         println!("Global Options:");
         println!("  -p, --print [PROMPT]            Run non-interactively and print response");
         println!("  -i, --prompt-interactive        Run initial prompt interactively in REPL");
+        println!("      --view <VIEW>               Initial Cockpit view (overview, swarm, memory, cost, missions, ai)");
         println!("  -c, --continue                  Continue the most recent conversation");
         println!("  -r, --resume [SESSION_ID]       Resume a previous conversation by ID or picker");
         println!("      --fork-session              When resuming, fork into a new session ID");
@@ -1992,6 +2019,9 @@ complete -F _ntx_completions ntx"#);
         println!("  -v, --version                   Output version and runtime details");
         println!("  -h, --help                      Display this help screen\n");
         println!("Commands:");
+        println!("  tui | cockpit [VIEW]            Launch Ruflo-grade full-screen interactive TUI cockpit");
+        println!("  swarm                           Open Autonomous Multi-Agent Swarm cockpit directly");
+        println!("  repl                            Start interactive pure Rust REPL shell with cockpit tabs");
         println!("  status                          System health, runtimes, and catalog overview");
         println!("  doctor                          Verify policy, cgroups, sandboxes, and invariants");
         println!("  exec [PROMPT]                   Execute a prompt or task non-interactively");
