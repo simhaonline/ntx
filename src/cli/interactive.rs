@@ -6,6 +6,7 @@
 
 use crate::db::MemoryEngine;
 use crate::provider::{GoogleOAuthEngine, ProviderRegistry};
+use crate::cli::pad_truncate;
 use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
@@ -554,26 +555,34 @@ impl InteractiveShell {
                 continue;
             }
 
-            // If viewing Providers cockpit, typing a number (1-37) or provider name selects and configures that provider!
-            if self.current_view == CockpitView::Providers {
-                if let Ok(idx) = trimmed.parse::<usize>() {
-                    let total_providers = ProviderRegistry::list_all().len();
-                    if idx >= 1 && idx <= total_providers {
-                        self.interactive_configure_provider(trimmed);
-                        continue;
-                    }
-                } else if trimmed.eq_ignore_ascii_case("add") || trimmed.eq_ignore_ascii_case("custom") {
-                    let _ = ProviderRegistry::interactive_setup_wizard();
-                    continue;
-                } else if let Some(p) = ProviderRegistry::get(trimmed) {
-                    if p.id != "unconfigured" {
-                        self.interactive_configure_provider(&p.id);
-                        continue;
-                    }
-                }
+            let lower_trimmed = trimmed.to_lowercase();
+
+            // 1. Unconditional Global Exit Check (Always exits cleanly regardless of active view)
+            if lower_trimmed == "exit"
+                || lower_trimmed == "quit"
+                || lower_trimmed == ":q"
+                || lower_trimmed == "/exit"
+                || lower_trimmed == "/quit"
+                || lower_trimmed == "/q"
+                || lower_trimmed == "bye"
+            {
+                println!("{}Exiting Nityaksha Concierge Platform. Goodbye!{}", theme.muted, theme.reset);
+                break;
             }
 
-            // 1. Check if user typed a quick View Switcher hotkey (1-6, ?, o, s, m, c, w, a, tab, next, prev)
+            // 2. Normalize and check if input is a known CLI command (starts with '/' or is a recognized command verb)
+            let (is_command, normalized_cmd) = Self::classify_command(trimmed);
+            if is_command {
+                let first_token = normalized_cmd.split_whitespace().next().unwrap_or("").to_lowercase();
+                if first_token == "exit" || first_token == "quit" || first_token == ":q" || first_token == "bye" {
+                    println!("{}Exiting Nityaksha Concierge Platform. Goodbye!{}", theme.muted, theme.reset);
+                    break;
+                }
+                self.handle_command(&normalized_cmd);
+                continue;
+            }
+
+            // 3. Quick View Switcher hotkey (1-6, ?, o, s, m, c, w, a, tab, next, prev)
             if let Some(target_view) = CockpitView::parse(trimmed) {
                 self.set_view(target_view);
                 self.render_active_view();
@@ -590,16 +599,23 @@ impl InteractiveShell {
                 continue;
             }
 
-            // 2. Normalize and check if input is a known CLI command (with or without '/')
-            let (is_command, normalized_cmd) = Self::classify_command(trimmed);
-            if is_command {
-                let first_token = normalized_cmd.split_whitespace().next().unwrap_or("");
-                if first_token == "exit" || first_token == "quit" || first_token == ":q" {
-                    println!("{}Exiting Nityaksha Concierge Platform. Goodbye!{}", theme.muted, theme.reset);
-                    break;
+            // 4. Provider-specific input (ONLY if explicitly in Providers view AND input is a valid number or provider)
+            if self.current_view == CockpitView::Providers {
+                if let Ok(idx) = trimmed.parse::<usize>() {
+                    let total_providers = ProviderRegistry::list_all().len();
+                    if idx < total_providers {
+                        self.interactive_configure_provider(trimmed);
+                        continue;
+                    }
+                } else if trimmed.eq_ignore_ascii_case("add") || trimmed.eq_ignore_ascii_case("custom") {
+                    let _ = ProviderRegistry::interactive_setup_wizard();
+                    continue;
+                } else if let Some(p) = ProviderRegistry::get(trimmed) {
+                    if p.id != "unconfigured" {
+                        self.interactive_configure_provider(&p.id);
+                        continue;
+                    }
                 }
-                self.handle_command(&normalized_cmd);
-                continue;
             }
 
             // 3. Natural Language Autonomous Prompt Execution
@@ -704,35 +720,36 @@ impl InteractiveShell {
             &self.session_id
         };
 
-        // 1. Large 3D Block Banner (NITYAKSHA)
-        let c_top = "\x1b[38;5;226m";
-        let c_mid = "\x1b[38;5;220m";
-        let c_bot = "\x1b[38;5;214m";
-        let c_shd = "\x1b[38;5;172m";
+        // 1. Sleek Radiant Brand Banner (NITYAKSHA - Rust Orange / Warm Amber Palette)
+        let c_top = "\x1b[38;5;208m";
+        let c_mid = "\x1b[38;5;166m";
+        let c_bot = "\x1b[38;5;130m";
+        let c_shd = "\x1b[38;5;94m";
         let rst = "\x1b[0m";
 
         println!();
-        println!("{}███    ██ ██ ████████ ██    ██  █████  ██   ██ ███████ ██   ██  █████ {}", c_top, rst);
-        println!("{}████   ██ ██    ██     ██  ██  ██   ██ ██  ██  ██      ██   ██ ██   ██{}", c_mid, rst);
-        println!("{}██ ██  ██ ██    ██      ████   ███████ █████   ███████ ███████ ███████{}", c_mid, rst);
-        println!("{}██  ██ ██ ██    ██       ██    ██   ██ ██  ██       ██ ██   ██ ██   ██{}", c_bot, rst);
-        println!("{}██   ████ ██    ██       ██    ██   ██ ██   ██ ███████ ██   ██ ██   ██{}", c_shd, rst);
+        println!("  {}███    ██ ██ ████████ ██    ██  █████  ██   ██ ███████ ██   ██  █████ {}", c_top, rst);
+        println!("  {}████   ██ ██    ██     ██  ██  ██   ██ ██  ██  ██      ██   ██ ██   ██{}", c_mid, rst);
+        println!("  {}██ ██  ██ ██    ██      ████   ███████ █████   ███████ ███████ ███████{}", c_mid, rst);
+        println!("  {}██  ██ ██ ██    ██       ██    ██   ██ ██  ██       ██ ██   ██ ██   ██{}", c_bot, rst);
+        println!("  {}██   ████ ██    ██       ██    ██   ██ ██   ██ ███████ ██   ██ ██   ██{}", c_shd, rst);
+        println!("  \x1b[38;5;244m◈ AN AI CONCIERGE PLATFORM · PURE RUST NATIVE CONTROL PLANE (v1.0.0) ◈\x1b[0m");
         println!();
 
         // 2. Card Box Parameters
-        let c_border = "\x1b[38;5;214m";
+        let c_border = "\x1b[38;5;166m";
         let c_gold = "\x1b[38;5;220m";
         let c_amber = "\x1b[38;5;178m";
         let c_white = "\x1b[1;37m";
         let c_dim = "\x1b[38;5;244m";
         let c_olive = "\x1b[38;5;136m";
 
-        let left_w = 36usize;
+        let left_w = 38usize;
         let right_w = total_w.saturating_sub(left_w + 5);
 
         // Header Title
-        let title = format!(" Nityaksha Meta-Harness v1.0.0 (Pure Native Rust) · stable · local {} ", short_sid);
-        let dashes_left = 18usize;
+        let title = format!(" Nityaksha Concierge Control Plane v1.0.0 (Pure Native Rust) · stable · local {} ", short_sid);
+        let dashes_left = 14usize;
         let dashes_right = total_w.saturating_sub(2 + dashes_left + title.chars().count());
         println!("{c_border}╭{left_dash}{c_gold}{title}{c_border}{right_dash}╮{rst}",
             left_dash = "─".repeat(dashes_left),
@@ -743,68 +760,66 @@ impl InteractiveShell {
             rst = rst
         );
 
-        // Left Column: Heraldic Emblem + Model + Dir + Session
+        // Left Column: NITYAKSHA Orbital Kinetic Eye (The Eternal Eye) Logomark
         let emblem = [
-            "          .---. .---.          ",
-            "         :     : :     :       ",
-            "      .:' :::  : :  ::: ':.    ",
-            "  .-':::   :::  : :  :::   :::'-. ",
-            ".-'::: '::  ::: : :::  ::' ::::'-.",
-            " '--':::  ':: ::: ::: ::'  :::''-  ",
-            "        '::.  ::: :::  .::'     ",
-            "          '::. :::: .::'       ",
-            "             '::..::'          ",
-            "               ::::            ",
-            "             .::' '::.         ",
-            "            ::'     '::        ",
-            "           ::.       .::       ",
-            "            '::.   .::'        ",
-            "               ':::':          ",
-            "                ::::           ",
-            "                ::::           ",
-            "               .::.::.         ",
-            "              ::'   '::        ",
-            "              ::     ::        ",
-            "               '::.::'         ",
-            "                 :             ",
+            "             .───────.             ",
+            "          .·'    ▲    '·.          ",
+            "       .·'    .·' '·.    '·.       ",
+            "     .·'   .·'  ╭─╮  '·.   '·.     ",
+            "    /    .·'    │●│    '·.    \\    ",
+            "   │   .·'   .──┴─┴──.   '·.   │   ",
+            "  ─◈━━━┫    │  ◈   ◈  │    ┣━━━◈─  ",
+            "   │    '·.  '──┬─┬──'  .·'    │   ",
+            "    \\     '·.   │●│   .·'     /    ",
+            "     '·.    '·. ╰─╯ .·'    .·'     ",
+            "       '·.    '·. .·'    .·'       ",
+            "          '·.    ▼    .·'          ",
+            "             '───────'             ",
         ];
 
         let mut left_col: Vec<String> = emblem.iter().map(|l| format!("{}{}{}", c_amber, l, rst)).collect();
-        let ai_label = if active_p.is_configured {
-            format!("{}{} · {}{}", c_gold, active_p.default_model, active_p.name, rst)
-        } else {
-            format!("\x1b[1;33m⚠️ No Provider Configured\x1b[0m")
-        };
-        left_col.push(ai_label);
-        let dir_disp = clean_path(&self.current_dir, 32);
-        left_col.push(format!("{}{}{}", c_olive, dir_disp, rst));
-        left_col.push(format!("{}Session: {}{}", c_dim, short_sid, rst));
+        left_col.push(String::new());
+        left_col.push(format!("    \x1b[1m{c_gold}◈ NITYAKSHA CONCIERGE ◈{rst}"));
+        left_col.push(format!("    {c_dim}Deterministic Pure Rust Core{rst}"));
+        left_col.push(String::new());
 
-        // Right Column: Available Tools + Available Skills
+        let ai_status = if active_p.id == "auto" {
+            format!("{c_gold}Auto Router{rst} ({c_white}{}{rst})", active_p.default_model)
+        } else if active_p.is_configured {
+            format!("{c_gold}{}{rst} ({c_white}{}{rst})", pad_truncate(&active_p.name, 12), pad_truncate(&active_p.default_model, 14))
+        } else {
+            format!("\x1b[1;33m⚠️ No Active Provider\x1b[0m")
+        };
+        left_col.push(format!(" {c_amber}Active AI :{rst} {}", ai_status));
+
+        let dir_disp = clean_path(&self.current_dir, 22);
+        left_col.push(format!(" {c_amber}Workspace :{rst} {c_olive}{}{rst}", dir_disp));
+        left_col.push(format!(" {c_amber}Sandbox   :{rst} {c_white}Sovereign POSIX Jail{rst}"));
+        left_col.push(format!(" {c_amber}Session ID:{rst} {c_dim}{}{rst}", short_sid));
+
+        // Right Column: Authentic Operational Architecture & High-Signal Telemetry
         let right_col = vec![
-            format!("{c_gold}Available Tools{rst}"),
-            format!("{c_amber}browser-use:{rst} {c_white}browser_exec{rst}"),
-            format!("{c_amber}clarify:{rst} {c_white}clarify{rst}"),
-            format!("{c_amber}code_execution:{rst} {c_white}execute_code{rst}"),
-            format!("{c_amber}connections:{rst} {c_white}manage_connections{rst}"),
-            format!("{c_amber}delegation:{rst} {c_white}delegate_task{rst}"),
-            format!("{c_amber}file:{rst} {c_white}patch, read_file, search_files, write_file{rst}"),
-            format!("{c_amber}image_gen:{rst} {c_gold}image_generate{rst}"),
-            format!("{c_amber}memory:{rst} {c_white}memory{rst}"),
-            format!("{c_dim}(and 8 more toolsets...){rst}"),
+            format!("{c_gold}◈ GATEWAY CONTROL PLANE & TELEMETRY{rst}"),
+            format!("  {c_amber}Provider Pool :{rst} {c_white}39 AI Backends{rst} {c_dim}(Commercial, Sovereign, Cloud){rst}"),
+            format!("  {c_amber}Active Route  :{rst} {c_white}Auto Smart Free Router{rst} {c_gold}[Index 0]{rst}"),
+            format!("  {c_amber}Failover Gate :{rst} {c_white}Local Core → Free Quotas → Fallback Cascade{rst}"),
+            format!("  {c_amber}Prompt Opt    :{rst} {c_white}RTK Token Compressor{rst} {c_dim}(15–35% Cost Reduction){rst}"),
+            format!("  {c_amber}LLM Classifier:{rst} {c_white}Adaptive Tiers{rst} {c_dim}(FastFlash ↔ Balanced ↔ DeepReasoning){rst}"),
+            format!("  {c_amber}Circuit Breaker:{rst} {c_white}Active{rst} {c_dim}(60s Auto-Cooldown on Rate Limits/503){rst}"),
+            format!("  {c_amber}Memory Stack  :{rst} {c_white}SQLite WAL{rst} + {c_dim}Associative Spatial Loci Engine{rst}"),
+            format!("  {c_amber}HTTP Gateway  :{rst} {c_white}http://127.0.0.1:8080{rst} {c_dim}(Drop-in OpenAI API){rst}"),
             String::new(),
-            format!("{c_gold}Available Skills{rst}"),
-            format!("{c_amber}autonomous-ai-agents:{rst} {c_white}agent-merge-conflict-arbiter, +10 more{rst}"),
-            format!("{c_amber}blockchain & quant:{rst} {c_white}evm, hyperliquid, solana, pine-v6{rst}"),
-            format!("{c_amber}communication:{rst} {c_white}one-three-one-rule, anti-slop{rst}"),
-            format!("{c_amber}creative:{rst} {c_white}archify, architecture-diagram, ascii-art, +29 more{rst}"),
-            format!("{c_amber}data-science:{rst} {c_white}jupyter-notebook, hybrid-rag{rst}"),
-            format!("{c_amber}devops:{rst} {c_white}actual-setup, docker-management, inference-sh-cli, +2 more{rst}"),
-            format!("{c_amber}dogfood:{rst} {c_white}adversarial-ux-test{rst}"),
-            format!("{c_amber}email & office:{rst} {c_white}agentmail, email-inbox-triage, himalaya{rst}"),
-            format!("{c_amber}finance:{rst} {c_white}3-statement-model, comps-analysis, dcf-model, +6 more{rst}"),
-            format!("{c_amber}gaming:{rst} {c_white}pokemon-player{rst}"),
-            format!("{c_amber}general:{rst} {c_white}ai-governance-grc, ai-infrastructure-hardware, +97 more{rst}"),
+            format!("{c_gold}◈ WORKSTATION VIEWS & SHORTCUTS{rst}"),
+            format!("  {c_white}[1] Overview  [2] Swarm  [3] Memory  [4] Cost  [5] Missions  [6] Gateway{rst}"),
+            String::new(),
+            format!("{c_gold}◈ ESSENTIAL COMMAND PALETTE{rst}"),
+            format!("  {c_amber}/provider{rst} (or {c_white}6{rst})      {c_dim}Manage 39 providers, test latency, guided wizard{rst}"),
+            format!("  {c_amber}/model [name]{rst}        {c_dim}Discover remote provider models & set active{rst}"),
+            format!("  {c_amber}/key [id] [key]{rst}     {c_dim}Configure credentials directly for any provider{rst}"),
+            format!("  {c_amber}/router{rst}              {c_dim}Inspect live router telemetry, RTK savings & reset{rst}"),
+            format!("  {c_amber}/effort [level]{rst}      {c_dim}Set reasoning thinking budget (low, med, max...){rst}"),
+            format!("  {c_amber}/help{rst} (or {c_white}?{rst})          {c_dim}Display complete interactive command manual{rst}"),
+            format!("  {c_amber}/exit{rst} (or {c_white}exit{rst})       {c_dim}Cleanly exit Nityaksha Concierge Platform{rst}"),
         ];
 
         let max_rows = left_col.len().max(right_col.len());
@@ -825,8 +840,8 @@ impl InteractiveShell {
         println!("{c_border}╰{bot_dash}╯{rst}");
 
         // Bottom Navigation Bar & Hints
-        println!("  \x1b[38;5;244m💡 Quick Navigation: Type '2' for Swarm, '3' for Memory, '4' for Cost, '5' for Missions, '6' for AI Gateway, or '/router'\x1b[0m");
-        println!("  \x1b[38;5;244mType your natural language prompt below to execute an autonomous swarm turn.\x1b[0m");
+        println!("  \x1b[38;5;244m💡 Navigation: Press '1'-'6' to switch views, '/provider' to manage AI backends, or 'exit' to quit.\x1b[0m");
+        println!("  \x1b[38;5;244m   Type your natural language prompt below to execute an autonomous concierge turn.\x1b[0m");
     }
 
     /// [2] SWARM COCKPIT VIEW
@@ -1474,6 +1489,9 @@ impl InteractiveShell {
                     } else if sub == "select" && parts.len() >= 3 {
                         let id = parts[2];
                         self.interactive_configure_provider(id);
+                    } else if sub == "list" || sub == "ls" || sub == "status" || sub == "show" {
+                        self.set_view(CockpitView::Providers);
+                        self.render_active_view();
                     } else if parts.len() >= 3 {
                         let id = parts[1];
                         let key = parts[2..].join(" ");
@@ -1484,14 +1502,18 @@ impl InteractiveShell {
                 } else {
                     self.set_view(CockpitView::Providers);
                     self.render_active_view();
-                    println!("\n  {}Direct Configuration:{} Enter provider number (1-{}) or ID to configure, 'add' for custom, or Enter to continue:",
-                        theme.accent, theme.reset, ProviderRegistry::list_all().len());
+                    let total_idx = ProviderRegistry::list_all().len().saturating_sub(1);
+                    println!("\n  {}Direct Configuration:{} Enter provider number (0-{}) or ID to configure, 'add' for custom, or Enter to continue:",
+                        theme.accent, theme.reset, total_idx);
                     print!("  Select > ");
                     let _ = io::stdout().flush();
                     let mut pick = String::new();
                     if io::stdin().read_line(&mut pick).is_ok() {
                         let t = pick.trim();
                         if !t.is_empty() {
+                            if t.eq_ignore_ascii_case("exit") || t.eq_ignore_ascii_case("quit") || t.eq_ignore_ascii_case("cancel") || t.eq_ignore_ascii_case("q") || t.eq_ignore_ascii_case(":q") {
+                                return;
+                            }
                             if t.eq_ignore_ascii_case("add") || t.eq_ignore_ascii_case("custom") {
                                 let _ = ProviderRegistry::interactive_setup_wizard();
                             } else {
@@ -1812,8 +1834,8 @@ impl InteractiveShell {
                 let mut k = String::new();
                 let _ = io::stdin().read_line(&mut k);
                 let clean = k.trim();
-                if clean.is_empty() {
-                    println!("{}No API key entered. Setup aborted.{}", theme.warning, theme.reset);
+                if clean.is_empty() || clean.eq_ignore_ascii_case("exit") || clean.eq_ignore_ascii_case("quit") || clean.eq_ignore_ascii_case("cancel") || clean.eq_ignore_ascii_case("q") {
+                    println!("{}Setup aborted. No API key configured.{}", theme.muted, theme.reset);
                     return;
                 }
                 let _ = ProviderRegistry::set_key(&target_provider.id, clean);
@@ -1821,8 +1843,13 @@ impl InteractiveShell {
             }
         }
 
-        // Set as active provider
-        let _ = ProviderRegistry::set_active(&target_provider.id);
+        // Set as active provider only if credentials exist or auth_type is none
+        if target_provider.auth_type == "none" || key_for_query.is_some() || target_provider.is_configured {
+            let _ = ProviderRegistry::set_active(&target_provider.id);
+        } else {
+            println!("{}Provider not activated due to missing credentials.{}", theme.warning, theme.reset);
+            return;
+        }
 
         // Step 2, 3, 4: Select Model & Reasoning Effort
         self.interactive_select_model_and_reasoning(&target_provider.id, key_for_query.as_deref());

@@ -1262,8 +1262,21 @@ impl ProviderRegistry {
             return None;
         }
 
+        // Fast rejection of common terminal keywords & command verbs
+        let lower = trimmed.to_lowercase();
+        let reserved = [
+            "exit", "quit", ":q", "q", "bye", "help", "?", "-h", "--help",
+            "add", "custom", "list", "test", "clear", "cls", "menu", "back",
+            "status", "config", "run", "doctor", "update", "version", "model",
+            "router", "key", "swarm", "memory", "cost", "view", "theme", "trust",
+            "bot", "workflow", "missions", "dash", "dashboard", "overview", "cancel"
+        ];
+        if reserved.contains(&lower.as_str()) {
+            return None;
+        }
+
         // 1. Direct 0 or "auto" match
-        if trimmed == "0" || trimmed.eq_ignore_ascii_case("auto") {
+        if trimmed == "0" || lower == "auto" {
             return all.iter().find(|p| p.id == "auto").cloned();
         }
 
@@ -1291,9 +1304,14 @@ impl ProviderRegistry {
             return Some(p.clone());
         }
 
-        // 5. Substring match on id or name
-        let lower = trimmed.to_lowercase();
-        all.into_iter().find(|p| p.id.to_lowercase().contains(&lower) || p.name.to_lowercase().contains(&lower))
+        // 5. Safe prefix match ONLY (e.g., "perpl" -> perplexity, but NEVER substring matching like "exit" -> perplexity)
+        if lower.len() >= 4 {
+            if let Some(p) = all.iter().find(|p| p.id.to_lowercase().starts_with(&lower)) {
+                return Some(p.clone());
+            }
+        }
+
+        None
     }
 
     pub fn unconfigured_sentinel() -> ProviderDefinition {
@@ -2801,7 +2819,7 @@ impl ProviderRegistry {
         let _ = std::io::stdout().flush();
 
         let mut opt = String::new();
-        if std::io::stdin().read_line(&mut opt).is_err() || opt.trim().is_empty() {
+        if std::io::stdin().read_line(&mut opt).is_err() || opt.trim().is_empty() || opt.trim().eq_ignore_ascii_case("exit") || opt.trim().eq_ignore_ascii_case("quit") || opt.trim().eq_ignore_ascii_case("cancel") || opt.trim().eq_ignore_ascii_case("q") {
             println!("Setup cancelled.");
             return Ok(String::new());
         }
@@ -3481,5 +3499,25 @@ mod tests {
         let gemini_by_one = ProviderRegistry::get("1");
         assert!(gemini_by_one.is_some());
         assert_eq!(gemini_by_one.unwrap().id, "gemini");
+    }
+
+    #[test]
+    fn test_reserved_keywords_never_match_provider() {
+        // "exit" must NEVER match perplexity or any provider
+        assert!(ProviderRegistry::get("exit").is_none());
+        assert!(ProviderRegistry::get("quit").is_none());
+        assert!(ProviderRegistry::get(":q").is_none());
+        assert!(ProviderRegistry::get("q").is_none());
+        assert!(ProviderRegistry::get("bye").is_none());
+        assert!(ProviderRegistry::get("help").is_none());
+        assert!(ProviderRegistry::get("cancel").is_none());
+        assert!(ProviderRegistry::get("add").is_none());
+        assert!(ProviderRegistry::get("list").is_none());
+
+        // Real providers must still match
+        assert_eq!(ProviderRegistry::get("perplexity").map(|p| p.id), Some("perplexity".to_string()));
+        assert_eq!(ProviderRegistry::get("perp").map(|p| p.id), Some("perplexity".to_string()));
+        assert_eq!(ProviderRegistry::get("openai").map(|p| p.id), Some("openai".to_string()));
+        assert_eq!(ProviderRegistry::get("gemini").map(|p| p.id), Some("gemini".to_string()));
     }
 }
