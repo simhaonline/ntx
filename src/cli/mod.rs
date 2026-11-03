@@ -100,6 +100,51 @@ fn clean_terminal_text(desc: &str, max_len: usize) -> String {
     }
 }
 
+fn pad_truncate(text: &str, width: usize) -> String {
+    let clean = clean_terminal_text(text, width);
+    let char_count = clean.chars().count();
+    if char_count < width {
+        let pad = " ".repeat(width - char_count);
+        format!("{}{}", clean, pad)
+    } else {
+        clean
+    }
+}
+
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
+    let mut in_escape = false;
+    for c in s.chars() {
+        if c == '\x1b' {
+            in_escape = true;
+        } else if in_escape {
+            if c == 'm' {
+                in_escape = false;
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn normalize_category(cat: &str) -> &'static str {
+    match cat {
+        "Cloud Infrastructure" => "Cloud Infra",
+        "Coding & Reasoning" => "Coding/Logic",
+        "Inference Cloud" => "Cloud Infra",
+        "Agent Native" => "Agent Native",
+        "Developer Core" => "Dev Platform",
+        "Local Runtime" => "Local Core",
+        "Commercial" => "Commercial",
+        "Aggregator" => "Aggregator",
+        "Specialized" => "Specialized",
+        "Edge Cloud" => "Edge Cloud",
+        "Enterprise" => "Enterprise",
+        _ => "General AI",
+    }
+}
+
 pub struct CliHandler {
     engine: Arc<MemoryEngine>,
     sandbox: Arc<SandboxManager>,
@@ -1821,47 +1866,61 @@ complete -F _ntx_completions ntx"#);
             let providers = ProviderRegistry::list_all();
             let active = ProviderRegistry::active();
 
-            println!("=================================================================================================================");
-            println!("              NITYAKSHA AI PROVIDER GATEWAY (36+ Native Commercial, Local, Cloud & Custom Providers)            ");
-            println!("=================================================================================================================");
-            println!("  ID             STATUS       CATEGORY          DEFAULT MODEL                  AUTH METHOD");
-            println!("-----------------------------------------------------------------------------------------------------------------");
-            for p in &providers {
-                let mark = if p.is_active { "*" } else { " " };
-                let status_str = if p.is_active {
-                    "\x1b[32mACTIVE\x1b[0m      "
+            println!("╭──────┬──────────────┬──────────────┬──────────────────────────┬────────────┬──────────────────────────╮");
+            println!("│  #   │ PROVIDER     │ CATEGORY     │ DEFAULT MODEL            │ STATUS     │ AUTH / CREDENTIALS       │");
+            println!("├──────┼──────────────┼──────────────┼──────────────────────────┼────────────┼──────────────────────────┤");
+            for (idx, p) in providers.iter().enumerate() {
+                let num = format!(" [{:>2}] ", idx + 1);
+                let id = format!(" {:<12} ", pad_truncate(&p.id, 12));
+                let cat = format!(" {:<12} ", pad_truncate(normalize_category(&p.category), 12));
+                let model = format!(" {:<24} ", pad_truncate(&p.default_model, 24));
+                let status_badge = if p.is_active {
+                    " \x1b[1;32m● ACTIVE\x1b[0m   ".to_string()
                 } else if p.is_configured {
-                    "\x1b[36mREADY\x1b[0m       "
+                    " \x1b[1;36m✓ READY\x1b[0m    ".to_string()
                 } else {
-                    "\x1b[90mUNCONFIGURED\x1b[0m"
+                    " \x1b[33m○ NEED KEY\x1b[0m ".to_string()
                 };
-                let id_fmt = format!("{}{:<13}", mark, p.id);
-                let cat_fmt = format!("{:<16}", p.category);
-                let model_fmt = format!("{:<30}", clean_terminal_text(&p.default_model, 30));
-                let auth_fmt = clean_terminal_text(&p.auth_summary, 32);
+                let auth = format!(" {:<24} ", pad_truncate(&p.auth_summary, 24));
+                println!("│{}│{}│{}│{}│{}│{}│", num, id, cat, model, status_badge, auth);
+            }
+            println!("╰──────┴──────────────┴──────────────┴──────────────────────────┴────────────┴──────────────────────────╯");
 
-                println!("  {} {} {} {} {}", id_fmt, status_str, cat_fmt, model_fmt, auth_fmt);
-            }
-            println!("-----------------------------------------------------------------------------------------------------------------");
+            // Enclosed Bottom Summary Card (105 cols)
+            println!("╭───────────────────────────────────────────────────────────────────────────────────────────────────────╮");
             if active.is_configured {
-                println!("Active Provider: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
+                let act_line = format!("ACTIVE AI PROVIDER : \x1b[1;32m{} ({})\x1b[0m [● ACTIVE | Ready for queries]", active.name, active.default_model);
+                let vis_len = strip_ansi(&act_line).chars().count();
+                let pad = if vis_len < 101 { " ".repeat(101 - vis_len) } else { String::new() };
+                println!("│ {}{} │", act_line, pad);
             } else {
-                println!("Active Provider: \x1b[33m⚠️ NOT CONFIGURED (Run 'ntx provider add' to connect an AI provider)\x1b[0m");
+                let act_line = "ACTIVE AI PROVIDER : \x1b[1;33m⚠️ NOT CONFIGURED (Run 'ntx provider add' to connect an AI provider)\x1b[0m";
+                let vis_len = strip_ansi(act_line).chars().count();
+                let pad = if vis_len < 101 { " ".repeat(101 - vis_len) } else { String::new() };
+                println!("│ {}{} │", act_line, pad);
             }
-            println!("Commands & Setup:");
-            println!("  ntx provider add                - Launch interactive guided setup wizard");
-            println!("  ntx provider add <id> <key>     - Add API key, activate provider, and query live models");
-            println!("  ntx provider add custom <id> <url> <format> <key> <model> - Register custom endpoint");
-            println!("  ntx provider select <id>        - Switch active default provider");
-            println!("  ntx provider inspect <id>       - View available models, base URL, and configuration");
-            println!("  ntx provider set-url <id> <url> - Set custom base URL (e.g. self-hosted Ollama/vLLM)");
-            println!("  ntx provider test <id>          - Test connectivity and latency ping");
-            println!("  ntx key <id> <key>              - Directly configure provider API key");
+            println!("├───────────────────────────────────────────────────────────────────────────────────────────────────────┤");
+            let cmd_lines = [
+                "Quick Commands:",
+                "  • Interactive Guided Setup : ntx provider add            (Launches 4-step guided setup wizard)",
+                "  • Configure by Row / ID    : ntx provider configure <#>  (e.g. 'ntx provider configure 1' for Gemini)",
+                "  • Fast Direct API Key      : ntx key <# or ID> <key>     (e.g. 'ntx key 1 AIzaSy...' or 'ntx key 3 sk-...')",
+                "  • Switch Active Provider   : ntx provider set <# or ID>  (e.g. 'ntx provider set 3' or 'ntx provider set openai')",
+                "  • Authenticate via OAuth   : ntx auth login <provider>   (e.g. 'ntx auth login google' / 'ntx auth login github')",
+                "  • Test Latency & Ping      : ntx provider test <# or ID> (Pings provider endpoint and checks latency)",
+                "  • Inspect Provider Details : ntx provider inspect <#>    (View context window, endpoints & live models)",
+            ];
+            for l in &cmd_lines {
+                let vis_len = strip_ansi(l).chars().count();
+                let pad = if vis_len < 101 { " ".repeat(101 - vis_len) } else { String::new() };
+                println!("│ {}{} │", l, pad);
+            }
+            println!("╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯");
             return;
         }
 
         match args[0].as_str() {
-            "add" => {
+            "add" | "configure" | "setup" => {
                 if args.len() == 1 {
                     let _ = ProviderRegistry::interactive_setup_wizard();
                     return;
@@ -1914,6 +1973,27 @@ complete -F _ntx_completions ntx"#);
                 }
                 let _ = ProviderRegistry::interactive_setup_wizard();
             }
+            "select" | "use" | "set" | "set-active" => {
+                if args.len() < 2 {
+                    eprintln!("Usage: ntx provider set <id|#>\nExample: ntx provider set 1\n         ntx provider set openai");
+                    return;
+                }
+                let id = &args[1];
+                if let Some(p) = ProviderRegistry::get(id) {
+                    if !p.is_configured && p.auth_type != "none" {
+                        println!("\x1b[33m[NOTICE] Provider '{}' is unconfigured.", p.name);
+                        println!("Run 'ntx provider add {} <api_key>' to configure credentials.\x1b[0m", p.id);
+                    }
+                    match ProviderRegistry::set_active(&p.id) {
+                        Ok(()) => {
+                            println!("[SUCCESS] Active provider switched to: \x1b[32m{} ({})\x1b[0m", p.name, p.default_model);
+                        }
+                        Err(e) => eprintln!("[ERROR] Failed to switch provider: {}", e),
+                    }
+                } else {
+                    eprintln!("[ERROR] Unknown provider '{}'. Run 'ntx provider list' for available options (1-38).", id);
+                }
+            }
             "set-key" | "key" => {
                 if args.len() < 3 {
                     eprintln!("Usage: ntx provider set-key <provider_id> <api_key>\nExample: ntx provider add gemini AIzaSy...\n         ntx provider set-key openai sk-proj-...");
@@ -1957,27 +2037,6 @@ complete -F _ntx_completions ntx"#);
                     println!("  Available Models: {}", p.available_models.join(", "));
                 } else {
                     eprintln!("[ERROR] Provider '{}' not found. Run 'ntx provider list' to view available.", id);
-                }
-            }
-            "select" | "use" | "set-active" => {
-                if args.len() < 2 {
-                    eprintln!("Usage: ntx provider select <id|index>");
-                    return;
-                }
-                let id = &args[1];
-                if let Some(p) = ProviderRegistry::get(id) {
-                    if !p.is_configured && p.auth_type != "none" {
-                        println!("\x1b[33m[NOTICE] Provider '{}' is unconfigured ($" , p.name);
-                        println!("Run 'ntx provider add {} <api_key>' to configure credentials.\x1b[0m", p.id);
-                    }
-                    match ProviderRegistry::set_active(&p.id) {
-                        Ok(()) => {
-                            println!("[SUCCESS] Active provider switched to: \x1b[32m{} ({})\x1b[0m", p.name, p.default_model);
-                        }
-                        Err(e) => eprintln!("[ERROR] Failed to switch provider: {}", e),
-                    }
-                } else {
-                    eprintln!("[ERROR] Unknown provider '{}'. Run 'ntx provider list' for available options (1-37).", id);
                 }
             }
             "set-url" => {

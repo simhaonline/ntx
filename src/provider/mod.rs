@@ -364,6 +364,33 @@ impl ProviderRegistry {
                 max_context_window: 128_000,
             },
             ProviderDefinition {
+                id: "github".to_string(),
+                name: "GitHub Models".to_string(),
+                category: "Developer Core".to_string(),
+                base_url: "https://models.github.ai/inference".to_string(),
+                default_model: "gpt-4o".to_string(),
+                available_models: vec![
+                    "gpt-4o".to_string(),
+                    "gpt-4o-mini".to_string(),
+                    "o1".to_string(),
+                    "o3-mini".to_string(),
+                    "DeepSeek-R1".to_string(),
+                    "Meta-Llama-3.3-70B-Instruct".to_string(),
+                    "Mistral-large-2407".to_string(),
+                    "Cohere-command-r-plus-08-2024".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "GITHUB_TOKEN".to_string(),
+                description: "GitHub Models inference platform powered by Azure AI with support for GPT-4o, DeepSeek-R1, and Llama 3.3.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
                 id: "together".to_string(),
                 name: "Together AI".to_string(),
                 category: "Specialized".to_string(),
@@ -1077,6 +1104,37 @@ impl ProviderRegistry {
                     } else {
                         p.auth_summary = format!("Requires API Key (${}) or Google OAuth", p.env_var);
                     }
+                } else if p.id == "github" {
+                    if let Some(key) = config.keys.get("github") {
+                        p.is_configured = true;
+                        p.api_key = Some(mask_key(key));
+                        p.auth_summary = "GitHub PAT (Config)".to_string();
+                    } else if let Ok(key) = std::env::var("GITHUB_TOKEN") {
+                        if !key.is_empty() {
+                            p.is_configured = true;
+                            p.api_key = Some(mask_key(&key));
+                            p.auth_summary = "GitHub Token ($GITHUB_TOKEN)".to_string();
+                        } else {
+                            p.auth_summary = "Requires PAT ($GITHUB_TOKEN)".to_string();
+                        }
+                    } else if let Ok(output) = Command::new("gh").arg("auth").arg("token").output() {
+                        if output.status.success() {
+                            let tok = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            if !tok.is_empty() {
+                                p.is_configured = true;
+                                p.api_key = Some(mask_key(&tok));
+                                p.auth_summary = "GitHub CLI Token (gh auth)".to_string();
+                            } else {
+                                p.auth_summary = "Requires PAT ($GITHUB_TOKEN)".to_string();
+                            }
+                        } else {
+                            p.auth_summary = "Requires PAT ($GITHUB_TOKEN)".to_string();
+                        }
+                    } else if std::path::Path::new("/root/install/gauth.md").exists() {
+                        p.auth_summary = "OAuth App in gauth.md".to_string();
+                    } else {
+                        p.auth_summary = "Requires PAT ($GITHUB_TOKEN)".to_string();
+                    }
                 } else if p.auth_type == "none" {
                     p.is_configured = true;
                     p.auth_summary = "Local / Zero Credentials".to_string();
@@ -1359,6 +1417,58 @@ impl ProviderRegistry {
         Self::save_config(&config)
     }
 
+    /// Score and rank chat models so flagships and reasoning models appear first
+    pub fn score_chat_model_relevance(id: &str) -> i32 {
+        let lower = id.to_lowercase();
+        if lower.contains("embedding")
+            || lower.contains("tts")
+            || lower.contains("dall-e")
+            || lower.contains("whisper")
+            || lower.contains("moderation")
+            || lower.contains("babbage")
+            || lower.contains("davinci")
+            || lower.contains("curie")
+            || lower.contains("canary")
+            || lower.contains("audio")
+            || lower.contains("realtime")
+            || lower.contains("transcription")
+            || lower.contains("search")
+            || lower.contains("similarity")
+        {
+            return -100;
+        }
+
+        if lower == "gpt-4o" { return 100; }
+        if lower == "gpt-4o-mini" { return 99; }
+        if lower == "o3-mini" || lower.starts_with("o3-mini") { return 98; }
+        if lower == "o1" || lower.starts_with("o1-20") { return 97; }
+        if lower == "claude-3-7-sonnet-20250219" || lower.contains("3-7-sonnet") { return 96; }
+        if lower == "gemini-2.5-flash" || lower == "gemini-2.5-pro" { return 95; }
+        if lower == "gemini-2.0-flash" || lower.contains("2.0-flash") { return 94; }
+        if lower == "deepseek-chat" || lower == "deepseek-v3" { return 93; }
+        if lower == "deepseek-reasoner" || lower == "deepseek-r1" { return 92; }
+        if lower == "claude-3-5-sonnet-20241022" || lower.contains("3-5-sonnet") { return 91; }
+        if lower.contains("hermes-3-llama-3.1-405b") { return 90; }
+        if lower.contains("llama-3.3-70b") || lower.contains("llama3.3:70b") { return 89; }
+        if lower.contains("qwen-max") || lower.contains("qwen-plus") { return 88; }
+        if lower == "chatgpt-4o-latest" { return 87; }
+        if lower == "o1-mini" { return 86; }
+        if lower == "o1-preview" { return 85; }
+        if lower.contains("gpt-4-turbo") || lower == "gpt-4" { return 80; }
+        if lower.contains("claude-3-5-haiku") { return 78; }
+        if lower.contains("sonar-pro") { return 76; }
+        if lower.contains("grok-2") { return 75; }
+        if lower.contains("glm-4-plus") || lower.contains("glm-4") { return 74; }
+        if lower.contains("moonshot-v1") || lower.contains("kimi") { return 73; }
+        if lower.contains("hunyuan-turbo") || lower.contains("hunyuan-pro") { return 72; }
+        if lower.contains("mistral-large") || lower.contains("codestral") { return 71; }
+        if lower.contains("command-r-plus") { return 70; }
+        if lower.contains("instruct") || lower.contains("chat") { return 60; }
+        if lower.contains("gpt-3.5-turbo") { return 45; }
+
+        50
+    }
+
     /// Dynamically fetch live model list from provider API with given key and url overrides
     pub fn fetch_remote_models_with_key(
         provider_id: &str,
@@ -1512,10 +1622,14 @@ impl ProviderRegistry {
         if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
             let mut list: Vec<String> = data.iter()
                 .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
-                .filter(|id| !id.contains("embedding") && !id.contains("tts") && !id.contains("dall-e") && !id.contains("whisper"))
+                .filter(|id| Self::score_chat_model_relevance(id) > 0)
                 .collect();
             if !list.is_empty() {
-                list.sort();
+                list.sort_by(|a, b| {
+                    let sa = Self::score_chat_model_relevance(a);
+                    let sb = Self::score_chat_model_relevance(b);
+                    sb.cmp(&sa).then_with(|| a.cmp(b))
+                });
                 return Ok(list);
             }
         }
@@ -1644,6 +1758,16 @@ impl ProviderRegistry {
         if let Ok(k) = std::env::var(&provider.env_var) {
             if !k.is_empty() {
                 return Some(k);
+            }
+        }
+        if provider.id == "github" {
+            if let Ok(output) = Command::new("gh").arg("auth").arg("token").output() {
+                if output.status.success() {
+                    let tok = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if !tok.is_empty() {
+                        return Some(tok);
+                    }
+                }
             }
         }
         None
@@ -2126,6 +2250,7 @@ impl ProviderRegistry {
             "deepseek" => Some("deepseek"),
             "groq" => Some("groq"),
             "openrouter" | "or" => Some("openrouter"),
+            "github" | "gh" | "github-models" => Some("github"),
             "kimi" | "moonshot" => Some("kimi"),
             "glm" | "zhipu" | "bigmodel" => Some("glm"),
             "alibaba" | "dashscope" | "qwen" => Some("alibaba"),
@@ -2167,6 +2292,7 @@ impl ProviderRegistry {
             "deepseek" => "https://platform.deepseek.com/api_keys",
             "groq" => "https://console.groq.com/keys",
             "openrouter" => "https://openrouter.ai/keys",
+            "github" => "https://github.com/settings/tokens",
             "kimi" => "https://platform.moonshot.cn/console/api-keys",
             "glm" => "https://open.bigmodel.cn/usercenter/apikeys",
             "alibaba" => "https://dashscope.console.aliyun.com/apiKey",
@@ -2201,46 +2327,104 @@ impl ProviderRegistry {
         }
     }
 
+    pub fn pad_clean(text: &str, width: usize) -> String {
+        let unescaped = text
+            .replace("\\u2014", "—")
+            .replace("\\u2019", "'")
+            .replace("\\u201c", "\"")
+            .replace("\\u201d", "\"")
+            .replace('\r', "")
+            .replace('\n', " ");
+        let words: Vec<&str> = unescaped.split_whitespace().collect();
+        let text = words.join(" ");
+        let char_count = text.chars().count();
+        if char_count > width {
+            let truncated: String = text.chars().take(width.saturating_sub(3)).collect();
+            format!("{}...", truncated)
+        } else {
+            let pad = " ".repeat(width - char_count);
+            format!("{}{}", text, pad)
+        }
+    }
+
+    pub fn strip_ansi_codes(s: &str) -> String {
+        let mut out = String::new();
+        let mut in_escape = false;
+        for c in s.chars() {
+            if c == '\x1b' {
+                in_escape = true;
+            } else if in_escape {
+                if c == 'm' {
+                    in_escape = false;
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        out
+    }
+
     pub fn print_auth_status() {
         let all = Self::list_all();
         let google_creds = GoogleOAuthEngine::load_credentials();
+        let active = Self::active();
 
-        println!("==================================================================================");
-        println!("               NITYAKSHA AI PROVIDER AUTHENTICATION STATUS                       ");
-        println!("==================================================================================");
-        println!("  ID             STATUS       AUTH METHOD                   DEFAULT MODEL");
-        println!("----------------------------------------------------------------------------------");
+        println!("╭──────┬──────────────┬────────────┬─────────────────────────────┬──────────────────────────╮");
+        println!("│  #   │ PROVIDER     │ STATUS     │ AUTHENTICATION SUMMARY      │ DEFAULT MODEL            │");
+        println!("├──────┼──────────────┼────────────┼─────────────────────────────┼──────────────────────────┤");
 
-        for p in &all {
-            let marker = if p.is_active { "*" } else { " " };
-            let status_badge = if p.is_configured {
-                "\x1b[32mCONFIGURED\x1b[0m"
+        for (idx, p) in all.iter().enumerate() {
+            let num = format!(" [{:>2}] ", idx + 1);
+            let id = format!(" {:<12} ", Self::pad_clean(&p.id, 12));
+            let status_badge = if p.is_active {
+                " \x1b[1;32m● ACTIVE\x1b[0m   ".to_string()
+            } else if p.is_configured {
+                " \x1b[1;36m✓ READY\x1b[0m    ".to_string()
             } else {
-                "\x1b[33mUNCONFIGURED\x1b[0m"
+                " \x1b[33m○ NEED KEY\x1b[0m ".to_string()
             };
+            let auth = format!(" {:<27} ", Self::pad_clean(&p.auth_summary, 27));
+            let model = format!(" {:<24} ", Self::pad_clean(&p.default_model, 24));
 
-            println!(
-                "  {}{:<12} {:<21} {:<29} {}",
-                marker, p.id, status_badge, p.auth_summary, p.default_model
-            );
+            println!("│{}│{}│{}│{}│{}│", num, id, status_badge, auth, model);
         }
 
-        println!("----------------------------------------------------------------------------------");
-        if let Some(creds) = google_creds {
+        println!("╰──────┴──────────────┴────────────┴─────────────────────────────┴──────────────────────────╯");
+
+        // OAuth & Active Session Card (93 chars)
+        println!("╭───────────────────────────────────────────────────────────────────────────────────────────╮");
+        if let Some(ref creds) = google_creds {
             let email = creds.email.as_deref().unwrap_or("Connected Account");
             let remaining_secs = creds.expires_at - chrono::Utc::now().timestamp();
-            println!("  [Google OAuth Session]");
-            println!("    Account     : {}", email);
-            println!("    Expiry      : ~{} minutes remaining (Auto-Refresh Active)", remaining_secs / 60);
-            println!("    Token Vault : {}", GoogleOAuthEngine::credential_path().display());
+            let o_line = format!("Google OAuth Session : {} (~{} min remaining, Auto-Refresh Active)", email, (remaining_secs / 60).max(0));
+            let vlen = Self::strip_ansi_codes(&o_line).chars().count();
+            let pad = if vlen < 89 { " ".repeat(89 - vlen) } else { String::new() };
+            println!("│ {}{} │", o_line, pad);
+            println!("├───────────────────────────────────────────────────────────────────────────────────────────┤");
         }
-
-        println!("\n  Authentication Shortcuts:");
-        println!("    ntx provider add               - Interactive guided setup wizard (preconfigured or custom)");
-        println!("    ntx provider add <id> <key>    - Add API key, activate provider, and query live models");
-        println!("    ntx auth login [provider]      - Authenticate specific provider (gemini, claude, openai, etc.)");
-        println!("    ntx auth logout [provider]     - Revoke credentials or clear API keys");
-        println!("    ntx provider list              - View all 36+ available models and endpoints");
+        let act_line = if active.is_configured {
+            format!("Active AI Provider   : \x1b[1;32m{} ({})\x1b[0m [● ACTIVE]", active.name, active.default_model)
+        } else {
+            "Active AI Provider   : \x1b[1;33m⚠️ NOT CONFIGURED (Run 'ntx provider add' to connect)\x1b[0m".to_string()
+        };
+        let vlen = Self::strip_ansi_codes(&act_line).chars().count();
+        let pad = if vlen < 89 { " ".repeat(89 - vlen) } else { String::new() };
+        println!("│ {}{} │", act_line, pad);
+        println!("├───────────────────────────────────────────────────────────────────────────────────────────┤");
+        let cmds = [
+            "Authentication Shortcuts:",
+            "  • Connect via Number  : ntx provider add <#>      (e.g. 'ntx provider add 1' for Gemini)",
+            "  • Fast Direct API Key : ntx key <# or ID> <key>   (e.g. 'ntx key 3 sk-proj-...')",
+            "  • OAuth Browser Login : ntx auth login <provider> (e.g. 'ntx auth login google')",
+            "  • Switch Provider     : ntx provider set <#>      (e.g. 'ntx provider set 3')",
+            "  • Clear Credentials   : ntx auth logout <provider>",
+        ];
+        for c in &cmds {
+            let clen = Self::strip_ansi_codes(c).chars().count();
+            let pad = if clen < 89 { " ".repeat(89 - clen) } else { String::new() };
+            println!("│ {}{} │", c, pad);
+        }
+        println!("╰───────────────────────────────────────────────────────────────────────────────────────────╯");
     }
 
     /// Interactive provider setup wizard
@@ -2541,26 +2725,24 @@ impl ProviderRegistry {
                         }
                         Err(e) => {
                             eprintln!("\n[ERROR] Google OAuth Token Exchange failed: {}", e);
-                            if e.contains("invalid_client") {
-                                eprintln!("\n┌────────────────────────────────────────────────────────────────────────┐");
-                                eprintln!("│ ⚠️  GOOGLE OAUTH CLIENT CONFIGURATION NOTICE                           │");
-                                eprintln!("├────────────────────────────────────────────────────────────────────────┤");
-                                eprintln!("│ Google requires an authorized GCP OAuth 2.0 Client Secret for this flow. │");
-                                eprintln!("│ For zero-friction setup without GCP console configuration, use your    │");
-                                eprintln!("│ Google AI Studio API Key (instant, free, all Gemini models).           │");
-                                eprintln!("│ Get your key at: https://aistudio.google.com/app/apikey                │");
-                                eprintln!("└────────────────────────────────────────────────────────────────────────┘");
-                                print!("Enter Gemini API Key (or press Enter to cancel): ");
-                                let _ = std::io::stdout().flush();
-                                let mut fallback_key = String::new();
-                                if std::io::stdin().read_line(&mut fallback_key).is_ok() {
-                                    let clean_fallback = fallback_key.trim();
-                                    if !clean_fallback.is_empty() {
-                                        Self::set_key("gemini", clean_fallback)?;
-                                        Self::set_active("gemini")?;
-                                        println!("✓ Successfully configured and activated Google Gemini with API Key!");
-                                        return Ok(());
-                                    }
+                            eprintln!("\n┌────────────────────────────────────────────────────────────────────────┐");
+                            eprintln!("│ ⚠️  GOOGLE OAUTH CLIENT NOTICE                                          │");
+                            eprintln!("├────────────────────────────────────────────────────────────────────────┤");
+                            eprintln!("│ Google rejects public client secrets for web token exchanges.          │");
+                            eprintln!("│ For zero-friction setup without GCP console configuration, use your    │");
+                            eprintln!("│ Google AI Studio API Key (instant, free, all Gemini 2.0/2.5 models).   │");
+                            eprintln!("│ Get your free key at: https://aistudio.google.com/app/apikey           │");
+                            eprintln!("└────────────────────────────────────────────────────────────────────────┘");
+                            print!("Enter Gemini API Key (or press Enter to cancel): ");
+                            let _ = std::io::stdout().flush();
+                            let mut fallback_key = String::new();
+                            if std::io::stdin().read_line(&mut fallback_key).is_ok() {
+                                let clean_fallback = fallback_key.trim();
+                                if !clean_fallback.is_empty() {
+                                    Self::set_key("gemini", clean_fallback)?;
+                                    Self::set_active("gemini")?;
+                                    println!("✓ Successfully configured and activated Google Gemini with API Key!");
+                                    return Ok(());
                                 }
                             }
                             return Err(e);
@@ -2574,15 +2756,21 @@ impl ProviderRegistry {
                 }
             }
 
-            println!("\n┌────────────────────────────────────────────────────────────────────────┐");
-            println!("│ 🌐 GOOGLE GEMINI AUTHENTICATION METHOD                                 │");
+            println!("\n╭────────────────────────────────────────────────────────────────────────╮");
+            println!("│ 🌐 GOOGLE GEMINI AUTHENTICATION SETUP                                  │");
             println!("├────────────────────────────────────────────────────────────────────────┤");
-            println!("│   [1] Gemini API Key (Recommended: instant, no redirects, all models) │");
-            println!("│   [2] Google OAuth 2.0 (Browser sign-in via local/remote loopback)     │");
-            println!("│   [3] Google Cloud ADC (Use local gcloud application credentials)      │");
-            println!("│   [4] Custom GCP OAuth (Enter your custom GCP Client ID & Secret)      │");
-            println!("└────────────────────────────────────────────────────────────────────────┘");
-            print!("Select method [1-4 | Enter for Gemini API Key]: ");
+            println!("│   [1] Google AI Studio API Key (Recommended)                           │");
+            println!("│       • 100% Free, permanent, instant setup, zero browser redirects.   │");
+            println!("│       • Supports gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-pro.   │");
+            println!("│       • Get your key in 5 seconds at: https://aistudio.google.com/app/apikey │");
+            println!("│                                                                        │");
+            println!("│   [2] Google Cloud Platform (GCP) OAuth 2.0                            │");
+            println!("│       • For GCP Console Desktop OAuth clients (console.cloud.google.com)│");
+            println!("│       • Requires GCP Client ID & Secret (NOT GitHub credentials).      │");
+            println!("│                                                                        │");
+            println!("│   [3] Google Cloud ADC (Local gcloud application default credentials)  │");
+            println!("╰────────────────────────────────────────────────────────────────────────╯");
+            print!("Select option [1-3 | Enter for (1) AI Studio Key]: ");
             let _ = std::io::stdout().flush();
 
             let mut method_input = String::new();
@@ -2591,20 +2779,40 @@ impl ProviderRegistry {
 
             match method {
                 "2" => {
-                    println!("[INFO] Launching Google OAuth 2.0 flow...");
-                    GoogleOAuthEngine::interactive_login(None, None)?;
+                    println!("\n[INFO] Initializing GCP OAuth 2.0 flow...");
+                    println!("Note: Google OAuth strictly requires a Client ID from Google Cloud Console");
+                    println!("      (https://console.cloud.google.com/apis/credentials as 'Desktop app').");
+                    let existing_cid = GoogleOAuthEngine::get_client_id(None);
+                    let has_custom = existing_cid != google_oauth::DEFAULT_CLIENT_ID;
+
+                    let (cid, csec) = if has_custom {
+                        (Some(existing_cid), Some(GoogleOAuthEngine::get_client_secret(None)))
+                    } else {
+                        print!("Enter Google Cloud Client ID (or press Enter to try default): ");
+                        let _ = std::io::stdout().flush();
+                        let mut in_cid = String::new();
+                        let _ = std::io::stdin().read_line(&mut in_cid);
+                        let clean_cid = in_cid.trim();
+
+                        if !clean_cid.is_empty() {
+                            print!("Enter Google Cloud Client Secret: ");
+                            let _ = std::io::stdout().flush();
+                            let mut in_sec = String::new();
+                            let _ = std::io::stdin().read_line(&mut in_sec);
+                            let clean_sec = in_sec.trim();
+                            let _ = GoogleOAuthEngine::save_custom_client(clean_cid, clean_sec);
+                            (Some(clean_cid.to_string()), Some(clean_sec.to_string()))
+                        } else {
+                            (None, None)
+                        }
+                    };
+
+                    GoogleOAuthEngine::interactive_login(cid.as_deref(), csec.as_deref())?;
                     Self::set_active("gemini")?;
                     println!("✓ Google Gemini is active.");
                     return Ok(());
                 }
                 "3" => {
-                    if let Some(creds) = GoogleOAuthEngine::load_credentials() {
-                        if creds.auth_source == "gcloud_adc" {
-                            Self::set_active("gemini")?;
-                            println!("✓ Successfully activated Google Gemini using gcloud ADC credentials.");
-                            return Ok(());
-                        }
-                    }
                     if let Ok(output) = Command::new("gcloud").arg("auth").arg("print-access-token").output() {
                         if output.status.success() {
                             Self::set_active("gemini")?;
@@ -2614,31 +2822,7 @@ impl ProviderRegistry {
                     }
                     return Err("No active gcloud credentials found. Run 'gcloud auth application-default login' first.".to_string());
                 }
-                "4" => {
-                    print!("Enter Google Cloud Client ID: ");
-                    let _ = std::io::stdout().flush();
-                    let mut cid = String::new();
-                    std::io::stdin().read_line(&mut cid).map_err(|e| e.to_string())?;
-                    let cid = cid.trim();
-
-                    print!("Enter Google Cloud Client Secret: ");
-                    let _ = std::io::stdout().flush();
-                    let mut csec = String::new();
-                    std::io::stdin().read_line(&mut csec).map_err(|e| e.to_string())?;
-                    let csec = csec.trim();
-
-                    if cid.is_empty() || csec.is_empty() {
-                        return Err("Client ID and Client Secret cannot be empty.".to_string());
-                    }
-
-                    let _ = GoogleOAuthEngine::save_custom_client(cid, csec);
-                    GoogleOAuthEngine::interactive_login(Some(cid), Some(csec))?;
-                    Self::set_active("gemini")?;
-                    println!("✓ Custom GCP OAuth credentials saved and Google Gemini activated.");
-                    return Ok(());
-                }
                 _ => {
-                    // Option 1 (Default): Gemini API Key
                     println!("\nGet your free Gemini API key at: https://aistudio.google.com/app/apikey");
                     print!("Enter Gemini API Key (AIza...): ");
                     let _ = std::io::stdout().flush();
@@ -2650,13 +2834,75 @@ impl ProviderRegistry {
                     }
                     Self::set_key("gemini", clean_key)?;
                     Self::set_active("gemini")?;
-                    println!("✓ Successfully configured and activated Google Gemini with API Key.");
+                    println!("✓ Successfully configured and activated Google Gemini with API Key!");
+                    println!("  Credentials stored securely in {}", Self::config_path().display());
                     return Ok(());
                 }
             }
         }
 
-        // 3. Local Providers (Ollama, LM Studio, vLLM)
+        // 3. GitHub Models Authentication Flow
+        if provider.id == "github" {
+            println!("\n╭────────────────────────────────────────────────────────────────────────╮");
+            println!("│ 🐙 GITHUB MODELS AUTHENTICATION                                        │");
+            println!("├────────────────────────────────────────────────────────────────────────┤");
+            println!("│ Free access to GPT-4o, DeepSeek-R1, and Llama 3.3 via GitHub Models.   │");
+            println!("│ Choose authentication method:                                          │");
+            println!("│   [1] GitHub Personal Access Token (PAT)                               │");
+            println!("│       Create token at: https://github.com/settings/tokens              │");
+            println!("│   [2] Use Local GitHub CLI Token (gh auth token)                       │");
+            println!("│   [3] GitHub OAuth 2.0 App (from gauth.md)                             │");
+            println!("╰────────────────────────────────────────────────────────────────────────╯");
+            print!("Select option [1-3 | Enter for PAT]: ");
+            let _ = std::io::stdout().flush();
+            let mut opt = String::new();
+            let _ = std::io::stdin().read_line(&mut opt);
+            let opt = opt.trim();
+
+            let token = if opt == "2" {
+                match Command::new("gh").arg("auth").arg("token").output() {
+                    Ok(out) if out.status.success() => {
+                        let tok = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                        if tok.is_empty() {
+                            return Err("gh auth token returned empty token.".to_string());
+                        }
+                        println!("✓ Detected active GitHub CLI authentication.");
+                        tok
+                    }
+                    _ => return Err("Failed to retrieve token from gh CLI. Ensure 'gh auth login' has succeeded.".to_string()),
+                }
+            } else if opt == "3" {
+                if std::path::Path::new("/root/install/gauth.md").exists() {
+                    println!("✓ Detected GitHub OAuth credentials in /root/install/gauth.md");
+                }
+                print!("Enter GitHub Personal Access Token or OAuth Token: ");
+                let _ = std::io::stdout().flush();
+                let mut tok = String::new();
+                std::io::stdin().read_line(&mut tok).map_err(|e| e.to_string())?;
+                let clean = tok.trim().to_string();
+                if clean.is_empty() {
+                    return Err("Authentication cancelled: empty token.".to_string());
+                }
+                clean
+            } else {
+                print!("Enter GitHub Token (ghp_... or github_pat_...): ");
+                let _ = std::io::stdout().flush();
+                let mut tok = String::new();
+                std::io::stdin().read_line(&mut tok).map_err(|e| e.to_string())?;
+                let clean = tok.trim().to_string();
+                if clean.is_empty() {
+                    return Err("Authentication cancelled: empty token.".to_string());
+                }
+                clean
+            };
+
+            Self::set_key("github", &token)?;
+            Self::set_active("github")?;
+            println!("\n✓ Successfully authenticated and activated GitHub Models ({})!", provider.default_model);
+            return Ok(());
+        }
+
+        // 4. Local Providers (Ollama, LM Studio, vLLM)
         if provider.auth_type == "none" {
             Self::set_active(&provider.id)?;
             println!("✓ Activated {} ({}) at {}.", provider.name, provider.default_model, provider.base_url);
@@ -2664,17 +2910,17 @@ impl ProviderRegistry {
             return Ok(());
         }
 
-        // 4. Commercial / Cloud Providers (Anthropic, OpenAI, Nous, DeepSeek, Groq, etc.)
+        // 5. Commercial / Cloud Providers (Anthropic, OpenAI, Nous, DeepSeek, Groq, etc.)
         let api_key = if let Some(key) = key_arg {
             key.trim().to_string()
         } else {
-            println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+            println!("\n╭────────────────────────────────────────────────────────────────────────╮");
             println!("│ 🔑 {} AUTHENTICATION", provider.name.to_uppercase());
             println!("├────────────────────────────────────────────────────────────────────────┤");
             println!("│ 1. Create or retrieve an API key at:                                   │");
             println!("│    {}", Self::portal_url(&provider.id));
             println!("│ 2. Paste your API key below:                                           │");
-            println!("└────────────────────────────────────────────────────────────────────────┘");
+            println!("╰────────────────────────────────────────────────────────────────────────╯");
             print!("Enter {} API Key: ", provider.name);
             let _ = std::io::stdout().flush();
 
@@ -2699,22 +2945,38 @@ impl ProviderRegistry {
         match Self::fetch_remote_models_with_key(&provider.id, Some(&api_key), None) {
             Ok(models) if !models.is_empty() => {
                 println!("✓ Connected! Found {} models from {} API:", models.len(), provider.name);
-                for (idx, m) in models.iter().take(8).enumerate() {
+                let max_disp = models.len().min(14);
+                for (idx, m) in models.iter().take(max_disp).enumerate() {
                     let is_cur = m == &provider.default_model;
                     let mark = if is_cur { " * (current default)" } else { "" };
-                    println!("   [{}] {:<34}{}", idx + 1, m, mark);
+                    println!("   [{:>2}] {:<36}{}", idx + 1, m, mark);
                 }
-                print!("Select default model [1-{} or Enter to keep '{}']: ", models.len().min(8), provider.default_model);
+                println!("   [ c] Enter custom model name manually");
+                print!("Select default model [1-{} or 'c' | Enter to keep '{}']: ", max_disp, provider.default_model);
                 let _ = std::io::stdout().flush();
                 let mut m_in = String::new();
                 if std::io::stdin().read_line(&mut m_in).is_ok() {
                     let trimmed = m_in.trim();
-                    if let Ok(idx) = trimmed.parse::<usize>() {
+                    if trimmed.eq_ignore_ascii_case("c") {
+                        print!("Enter custom model identifier: ");
+                        let _ = std::io::stdout().flush();
+                        let mut custom_m = String::new();
+                        if std::io::stdin().read_line(&mut custom_m).is_ok() {
+                            let cm = custom_m.trim();
+                            if !cm.is_empty() {
+                                let _ = Self::set_model(&provider.id, cm);
+                                println!("✓ Default model set to: {}", cm);
+                            }
+                        }
+                    } else if let Ok(idx) = trimmed.parse::<usize>() {
                         if idx >= 1 && idx <= models.len() {
                             let chosen = &models[idx - 1];
                             let _ = Self::set_model(&provider.id, chosen);
                             println!("✓ Default model set to: {}", chosen);
                         }
+                    } else if !trimmed.is_empty() {
+                        let _ = Self::set_model(&provider.id, trimmed);
+                        println!("✓ Default model set to: {}", trimmed);
                     }
                 }
             }

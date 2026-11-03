@@ -1790,7 +1790,8 @@ impl InteractiveShell {
             theme.reset,
         );
 
-        for (i, m) in models.iter().take(8).enumerate() {
+        let max_models = models.len().min(14);
+        for (i, m) in models.iter().take(max_models).enumerate() {
             let is_active = m == &active.default_model;
             let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
             let ctx = active.context_window_for_model(m);
@@ -1803,14 +1804,26 @@ impl InteractiveShell {
                 i + 1, mark, m, format_num_commas(ctx), format_tokens_short(ctx), reasoning_tag);
             print_box_line(theme.accent, &row, inner_width, theme.reset);
         }
+        let custom_row = format!("  [ c] {}Enter custom model name manually{}", theme.accent, theme.reset);
+        print_box_line(theme.accent, &custom_row, inner_width, theme.reset);
         print_box_bottom(theme.accent, inner_width, theme.reset);
 
-        print!("Select model [1-{} or model name | Enter for '{}']: ", models.len().min(8), active.default_model);
+        print!("Select model [1-{} or 'c' | Enter for '{}']: ", max_models, active.default_model);
         let _ = io::stdout().flush();
         let mut model_choice = String::new();
         let _ = io::stdin().read_line(&mut model_choice);
         let trimmed_m = model_choice.trim();
-        if let Ok(idx) = trimmed_m.parse::<usize>() {
+        if trimmed_m.eq_ignore_ascii_case("c") {
+            print!("Enter custom model identifier: ");
+            let _ = io::stdout().flush();
+            let mut custom_m = String::new();
+            if io::stdin().read_line(&mut custom_m).is_ok() {
+                let cm = custom_m.trim();
+                if !cm.is_empty() {
+                    let _ = ProviderRegistry::set_model(&active.id, cm);
+                }
+            }
+        } else if let Ok(idx) = trimmed_m.parse::<usize>() {
             if idx >= 1 && idx <= models.len() {
                 let chosen = &models[idx - 1];
                 let _ = ProviderRegistry::set_model(&active.id, chosen);
