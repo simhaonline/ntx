@@ -1087,9 +1087,11 @@ impl ProviderRegistry {
                     p.base_url = url.clone();
                 }
 
-                // Check custom model
+                // Check custom model with strict cross-provider compatibility validation
                 if let Some(model) = config.custom_models.get(&p.id) {
-                    p.default_model = model.clone();
+                    if Self::is_model_compatible_with_provider(&p.id, model) {
+                        p.default_model = model.clone();
+                    }
                 }
 
                 // Check Google OAuth or API Key
@@ -1358,7 +1360,76 @@ impl ProviderRegistry {
         let p = Self::get(id).ok_or_else(|| format!("Unknown provider '{}'", id))?;
         let mut config = Self::load_config();
         config.active_provider = p.id;
+        config.custom_models.retain(|prov_id, m| Self::is_model_compatible_with_provider(prov_id, m));
         Self::save_config(&config)
+    }
+
+    /// Infer native provider family from a model name identifier
+    pub fn infer_provider_for_model(model: &str) -> Option<&'static str> {
+        let lower = model.to_lowercase();
+        if lower.starts_with("google/") || lower.starts_with("gemini") || lower.starts_with("gemma") || lower.contains("argon") {
+            Some("gemini")
+        } else if lower.starts_with("openai/") || lower.starts_with("gpt-") || lower.starts_with("chatgpt")
+            || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4") {
+            Some("openai")
+        } else if lower.starts_with("anthropic/") || lower.starts_with("claude") {
+            Some("anthropic")
+        } else if lower.starts_with("deepseek/") || lower.starts_with("deepseek") {
+            Some("deepseek")
+        } else if lower.starts_with("x-ai/") || lower.starts_with("grok") {
+            Some("grok")
+        } else if lower.starts_with("moonshot/") || lower.starts_with("kimi") {
+            Some("kimi")
+        } else if lower.starts_with("zhipu/") || lower.starts_with("glm") {
+            Some("glm")
+        } else if lower.starts_with("qwen/") || lower.starts_with("qwen") {
+            Some("alibaba")
+        } else if lower.starts_with("tencent/") || lower.starts_with("hunyuan") {
+            Some("tencent")
+        } else if lower.starts_with("bytedance/") || lower.starts_with("doubao") || lower.starts_with("skylark") {
+            Some("bytedance")
+        } else if lower.starts_with("mistralai/") || lower.starts_with("mistral") || lower.starts_with("codestral") {
+            Some("mistral")
+        } else {
+            None
+        }
+    }
+
+    /// Check if a model is strictly compatible with a provider, preventing cross-provider contamination
+    pub fn is_model_compatible_with_provider(provider_id: &str, model: &str) -> bool {
+        let p_id = provider_id.to_lowercase();
+        let m_lower = model.trim().to_lowercase();
+        if m_lower.is_empty() {
+            return false;
+        }
+
+        // Multi-model aggregators, proxies, local runtimes, and custom endpoints can host models across vendors
+        if p_id == "openrouter" || p_id == "novita" || p_id == "together" || p_id == "groq"
+            || p_id == "fireworks" || p_id == "ollama" || p_id == "lmstudio" || p_id == "vllm"
+            || p_id == "kilocode" || p_id == "cloudflare" || p_id == "nvidia" || p_id == "codebuddy"
+            || p_id == "manus" || p_id == "huggingface" || p_id == "custom" {
+            return true;
+        }
+
+        let inferred = match Self::infer_provider_for_model(&m_lower) {
+            Some(i) => i,
+            None => return true, // Custom, fine-tuned, or generic model names are allowed
+        };
+
+        match p_id.as_str() {
+            "openai" => inferred == "openai",
+            "gemini" | "aistudio" => inferred == "gemini",
+            "anthropic" => inferred == "anthropic",
+            "deepseek" => inferred == "deepseek",
+            "grok" => inferred == "grok",
+            "kimi" => inferred == "kimi",
+            "glm" => inferred == "glm",
+            "alibaba" => inferred == "alibaba",
+            "tencent" => inferred == "tencent",
+            "bytedance" => inferred == "bytedance",
+            "mistral" => inferred == "mistral",
+            _ => true,
+        }
     }
 
     /// Set API key for provider
@@ -1387,14 +1458,32 @@ impl ProviderRegistry {
         Self::save_config(&config)
     }
 
-    /// Set custom model for provider
+    /// Set custom model for provider with invariant protection and auto-routing
     pub fn set_model(id: &str, model: &str) -> Result<(), String> {
-        let p = Self::get(id).ok_or_else(|| format!("Unknown provider '{}'", id))?;
+        let trimmed_model = model.trim();
+        if trimmed_model.is_empty() {
+            return Err("Model name cannot be empty".to_string());
+        }
+
+        // Auto-route cross-provider model assignments to their correct native provider
+        let target_id = if let Some(inferred) = Self::infer_provider_for_model(trimmed_model) {
+            if !Self::is_model_compatible_with_provider(id, trimmed_model) {
+                inferred
+            } else {
+                id
+            }
+        } else {
+            id
+        };
+
+        let p = Self::get(target_id).ok_or_else(|| format!("Unknown provider '{}'", target_id))?;
         let mut config = Self::load_config();
-        config.custom_models.insert(p.id.clone(), model.trim().to_string());
+        config.custom_models.insert(p.id.clone(), trimmed_model.to_string());
+        // Clean any invalid cross-provider contamination
+        config.custom_models.retain(|prov_id, m| Self::is_model_compatible_with_provider(prov_id, m));
         for cp in &mut config.custom_providers {
             if cp.id.eq_ignore_ascii_case(&p.id) {
-                cp.default_model = model.trim().to_string();
+                cp.default_model = trimmed_model.to_string();
             }
         }
         Self::save_config(&config)
@@ -1468,13 +1557,17 @@ impl ProviderRegistry {
         if lower.contains("deep-research") { return 117; }
 
         // Frontier OpenAI Architecture
-        if lower.starts_with("gpt-6") || lower.contains("gpt-6") { return 115; }
-        if lower.starts_with("gpt-5") || lower.contains("gpt-5") { return 110; }
-        if lower.starts_with("o4") || lower.contains("o4-") { return 105; }
-        if lower.starts_with("o3") || lower.contains("o3-") { return 102; }
-        if lower == "gpt-4o" { return 100; }
-        if lower == "gpt-4o-mini" { return 99; }
-        if lower == "o1" || lower.starts_with("o1-20") { return 97; }
+        if lower == "gpt-4o" { return 110; }
+        if lower == "o3-mini" || lower == "o3" { return 108; }
+        if lower == "o1" || lower.starts_with("o1-20") { return 106; }
+        if lower == "gpt-4o-mini" { return 105; }
+        if lower == "chatgpt-4o-latest" { return 104; }
+        if lower == "gpt-4.5-preview" { return 103; }
+        if lower == "o1-mini" { return 102; }
+        if lower == "o1-preview" { return 101; }
+        if lower.starts_with("gpt-6") || lower.contains("gpt-6") { return 89; }
+        if lower.starts_with("gpt-5") || lower.contains("gpt-5") { return 88; }
+        if lower.starts_with("o4") || lower.contains("o4-") { return 87; }
 
         // Anthropic Claude Architecture
         if lower.contains("3-7-sonnet") { return 96; }
@@ -1641,8 +1734,8 @@ impl ProviderRegistry {
                     .collect();
                 if !entries.is_empty() {
                     entries.sort_by(|a, b| {
-                        b.1.cmp(&a.1)
-                            .then_with(|| b.2.cmp(&a.2))
+                        b.2.cmp(&a.2)
+                            .then_with(|| b.1.cmp(&a.1))
                             .then_with(|| a.0.cmp(&b.0))
                     });
                     return Ok(entries.into_iter().map(|(id, _, _)| id).collect());
@@ -1692,10 +1785,10 @@ impl ProviderRegistry {
                 .collect();
             if !entries.is_empty() {
                 entries.sort_by(|a, b| {
-                    // Sort descending by created timestamp first (newest release first)
-                    b.1.cmp(&a.1)
-                        // Then sort by relevance score
-                        .then_with(|| b.2.cmp(&a.2))
+                    // Relevance score first (flagship models first: gpt-4o, o3-mini, o1, etc.)
+                    b.2.cmp(&a.2)
+                        // Then newest release timestamp
+                        .then_with(|| b.1.cmp(&a.1))
                         // Then tie-break alphabetically
                         .then_with(|| a.0.cmp(&b.0))
                 });
@@ -3214,4 +3307,45 @@ fn mask_key(key: &str) -> String {
         return "********".to_string();
     }
     format!("{}...{}", &key[..4], &key[len - 4..])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_infer_provider_for_model() {
+        assert_eq!(ProviderRegistry::infer_provider_for_model("gemini-3.6-flash"), Some("gemini"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("gemini-2.5-flash-lite"), Some("gemini"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("gemma-2-9b-it"), Some("gemini"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("gpt-4o"), Some("openai"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("gpt-4o-mini"), Some("openai"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("o1"), Some("openai"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("o3-mini"), Some("openai"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("claude-3-7-sonnet"), Some("anthropic"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("deepseek-chat"), Some("deepseek"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("grok-2"), Some("grok"));
+        assert_eq!(ProviderRegistry::infer_provider_for_model("custom-finetune-v1"), None);
+    }
+
+    #[test]
+    fn test_cross_provider_model_compatibility() {
+        // Dedicated providers MUST reject foreign models
+        assert!(!ProviderRegistry::is_model_compatible_with_provider("openai", "gemini-3.6-flash"));
+        assert!(!ProviderRegistry::is_model_compatible_with_provider("openai", "claude-3-5-sonnet"));
+        assert!(ProviderRegistry::is_model_compatible_with_provider("openai", "gpt-4o"));
+        assert!(ProviderRegistry::is_model_compatible_with_provider("openai", "o3-mini"));
+
+        assert!(!ProviderRegistry::is_model_compatible_with_provider("gemini", "gpt-4o"));
+        assert!(!ProviderRegistry::is_model_compatible_with_provider("gemini", "claude-3-5-sonnet"));
+        assert!(ProviderRegistry::is_model_compatible_with_provider("gemini", "gemini-3.6-flash"));
+
+        assert!(!ProviderRegistry::is_model_compatible_with_provider("anthropic", "gpt-4o"));
+        assert!(!ProviderRegistry::is_model_compatible_with_provider("anthropic", "gemini-3.6-flash"));
+        assert!(ProviderRegistry::is_model_compatible_with_provider("anthropic", "claude-3-5-sonnet"));
+
+        // Aggregators allow all vendor model prefixes
+        assert!(ProviderRegistry::is_model_compatible_with_provider("openrouter", "google/gemini-flash-1.5"));
+        assert!(ProviderRegistry::is_model_compatible_with_provider("openrouter", "openai/gpt-4o"));
+    }
 }

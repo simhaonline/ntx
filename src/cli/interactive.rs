@@ -1414,10 +1414,26 @@ impl InteractiveShell {
                     };
 
                     if let Some(m) = chosen {
-                        let _ = ProviderRegistry::set_model(&active_p.id, &m);
-                        let ctx = active_p.context_window_for_model(&m);
-                        println!("{}✓ Switched model for {} to: {} (context limit: {} tokens / {}){}",
-                            theme.success, active_p.name, m, format_num_commas(ctx), format_tokens_short(ctx), theme.reset);
+                        let target_prov = if let Some(inferred) = ProviderRegistry::infer_provider_for_model(&m) {
+                            if !ProviderRegistry::is_model_compatible_with_provider(&active_p.id, &m) {
+                                let _ = ProviderRegistry::set_active(inferred);
+                                ProviderRegistry::get(inferred).unwrap_or_else(|| active_p.clone())
+                            } else {
+                                active_p.clone()
+                            }
+                        } else {
+                            active_p.clone()
+                        };
+
+                        let _ = ProviderRegistry::set_model(&target_prov.id, &m);
+                        let ctx = target_prov.context_window_for_model(&m);
+                        if target_prov.id != active_p.id {
+                            println!("{}✓ Model '{}' belongs to {}. Switched active provider to: {} ({}) (context limit: {} tokens){}",
+                                theme.success, m, target_prov.name, target_prov.name, m, format_num_commas(ctx), theme.reset);
+                        } else {
+                            println!("{}✓ Switched model for {} to: {} (context limit: {} tokens / {}){}",
+                                theme.success, target_prov.name, m, format_num_commas(ctx), format_tokens_short(ctx), theme.reset);
+                        }
                     } else {
                         println!("{}Invalid model index or name. Type /model to see list.{}", theme.warning, theme.reset);
                     }
@@ -1866,41 +1882,49 @@ impl InteractiveShell {
         print_box_line(theme.accent, &custom_row, inner_width, theme.reset);
         print_box_bottom(theme.accent, inner_width, theme.reset);
 
-        print!("Select model [1-{} or type model name | Enter for '{}']: ", models.len(), active.default_model);
+        // Ensure prompt displays an authentic compatible model for active provider
+        let effective_default = if ProviderRegistry::is_model_compatible_with_provider(&active.id, &active.default_model) {
+            active.default_model.clone()
+        } else {
+            models.first().cloned().unwrap_or_else(|| "gpt-4o".to_string())
+        };
+
+        print!("Select model [1-{} or type model name | Enter for '{}']: ", models.len(), effective_default);
         let _ = io::stdout().flush();
         let mut model_choice = String::new();
         let _ = io::stdin().read_line(&mut model_choice);
         let trimmed_m = model_choice.trim();
-        if trimmed_m.eq_ignore_ascii_case("c") {
+        let selected_model = if trimmed_m.eq_ignore_ascii_case("c") {
             print!("Enter custom model identifier: ");
             let _ = io::stdout().flush();
             let mut custom_m = String::new();
-            if io::stdin().read_line(&mut custom_m).is_ok() {
-                let cm = custom_m.trim();
-                if !cm.is_empty() {
-                    let _ = ProviderRegistry::set_model(&active.id, cm);
-                    println!("{}✓ Default model updated to: {}{}", theme.success, cm, theme.reset);
-                }
+            if io::stdin().read_line(&mut custom_m).is_ok() && !custom_m.trim().is_empty() {
+                Some(custom_m.trim().to_string())
+            } else {
+                Some(effective_default)
             }
         } else if let Ok(idx) = trimmed_m.parse::<usize>() {
             if idx >= 1 && idx <= models.len() {
-                let chosen = &models[idx - 1];
-                let _ = ProviderRegistry::set_model(&active.id, chosen);
-                println!("{}✓ Default model updated to: {}{}", theme.success, chosen, theme.reset);
+                Some(models[idx - 1].clone())
             } else {
-                println!("{}Invalid selection number [1-{}]. Kept '{}'.{}", theme.warning, models.len(), active.default_model, theme.reset);
+                println!("{}Invalid selection number [1-{}]. Defaulting to '{}'.{}", theme.warning, models.len(), effective_default, theme.reset);
+                Some(effective_default)
             }
         } else if !trimmed_m.is_empty() {
             if let Some(matched) = models.iter().find(|m| m.eq_ignore_ascii_case(trimmed_m)) {
-                let _ = ProviderRegistry::set_model(&active.id, matched);
-                println!("{}✓ Default model updated to: {}{}", theme.success, matched, theme.reset);
+                Some(matched.clone())
             } else if let Some(matched) = models.iter().find(|m| m.to_lowercase().contains(&trimmed_m.to_lowercase())) {
-                let _ = ProviderRegistry::set_model(&active.id, matched);
-                println!("{}✓ Matched '{}' -> Updated default model to: {}{}", theme.success, trimmed_m, matched, theme.reset);
+                Some(matched.clone())
             } else {
-                let _ = ProviderRegistry::set_model(&active.id, trimmed_m);
-                println!("{}✓ Custom model set to: {}{}", theme.success, trimmed_m, theme.reset);
+                Some(trimmed_m.to_string())
             }
+        } else {
+            Some(effective_default)
+        };
+
+        if let Some(ref chosen_m) = selected_model {
+            let _ = ProviderRegistry::set_model(&active.id, chosen_m);
+            println!("{}✓ Default model updated to: {}{}", theme.success, chosen_m, theme.reset);
         }
 
         // Configure Reasoning Effort

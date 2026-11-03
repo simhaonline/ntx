@@ -2228,16 +2228,13 @@ complete -F _ntx_completions ntx"#);
         }
 
         let target_model = &args[0];
-        let lower = target_model.to_lowercase();
-        let target_provider_id = if (lower.starts_with("gemini") || lower.starts_with("gemma") || lower.contains("argon")) && active.id != "gemini" && active.id != "aistudio" {
-            let _ = ProviderRegistry::set_active("gemini");
-            "gemini"
-        } else if (lower.starts_with("gpt") || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4")) && active.id != "openai" {
-            let _ = ProviderRegistry::set_active("openai");
-            "openai"
-        } else if lower.starts_with("claude") && active.id != "anthropic" {
-            let _ = ProviderRegistry::set_active("anthropic");
-            "anthropic"
+        let target_provider_id = if let Some(inferred) = ProviderRegistry::infer_provider_for_model(target_model) {
+            if !ProviderRegistry::is_model_compatible_with_provider(&active.id, target_model) {
+                let _ = ProviderRegistry::set_active(inferred);
+                inferred
+            } else {
+                &active.id
+            }
         } else {
             &active.id
         };
@@ -2303,7 +2300,13 @@ complete -F _ntx_completions ntx"#);
         shell.dangerously_skip_permissions = options.dangerously_skip_permissions;
         if let Some(ref m) = options.model {
             let active = ProviderRegistry::active();
-            let _ = ProviderRegistry::set_model(&active.id, m);
+            if let Some(inferred) = ProviderRegistry::infer_provider_for_model(m) {
+                if !ProviderRegistry::is_model_compatible_with_provider(&active.id, m) {
+                    let _ = ProviderRegistry::set_active(inferred);
+                }
+            }
+            let cur = ProviderRegistry::active();
+            let _ = ProviderRegistry::set_model(&cur.id, m);
         }
         if let Some(ref eff) = options.effort {
             let _ = ProviderRegistry::set_reasoning_effort(eff);
