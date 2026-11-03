@@ -50,11 +50,11 @@ impl ProviderDefinition {
             200_000
         } else if m.contains("o1") || m.contains("o3-mini") || m.contains("sonar-pro") || m.contains("sonar-reasoning") {
             200_000
-        } else if m.contains("codestral") {
+        } else if m.contains("hunyuan") || m.contains("codestral") {
             256_000
-        } else if m.contains("grok-2") {
+        } else if m.contains("grok-2") || m.contains("qwen") || m.contains("qvq") || m.contains("qwq") {
             131_072
-        } else if m.contains("gpt-4.5") || m.contains("gpt-4o") || m.contains("llama-3.3") || m.contains("llama-3.1") || m.contains("hermes-3") {
+        } else if m.contains("gpt-4.5") || m.contains("gpt-4o") || m.contains("llama-3.3") || m.contains("llama-3.1") || m.contains("hermes-3") || m.contains("moonshot") || m.contains("kimi") || m.contains("glm-4") || m.contains("doubao") {
             128_000
         } else if m.contains("deepseek") {
             64_000
@@ -77,6 +77,10 @@ impl ProviderDefinition {
             || m.contains("claude-3-7")
             || m.contains("gemini-2.5")
             || m.contains("gemini-2.0")
+            || m.contains("qwq")
+            || m.contains("qvq")
+            || m.contains("glm-4")
+            || m.contains("moonshot")
     }
 }
 
@@ -93,6 +97,20 @@ pub struct PromptExecutionResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomProviderConfig {
+    pub id: String,
+    pub name: String,
+    pub base_url: String,
+    pub api_format: String, // "openai" or "anthropic"
+    pub api_key: Option<String>,
+    pub default_model: String,
+    #[serde(default)]
+    pub available_models: Vec<String>,
+    #[serde(default)]
+    pub max_context_window: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderConfigStore {
     pub active_provider: String,
     pub keys: HashMap<String, String>,
@@ -100,6 +118,8 @@ pub struct ProviderConfigStore {
     pub custom_models: HashMap<String, String>,
     #[serde(default = "default_reasoning_effort")]
     pub reasoning_effort: String,
+    #[serde(default)]
+    pub custom_providers: Vec<CustomProviderConfig>,
 }
 
 fn default_reasoning_effort() -> String {
@@ -109,11 +129,12 @@ fn default_reasoning_effort() -> String {
 impl Default for ProviderConfigStore {
     fn default() -> Self {
         Self {
-            active_provider: "gemini".to_string(),
+            active_provider: "openrouter".to_string(),
             keys: HashMap::new(),
             custom_urls: HashMap::new(),
             custom_models: HashMap::new(),
             reasoning_effort: default_reasoning_effort(),
+            custom_providers: Vec::new(),
         }
     }
 }
@@ -661,10 +682,364 @@ impl ProviderRegistry {
                 custom_base_url: None,
                 max_context_window: 128_000,
             },
+            ProviderDefinition {
+                id: "aistudio".to_string(),
+                name: "Google AI Studio".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
+                default_model: "gemini-2.5-flash".to_string(),
+                available_models: vec![
+                    "gemini-2.5-flash".to_string(),
+                    "gemini-2.5-pro".to_string(),
+                    "gemini-2.0-flash".to_string(),
+                    "gemini-2.0-flash-thinking-exp".to_string(),
+                    "gemini-2.0-pro-exp-02-05".to_string(),
+                    "gemini-1.5-pro".to_string(),
+                    "gemini-1.5-flash".to_string(),
+                ],
+                api_format: "gemini".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "GEMINI_API_KEY".to_string(),
+                description: "Direct Google AI Studio developer API with Gemini 2.5/2.0 thinking models and 2M context.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 1_048_576,
+            },
+            ProviderDefinition {
+                id: "kimi".to_string(),
+                name: "Kimi (Moonshot AI)".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://api.moonshot.cn/v1".to_string(),
+                default_model: "moonshot-v1-128k".to_string(),
+                available_models: vec![
+                    "moonshot-v1-128k".to_string(),
+                    "moonshot-v1-32k".to_string(),
+                    "moonshot-v1-8k".to_string(),
+                    "moonshot-v1-auto".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "MOONSHOT_API_KEY".to_string(),
+                description: "Frontier long-context LLM by Moonshot AI with lossless 128k context window and Chinese/English mastery.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "glm".to_string(),
+                name: "GLM (Zhipu AI)".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://open.bigmodel.cn/api/paas/v4".to_string(),
+                default_model: "glm-4-plus".to_string(),
+                available_models: vec![
+                    "glm-4-plus".to_string(),
+                    "glm-4-0520".to_string(),
+                    "glm-4-air".to_string(),
+                    "glm-4-flash".to_string(),
+                    "glm-4-long".to_string(),
+                    "codegeex-4".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "ZHIPU_API_KEY".to_string(),
+                description: "Zhipu AI flagship GLM-4 and CodeGeeX-4 foundation models with high mathematical and coding precision.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "alibaba".to_string(),
+                name: "Alibaba DashScope (Qwen)".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1".to_string(),
+                default_model: "qwen-max".to_string(),
+                available_models: vec![
+                    "qwen-max".to_string(),
+                    "qwen-plus".to_string(),
+                    "qwen-turbo".to_string(),
+                    "qwen2.5-72b-instruct".to_string(),
+                    "qwen2.5-coder-32b-instruct".to_string(),
+                    "qvq-72b-preview".to_string(),
+                    "qwq-32b-preview".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "DASHSCOPE_API_KEY".to_string(),
+                description: "Alibaba Cloud DashScope powering Qwen 2.5, Qwen2.5-Coder, and QwQ/QVQ reasoning models.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 131_072,
+            },
+            ProviderDefinition {
+                id: "qwencloud".to_string(),
+                name: "Qwen Cloud International".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1".to_string(),
+                default_model: "qwen-max".to_string(),
+                available_models: vec![
+                    "qwen-max".to_string(),
+                    "qwen-plus".to_string(),
+                    "qwen-turbo".to_string(),
+                    "qwen2.5-72b-instruct".to_string(),
+                    "qwen2.5-coder-32b-instruct".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "DASHSCOPE_API_KEY".to_string(),
+                description: "Alibaba Cloud Model Studio International gateway for global Qwen API access.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 131_072,
+            },
+            ProviderDefinition {
+                id: "tencent".to_string(),
+                name: "Tencent Hunyuan".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://api.hunyuan.cloud.tencent.com/v1".to_string(),
+                default_model: "hunyuan-turbo".to_string(),
+                available_models: vec![
+                    "hunyuan-turbo".to_string(),
+                    "hunyuan-pro".to_string(),
+                    "hunyuan-standard".to_string(),
+                    "hunyuan-lite".to_string(),
+                    "hunyuan-code".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "HUNYUAN_API_KEY".to_string(),
+                description: "Tencent Hunyuan enterprise MoE models with 256k context and high Chinese reasoning capacity.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 256_000,
+            },
+            ProviderDefinition {
+                id: "fal".to_string(),
+                name: "Fal.ai".to_string(),
+                category: "Inference Cloud".to_string(),
+                base_url: "https://queue.fal.run/v1".to_string(),
+                default_model: "fal-ai/fast-sdxl".to_string(),
+                available_models: vec![
+                    "fal-ai/fast-sdxl".to_string(),
+                    "fal-ai/flux/dev".to_string(),
+                    "fal-ai/flux/schnell".to_string(),
+                    "meta-llama/llama-3.3-70b-instruct".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "FAL_KEY".to_string(),
+                description: "Ultra-fast serverless media generation and LLM inference engine for creators and agents.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "kilocode".to_string(),
+                name: "Kilocode AI".to_string(),
+                category: "Coding & Reasoning".to_string(),
+                base_url: "https://api.kilocode.com/v1".to_string(),
+                default_model: "kilocode-1".to_string(),
+                available_models: vec![
+                    "kilocode-1".to_string(),
+                    "kilocode-code".to_string(),
+                    "kilocode-reasoner".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "KILOCODE_API_KEY".to_string(),
+                description: "Specialized developer-centric LLM inference for code generation, review, and repository architecture.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "grok".to_string(),
+                name: "xAI Grok".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://api.x.ai/v1".to_string(),
+                default_model: "grok-2-latest".to_string(),
+                available_models: vec![
+                    "grok-2-latest".to_string(),
+                    "grok-2-1212".to_string(),
+                    "grok-2-vision-1212".to_string(),
+                    "grok-beta".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "XAI_API_KEY".to_string(),
+                description: "xAI Grok-2 frontier intelligence with real-time world grounding and uncensored reasoning.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 131_072,
+            },
+            ProviderDefinition {
+                id: "bytedance".to_string(),
+                name: "ByteDance Doubao".to_string(),
+                category: "Commercial".to_string(),
+                base_url: "https://ark.cn-beijing.volces.com/api/v3".to_string(),
+                default_model: "doubao-pro-32k".to_string(),
+                available_models: vec![
+                    "doubao-pro-32k".to_string(),
+                    "doubao-pro-128k".to_string(),
+                    "doubao-lite-32k".to_string(),
+                    "doubao-lite-128k".to_string(),
+                    "doubao-vision-pro-32k".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "VOLC_API_KEY".to_string(),
+                description: "ByteDance Volcano Engine Doubao model suite optimized for cost-efficient enterprise agent execution.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "nvidia".to_string(),
+                name: "NVIDIA NIM".to_string(),
+                category: "Inference Cloud".to_string(),
+                base_url: "https://integrate.api.nvidia.com/v1".to_string(),
+                default_model: "meta/llama-3.3-70b-instruct".to_string(),
+                available_models: vec![
+                    "meta/llama-3.3-70b-instruct".to_string(),
+                    "nvidia/nemotron-4-340b-instruct".to_string(),
+                    "deepseek-ai/deepseek-r1".to_string(),
+                    "mistralai/mistral-large-2-instruct".to_string(),
+                    "meta/llama-3.1-405b-instruct".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "NVIDIA_API_KEY".to_string(),
+                description: "NVIDIA Inference Microservices (NIM) with TensorRT-LLM acceleration for top open foundation models.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "huggingface".to_string(),
+                name: "Hugging Face Inference".to_string(),
+                category: "Inference Cloud".to_string(),
+                base_url: "https://api-inference.huggingface.co/v1".to_string(),
+                default_model: "meta-llama/Llama-3.3-70B-Instruct".to_string(),
+                available_models: vec![
+                    "meta-llama/Llama-3.3-70B-Instruct".to_string(),
+                    "deepseek-ai/DeepSeek-R1".to_string(),
+                    "Qwen/Qwen2.5-72B-Instruct".to_string(),
+                    "mistralai/Mistral-7B-Instruct-v0.3".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "HF_TOKEN".to_string(),
+                description: "Hugging Face Serverless & Dedicated Inference Endpoints with OpenAI-compatible API interface.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "codebuddy".to_string(),
+                name: "Codebuddy AI".to_string(),
+                category: "Coding & Reasoning".to_string(),
+                base_url: "https://api.codebuddy.ca/v1".to_string(),
+                default_model: "codebuddy-coder".to_string(),
+                available_models: vec![
+                    "codebuddy-coder".to_string(),
+                    "codebuddy-pro".to_string(),
+                    "codebuddy-reasoner".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "CODEBUDDY_API_KEY".to_string(),
+                description: "Collaborative developer coding AI platform with automated syntax checking and unit test generation.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "manus".to_string(),
+                name: "Manus AI".to_string(),
+                category: "Agent Native".to_string(),
+                base_url: "https://api.manus.im/v1".to_string(),
+                default_model: "manus-agent-1".to_string(),
+                available_models: vec![
+                    "manus-agent-1".to_string(),
+                    "manus-pro".to_string(),
+                    "manus-code".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "MANUS_API_KEY".to_string(),
+                description: "Autonomous general-purpose agent intelligence with deep web browsing, code execution, and synthesis.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
+                id: "cloudflare".to_string(),
+                name: "Cloudflare Workers AI".to_string(),
+                category: "Edge Cloud".to_string(),
+                base_url: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1".to_string(),
+                default_model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast".to_string(),
+                available_models: vec![
+                    "@cf/meta/llama-3.3-70b-instruct-fp8-fast".to_string(),
+                    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b".to_string(),
+                    "@cf/meta/llama-3.1-8b-instruct".to_string(),
+                    "@cf/qwen/qwen1.5-14b-chat-awq".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "CLOUDFLARE_API_KEY".to_string(),
+                description: "Low-latency serverless AI inference running directly on Cloudflare global edge network across 300+ cities.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
         ];
 
         // Enrich with stored state & environment variables
-        raw_providers
+        let mut enriched: Vec<ProviderDefinition> = raw_providers
             .into_iter()
             .map(|mut p| {
                 p.is_active = p.id == config.active_provider;
@@ -681,23 +1056,26 @@ impl ProviderRegistry {
                 }
 
                 // Check Google OAuth or API Key
-                if p.id == "gemini" {
-                    if let Some(key) = config.keys.get("gemini") {
+                if p.id == "gemini" || p.id == "aistudio" {
+                    if let Some(key) = config.keys.get(&p.id) {
                         p.is_configured = true;
                         p.api_key = Some(mask_key(key));
                         p.auth_summary = "API Key (Config)".to_string();
-                    } else if let Ok(key) = std::env::var("GEMINI_API_KEY") {
+                    } else if let Ok(key) = std::env::var(&p.env_var) {
                         if !key.is_empty() {
                             p.is_configured = true;
                             p.api_key = Some(mask_key(&key));
-                            p.auth_summary = "API Key (Env)".to_string();
+                            p.auth_summary = format!("API Key (${})", p.env_var);
+                        } else {
+                            p.auth_summary = format!("Not configured (${})", p.env_var);
                         }
-                    } else if let Some(ref creds) = google_creds {
+                    } else if p.id == "gemini" && google_creds.is_some() {
+                        let creds = google_creds.as_ref().unwrap();
                         p.is_configured = true;
                         let email_display = creds.email.as_deref().unwrap_or("Connected Account");
                         p.auth_summary = format!("Google OAuth ({})", email_display);
                     } else {
-                        p.auth_summary = "Requires Gemini API Key or Google OAuth".to_string();
+                        p.auth_summary = format!("Requires API Key (${}) or Google OAuth", p.env_var);
                     }
                 } else if p.auth_type == "none" {
                     p.is_configured = true;
@@ -723,7 +1101,66 @@ impl ProviderRegistry {
 
                 p
             })
-            .collect()
+            .collect();
+
+        // Dynamically append custom user-configured providers
+        for cp in &config.custom_providers {
+            let is_active = cp.id == config.active_provider;
+            let stored_key = config.keys.get(&cp.id).cloned().or_else(|| cp.api_key.clone());
+            let is_configured = stored_key.as_ref().map(|k| !k.is_empty()).unwrap_or(cp.api_key.is_none());
+            let auth_summary = if let Some(ref k) = stored_key {
+                if !k.is_empty() {
+                    format!("API Key ({})", mask_key(k))
+                } else {
+                    "Local / Zero Credentials".to_string()
+                }
+            } else {
+                "Local / Zero Credentials".to_string()
+            };
+            enriched.push(ProviderDefinition {
+                id: cp.id.clone(),
+                name: cp.name.clone(),
+                category: "Custom".to_string(),
+                base_url: cp.base_url.clone(),
+                default_model: cp.default_model.clone(),
+                available_models: if cp.available_models.is_empty() {
+                    vec![cp.default_model.clone()]
+                } else {
+                    cp.available_models.clone()
+                },
+                api_format: cp.api_format.clone(),
+                auth_type: if stored_key.is_some() { "api_key".to_string() } else { "none".to_string() },
+                env_var: format!("{}_API_KEY", cp.id.to_uppercase().replace('-', "_")),
+                description: format!("User-configured {} compatible endpoint at {}", cp.api_format, cp.base_url),
+                is_configured,
+                is_active,
+                auth_summary,
+                api_key: stored_key.as_ref().map(|k| mask_key(k)),
+                custom_base_url: Some(cp.base_url.clone()),
+                max_context_window: if cp.max_context_window > 0 { cp.max_context_window } else { 128_000 },
+            });
+        }
+
+        let truly_configured_active_id = {
+            if let Some(p) = enriched.iter().find(|p| p.id.eq_ignore_ascii_case(&config.active_provider)) {
+                let has_creds = config.keys.contains_key(&p.id)
+                    || std::env::var(&p.env_var).map(|k| !k.is_empty()).unwrap_or(false)
+                    || (p.id == "gemini" && google_creds.is_some());
+                if has_creds || (p.auth_type == "none" && (config.custom_urls.contains_key(&p.id) || config.active_provider == "ollama" || config.active_provider == "lmstudio" || config.active_provider == "vllm")) {
+                    Some(p.id.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        for p in &mut enriched {
+            p.is_active = truly_configured_active_id.as_ref().map(|id| p.id == *id).unwrap_or(false);
+        }
+
+        enriched
     }
 
     /// Retrieve single provider by id
@@ -731,13 +1168,89 @@ impl ProviderRegistry {
         Self::list_all().into_iter().find(|p| p.id.eq_ignore_ascii_case(id))
     }
 
+    pub fn unconfigured_sentinel() -> ProviderDefinition {
+        ProviderDefinition {
+            id: "unconfigured".to_string(),
+            name: "None (Unconfigured)".to_string(),
+            category: "Setup Required".to_string(),
+            base_url: String::new(),
+            default_model: "no-model".to_string(),
+            available_models: vec![],
+            api_format: "openai".to_string(),
+            auth_type: "api_key".to_string(),
+            env_var: "AI_API_KEY".to_string(),
+            description: "No AI provider configured yet. Run '/provider add' or '/key' to connect an AI provider.".to_string(),
+            is_configured: false,
+            is_active: false,
+            auth_summary: "Not Configured (Run '/provider add' or '/key')".to_string(),
+            api_key: None,
+            custom_base_url: None,
+            max_context_window: 128_000,
+        }
+    }
+
     /// Retrieve active provider
     pub fn active() -> ProviderDefinition {
         let all = Self::list_all();
-        all.iter()
-            .find(|p| p.is_active)
-            .cloned()
-            .unwrap_or_else(|| all[0].clone())
+        let config = Self::load_config();
+
+        // 1. If explicitly selected active provider has credentials or custom URL, return it
+        if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(&config.active_provider)) {
+            let has_creds = config.keys.contains_key(&p.id)
+                || std::env::var(&p.env_var).map(|k| !k.is_empty()).unwrap_or(false)
+                || (p.id == "gemini" && GoogleOAuthEngine::load_credentials().is_some());
+            if has_creds {
+                return p.clone();
+            }
+            if p.auth_type == "none" && (config.custom_urls.contains_key(&p.id) || config.active_provider == "ollama" || config.active_provider == "lmstudio" || config.active_provider == "vllm") {
+                return p.clone();
+            }
+        }
+
+        // 2. If any other provider has saved keys in config, return it
+        for (prov_id, key) in &config.keys {
+            if !key.is_empty() {
+                if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(prov_id)) {
+                    return p.clone();
+                }
+            }
+        }
+
+        // 3. If any provider has environment variable credentials, return it
+        for p in &all {
+            if !p.env_var.is_empty() {
+                if let Ok(k) = std::env::var(&p.env_var) {
+                    if !k.is_empty() {
+                        return p.clone();
+                    }
+                }
+            }
+        }
+
+        // 4. If Google OAuth session exists, use gemini
+        if GoogleOAuthEngine::load_credentials().is_some() {
+            if let Some(p) = all.iter().find(|p| p.id == "gemini") {
+                return p.clone();
+            }
+        }
+
+        // 5. No provider configured: return unconfigured sentinel
+        Self::unconfigured_sentinel()
+    }
+
+    /// Register or update a custom user provider
+    pub fn add_custom_provider(custom: CustomProviderConfig) -> Result<(), String> {
+        let mut config = Self::load_config();
+        if let Some(pos) = config.custom_providers.iter().position(|p| p.id.eq_ignore_ascii_case(&custom.id)) {
+            config.custom_providers[pos] = custom.clone();
+        } else {
+            config.custom_providers.push(custom.clone());
+        }
+        if let Some(ref k) = custom.api_key {
+            config.keys.insert(custom.id.clone(), k.clone());
+        }
+        config.active_provider = custom.id.clone();
+        Self::save_config(&config)
     }
 
     /// Set active default provider
@@ -752,7 +1265,12 @@ impl ProviderRegistry {
     pub fn set_key(id: &str, key: &str) -> Result<(), String> {
         let p = Self::get(id).ok_or_else(|| format!("Unknown provider '{}'", id))?;
         let mut config = Self::load_config();
-        config.keys.insert(p.id, key.trim().to_string());
+        config.keys.insert(p.id.clone(), key.trim().to_string());
+        for cp in &mut config.custom_providers {
+            if cp.id.eq_ignore_ascii_case(&p.id) {
+                cp.api_key = Some(key.trim().to_string());
+            }
+        }
         Self::save_config(&config)
     }
 
@@ -760,7 +1278,12 @@ impl ProviderRegistry {
     pub fn set_base_url(id: &str, url: &str) -> Result<(), String> {
         let p = Self::get(id).ok_or_else(|| format!("Unknown provider '{}'", id))?;
         let mut config = Self::load_config();
-        config.custom_urls.insert(p.id, url.trim().to_string());
+        config.custom_urls.insert(p.id.clone(), url.trim().to_string());
+        for cp in &mut config.custom_providers {
+            if cp.id.eq_ignore_ascii_case(&p.id) {
+                cp.base_url = url.trim().to_string();
+            }
+        }
         Self::save_config(&config)
     }
 
@@ -768,7 +1291,12 @@ impl ProviderRegistry {
     pub fn set_model(id: &str, model: &str) -> Result<(), String> {
         let p = Self::get(id).ok_or_else(|| format!("Unknown provider '{}'", id))?;
         let mut config = Self::load_config();
-        config.custom_models.insert(p.id, model.trim().to_string());
+        config.custom_models.insert(p.id.clone(), model.trim().to_string());
+        for cp in &mut config.custom_providers {
+            if cp.id.eq_ignore_ascii_case(&p.id) {
+                cp.default_model = model.trim().to_string();
+            }
+        }
         Self::save_config(&config)
     }
 
@@ -1099,15 +1627,22 @@ impl ProviderRegistry {
         let active = Self::active();
         let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
 
-        if active.id == "gemini" {
+        if active.id == "unconfigured" || (!active.is_configured && active.auth_type != "none") {
+            return Err("No AI provider configured. Run '/provider add' (or 'ntx provider add <id> <key>') to configure an AI provider.".to_string());
+        }
+
+        if active.id == "gemini" || active.id == "aistudio" {
             let raw_key = Self::resolve_raw_key(&active);
-            let oauth_token = if raw_key.is_none() {
+            let oauth_token = if raw_key.is_none() && active.id == "gemini" {
                 GoogleOAuthEngine::get_valid_access_token().ok()
             } else {
                 None
             };
             if oauth_token.is_none() && raw_key.is_none() {
-                return Err("Google Gemini requires authentication. Run 'ntx auth login gemini <api_key>' (Get a free key at https://aistudio.google.com/app/apikey) or 'ntx auth login google'.".to_string());
+                return Err(format!(
+                    "{} requires authentication. Run 'ntx provider add {} <api_key>' (Get a free key at {}) or 'ntx auth login google'.",
+                    active.name, active.id, Self::portal_url(&active.id)
+                ));
             }
             return Self::call_gemini(
                 prompt,
@@ -1120,11 +1655,15 @@ impl ProviderRegistry {
             );
         }
 
-        if active.id == "anthropic" {
+        if active.api_format == "anthropic" || active.id == "anthropic" {
             let raw_key = Self::resolve_raw_key(&active).ok_or_else(|| {
-                "Anthropic Claude requires an API key. Run '/auth login claude' or set $ANTHROPIC_API_KEY from https://console.anthropic.com/settings/keys.".to_string()
+                format!(
+                    "{} requires an API key. Run '/provider add' or set ${} from {}.",
+                    active.name, active.env_var, Self::portal_url(&active.id)
+                )
             })?;
             return Self::call_anthropic(
+                &active,
                 prompt,
                 sys,
                 &active.default_model,
@@ -1134,12 +1673,12 @@ impl ProviderRegistry {
             );
         }
 
-        // OpenAI-compatible providers (OpenAI, Nous, DeepSeek, Groq, OpenRouter, Together, Mistral, Ollama, etc.)
+        // OpenAI-compatible providers (OpenAI, Nous, DeepSeek, Groq, OpenRouter, Kimi, GLM, Alibaba, Tencent, Fal, Kilocode, Grok, ByteDance, Qwen Cloud, NVIDIA NIM, Hugging Face, Codebuddy, Manus, Cloudflare, etc.)
         let raw_key = if active.auth_type != "none" {
             let key = Self::resolve_raw_key(&active).ok_or_else(|| {
                 format!(
-                    "{} requires an API key. Run '/auth login {}' to configure your API key from {}.",
-                    active.name, active.id, Self::portal_url(&active.id)
+                    "{} requires an API key. Run '/provider add' or set ${} from {}.",
+                    active.name, active.env_var, Self::portal_url(&active.id)
                 )
             })?;
             Some(key)
@@ -1303,6 +1842,7 @@ impl ProviderRegistry {
     }
 
     fn call_anthropic(
+        provider: &ProviderDefinition,
         prompt: &str,
         system_prompt: &str,
         model: &str,
@@ -1311,8 +1851,15 @@ impl ProviderRegistry {
         history: &[(String, String)],
     ) -> Result<PromptExecutionResult, String> {
         let start = Instant::now();
-        let context_limit = 200_000;
-        let url = "https://api.anthropic.com/v1/messages";
+        let context_limit = provider.context_window_for_model(model);
+        let base = provider.base_url.trim_end_matches('/');
+        let url = if base.ends_with("/messages") {
+            base.to_string()
+        } else if base.ends_with("/v1") {
+            format!("{}/messages", base)
+        } else {
+            format!("{}/v1/messages", base)
+        };
 
         let mut messages = Vec::new();
         for (u, a) in history {
@@ -1403,7 +1950,7 @@ impl ProviderRegistry {
             context_limit,
             duration_ms: elapsed,
             model: model.to_string(),
-            provider: "Anthropic Claude".to_string(),
+            provider: provider.name.clone(),
         })
     }
 
@@ -1479,8 +2026,17 @@ impl ProviderRegistry {
 
         if let Some(key) = api_key {
             if !key.is_empty() {
-                cmd.arg("-H").arg(format!("Authorization: Bearer {}", key));
+                if provider.id == "fal" {
+                    cmd.arg("-H").arg(format!("Authorization: Key {}", key));
+                } else {
+                    cmd.arg("-H").arg(format!("Authorization: Bearer {}", key));
+                }
             }
+        }
+
+        if provider.id == "openrouter" {
+            cmd.arg("-H").arg("HTTP-Referer: https://github.com/simhaonline/ntx");
+            cmd.arg("-H").arg("X-Title: Nityaksha Core");
         }
 
         cmd.arg("-d").arg("@-")
@@ -1531,17 +2087,31 @@ impl ProviderRegistry {
     pub fn normalize_id(input: &str) -> Option<&'static str> {
         match input.to_ascii_lowercase().as_str() {
             "google" | "gemini" => Some("gemini"),
+            "aistudio" | "google-ai-studio" | "googleaistudio" => Some("aistudio"),
             "claude" | "anthropic" => Some("anthropic"),
             "openai" | "codex" | "chatgpt" => Some("openai"),
             "nous" | "hermes" => Some("nous"),
             "deepseek" => Some("deepseek"),
             "groq" => Some("groq"),
-            "openrouter" => Some("openrouter"),
+            "openrouter" | "or" => Some("openrouter"),
+            "kimi" | "moonshot" => Some("kimi"),
+            "glm" | "zhipu" | "bigmodel" => Some("glm"),
+            "alibaba" | "dashscope" | "qwen" => Some("alibaba"),
+            "qwencloud" | "qwen-intl" | "dashscope-intl" => Some("qwencloud"),
+            "tencent" | "hunyuan" => Some("tencent"),
+            "fal" | "fal-ai" | "falai" => Some("fal"),
+            "kilocode" => Some("kilocode"),
+            "grok" | "xai" => Some("grok"),
+            "bytedance" | "doubao" | "volcengine" => Some("bytedance"),
+            "nvidia" | "nim" => Some("nvidia"),
+            "huggingface" | "hf" => Some("huggingface"),
+            "codebuddy" => Some("codebuddy"),
+            "manus" => Some("manus"),
+            "cloudflare" | "cf" | "workers-ai" => Some("cloudflare"),
             "together" => Some("together"),
             "mistral" => Some("mistral"),
             "cohere" => Some("cohere"),
             "perplexity" => Some("perplexity"),
-            "xai" | "grok" => Some("xai"),
             "fireworks" => Some("fireworks"),
             "cerebras" => Some("cerebras"),
             "sambanova" => Some("sambanova"),
@@ -1558,18 +2128,31 @@ impl ProviderRegistry {
 
     pub fn portal_url(id: &str) -> &'static str {
         match id {
-            "gemini" => "https://aistudio.google.com/app/apikey",
+            "gemini" | "aistudio" => "https://aistudio.google.com/app/apikey",
             "anthropic" => "https://console.anthropic.com/settings/keys",
             "openai" => "https://platform.openai.com/api-keys",
             "nous" => "https://portal.nousresearch.com",
             "deepseek" => "https://platform.deepseek.com/api_keys",
             "groq" => "https://console.groq.com/keys",
             "openrouter" => "https://openrouter.ai/keys",
+            "kimi" => "https://platform.moonshot.cn/console/api-keys",
+            "glm" => "https://open.bigmodel.cn/usercenter/apikeys",
+            "alibaba" => "https://dashscope.console.aliyun.com/apiKey",
+            "qwencloud" => "https://www.alibabacloud.com/en/product/model-studio",
+            "tencent" => "https://console.cloud.tencent.com/hunyuan/api-key",
+            "fal" => "https://fal.ai/dashboard/keys",
+            "kilocode" => "https://kilocode.com/dashboard/api-keys",
+            "grok" | "xai" => "https://console.x.ai",
+            "bytedance" => "https://console.volcengine.com/ark",
+            "nvidia" => "https://build.nvidia.com/",
+            "huggingface" => "https://huggingface.co/settings/tokens",
+            "codebuddy" => "https://codebuddy.ca/developer",
+            "manus" => "https://manus.im/dashboard",
+            "cloudflare" => "https://dash.cloudflare.com/",
             "together" => "https://api.together.ai/settings/api-keys",
             "mistral" => "https://console.mistral.ai/api-keys",
             "cohere" => "https://dashboard.cohere.com/api-keys",
             "perplexity" => "https://www.perplexity.ai/settings/api",
-            "xai" => "https://console.x.ai",
             "fireworks" => "https://fireworks.ai/api-keys",
             "cerebras" => "https://cloud.cerebras.ai",
             "sambanova" => "https://cloud.sambanova.ai/apis",
@@ -1582,7 +2165,7 @@ impl ProviderRegistry {
             "azure" => "https://portal.azure.com",
             "ollama-cloud" => "https://ollama.com",
             "ollama" => "http://localhost:11434",
-            _ => "https://aistudio.google.com/app/apikey",
+            _ => "https://openrouter.ai/keys",
         }
     }
 
@@ -1621,9 +2204,220 @@ impl ProviderRegistry {
         }
 
         println!("\n  Authentication Shortcuts:");
+        println!("    ntx provider add               - Hermes-style interactive setup wizard (preconfigured or custom)");
+        println!("    ntx provider add <id> <key>    - Add API key, activate provider, and query live models");
         println!("    ntx auth login [provider]      - Authenticate specific provider (gemini, claude, openai, etc.)");
         println!("    ntx auth logout [provider]     - Revoke credentials or clear API keys");
-        println!("    ntx provider list              - View all 21 available models and endpoints");
+        println!("    ntx provider list              - View all 36+ available models and endpoints");
+    }
+
+    /// Hermes-style interactive provider setup wizard
+    pub fn interactive_setup_wizard() -> Result<String, String> {
+        let all = Self::list_all();
+        println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+        println!("│ 🚀 HERMES-GRADE AI PROVIDER SETUP WIZARD                               │");
+        println!("├────────────────────────────────────────────────────────────────────────┤");
+        println!("│ Connect any commercial, inference cloud, local, or custom LLM endpoint.│");
+        println!("│                                                                        │");
+        println!("│   [1] Select from Preconfigured Providers (36+ Built-in Backends)      │");
+        println!("│       (OpenRouter, Gemini, Kimi, GLM, Alibaba, Tencent, Grok, etc.)    │");
+        println!("│   [2] Add Custom OpenAI-Compatible Endpoint                            │");
+        println!("│       (/chat/completions, /models, custom base URL, API key)           │");
+        println!("│   [3] Add Custom Anthropic-Compatible Endpoint                         │");
+        println!("│       (/messages, custom base URL, API key)                            │");
+        println!("│                                                                        │");
+        println!("│   Or type a provider ID directly (e.g. 'openrouter', 'kimi', 'glm').   │");
+        println!("└────────────────────────────────────────────────────────────────────────┘");
+        print!("Select setup option [1-3 or Provider ID | Enter to cancel]: ");
+        let _ = std::io::stdout().flush();
+
+        let mut opt = String::new();
+        if std::io::stdin().read_line(&mut opt).is_err() || opt.trim().is_empty() {
+            println!("Setup cancelled.");
+            return Ok(String::new());
+        }
+        let choice = opt.trim().to_lowercase();
+
+        if choice == "2" || choice == "3" || choice == "custom" {
+            let is_anthropic = choice == "3";
+            println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+            if is_anthropic {
+                println!("│ 🔌 ADD CUSTOM ANTHROPIC-COMPATIBLE PROVIDER                            │");
+                println!("│ Compatible with Anthropic /messages format and headers                 │");
+            } else {
+                println!("│ 🔌 ADD CUSTOM OPENAI-COMPATIBLE PROVIDER                               │");
+                println!("│ Compatible with /chat/completions and /models discovery                │");
+            }
+            println!("└────────────────────────────────────────────────────────────────────────┘");
+
+            print!("Enter unique provider ID (e.g. 'my-llm', 'together-custom'): ");
+            let _ = std::io::stdout().flush();
+            let mut id_in = String::new();
+            std::io::stdin().read_line(&mut id_in).map_err(|e| e.to_string())?;
+            let id = id_in.trim().to_lowercase().replace(' ', "-");
+            if id.is_empty() {
+                return Err("Provider ID cannot be empty.".to_string());
+            }
+
+            print!("Enter provider display name (e.g. 'My Local Llama', 'Together Custom'): ");
+            let _ = std::io::stdout().flush();
+            let mut name_in = String::new();
+            std::io::stdin().read_line(&mut name_in).map_err(|e| e.to_string())?;
+            let name = if name_in.trim().is_empty() { id.clone() } else { name_in.trim().to_string() };
+
+            print!("Enter Base URL (e.g. 'https://api.together.xyz/v1', 'http://127.0.0.1:8000/v1'): ");
+            let _ = std::io::stdout().flush();
+            let mut url_in = String::new();
+            std::io::stdin().read_line(&mut url_in).map_err(|e| e.to_string())?;
+            let base_url = url_in.trim().to_string();
+            if base_url.is_empty() {
+                return Err("Base URL cannot be empty.".to_string());
+            }
+
+            print!("Enter API Key (press Enter if none/local): ");
+            let _ = std::io::stdout().flush();
+            let mut key_in = String::new();
+            std::io::stdin().read_line(&mut key_in).map_err(|e| e.to_string())?;
+            let api_key = if key_in.trim().is_empty() { None } else { Some(key_in.trim().to_string()) };
+
+            println!("\n🔄 Querying live models from {} API...", base_url);
+            let mut discovered_models = Vec::new();
+            let api_format = if is_anthropic { "anthropic" } else { "openai" };
+
+            // Probe models endpoint
+            let probe_url = if is_anthropic {
+                format!("{}/models", base_url.trim_end_matches('/'))
+            } else {
+                let b = base_url.trim_end_matches('/');
+                if b.ends_with("/chat/completions") {
+                    b.replace("/chat/completions", "/models")
+                } else if b.ends_with("/v1") {
+                    format!("{}/models", b)
+                } else {
+                    format!("{}/v1/models", b)
+                }
+            };
+
+            let mut cmd = Command::new("curl");
+            cmd.arg("-s").arg("--max-time").arg("6").arg(&probe_url);
+            if let Some(ref k) = api_key {
+                if is_anthropic {
+                    cmd.arg("-H").arg(format!("x-api-key: {}", k));
+                    cmd.arg("-H").arg("anthropic-version: 2023-06-01");
+                } else {
+                    cmd.arg("-H").arg(format!("Authorization: Bearer {}", k));
+                }
+            }
+
+            if let Ok(output) = cmd.output() {
+                let resp_str = String::from_utf8_lossy(&output.stdout);
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
+                    if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
+                        for m in data {
+                            if let Some(mid) = m.get("id").and_then(|v| v.as_str()) {
+                                if !mid.contains("embedding") && !mid.contains("tts") && !mid.contains("dall-e") {
+                                    discovered_models.push(mid.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let default_model = if !discovered_models.is_empty() {
+                println!("✓ Connected! Found {} models from endpoint:", discovered_models.len());
+                for (idx, m) in discovered_models.iter().take(8).enumerate() {
+                    println!("   [{}] {}", idx + 1, m);
+                }
+                print!("Select default model [1-{} or enter model name | Enter for '{}']: ", discovered_models.len().min(8), discovered_models[0]);
+                let _ = std::io::stdout().flush();
+                let mut m_in = String::new();
+                std::io::stdin().read_line(&mut m_in).map_err(|e| e.to_string())?;
+                let m_choice = m_in.trim();
+                if let Ok(idx) = m_choice.parse::<usize>() {
+                    if idx >= 1 && idx <= discovered_models.len() {
+                        discovered_models[idx - 1].clone()
+                    } else {
+                        discovered_models[0].clone()
+                    }
+                } else if !m_choice.is_empty() {
+                    m_choice.to_string()
+                } else {
+                    discovered_models[0].clone()
+                }
+            } else {
+                print!("Enter default model name (e.g. 'llama-3.3-70b-instruct', 'gpt-4o'): ");
+                let _ = std::io::stdout().flush();
+                let mut m_in = String::new();
+                std::io::stdin().read_line(&mut m_in).map_err(|e| e.to_string())?;
+                let m_choice = m_in.trim();
+                if m_choice.is_empty() {
+                    "default".to_string()
+                } else {
+                    m_choice.to_string()
+                }
+            };
+
+            print!("Enter context window limit in tokens [default 128000 | Enter to keep]: ");
+            let _ = std::io::stdout().flush();
+            let mut ctx_in = String::new();
+            let _ = std::io::stdin().read_line(&mut ctx_in);
+            let max_context_window = ctx_in.trim().parse::<usize>().unwrap_or(128_000);
+
+            let custom_cfg = CustomProviderConfig {
+                id: id.clone(),
+                name: name.clone(),
+                base_url,
+                api_format: api_format.to_string(),
+                api_key,
+                default_model: default_model.clone(),
+                available_models: discovered_models,
+                max_context_window,
+            };
+
+            Self::add_custom_provider(custom_cfg)?;
+            println!("\n✓ Custom provider '{}' ({}) configured and activated!", name, default_model);
+            return Ok(id);
+        }
+
+        // Choice 1 or Direct Provider ID
+        let target_provider_id = if choice == "1" || choice.is_empty() {
+            println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+            println!("│ 🌐 SELECT PRECONFIGURED AI PROVIDER                                    │");
+            println!("├────────────────────────────────────────────────────────────────────────┤");
+            for (idx, p) in all.iter().enumerate() {
+                let mark = if p.is_active { "*" } else { " " };
+                let cfg = if p.is_configured { "✓" } else { " " };
+                println!("│ [{:>2}] [{}] {}{:<14} - {:<20} ({})", idx + 1, cfg, mark, p.id, p.name, p.default_model);
+            }
+            println!("└────────────────────────────────────────────────────────────────────────┘");
+            print!("Select provider [1-{} or Provider ID | Enter to cancel]: ", all.len());
+            let _ = std::io::stdout().flush();
+            let mut sel_in = String::new();
+            if std::io::stdin().read_line(&mut sel_in).is_err() || sel_in.trim().is_empty() {
+                return Ok(String::new());
+            }
+            let sel = sel_in.trim();
+            if let Ok(idx) = sel.parse::<usize>() {
+                if idx >= 1 && idx <= all.len() {
+                    all[idx - 1].id.clone()
+                } else {
+                    return Err(format!("Invalid provider number {}", idx));
+                }
+            } else if let Some(norm) = Self::normalize_id(sel) {
+                norm.to_string()
+            } else {
+                sel.to_string()
+            }
+        } else if let Some(norm) = Self::normalize_id(&choice) {
+            norm.to_string()
+        } else {
+            choice.to_string()
+        };
+
+        // Call login_provider on the resolved target
+        Self::login_provider(Some(&target_provider_id), None)?;
+        Ok(target_provider_id)
     }
 
     pub fn login_provider(provider_arg: Option<&str>, key_arg: Option<&str>) -> Result<(), String> {
@@ -1667,7 +2461,33 @@ impl ProviderRegistry {
         let provider = Self::get(&target_id)
             .ok_or_else(|| format!("Unknown provider '{}'. Run 'ntx provider list' for options.", target_id))?;
 
-        // 2. Handle Google Gemini Authentication Flow
+        // 2. Handle Google Gemini / Google AI Studio Authentication Flow
+        if provider.id == "aistudio" {
+            let api_key = if let Some(key) = key_arg {
+                key.trim().to_string()
+            } else {
+                println!("\n┌────────────────────────────────────────────────────────────────────────┐");
+                println!("│ 🔑 GOOGLE AI STUDIO API KEY CONFIGURATION                              │");
+                println!("├────────────────────────────────────────────────────────────────────────┤");
+                println!("│ 1. Create your free API key at: https://aistudio.google.com/app/apikey │");
+                println!("│ 2. Paste your Gemini API key below:                                    │");
+                println!("└────────────────────────────────────────────────────────────────────────┘");
+                print!("Enter Gemini API Key (AIza...): ");
+                let _ = std::io::stdout().flush();
+                let mut key_in = String::new();
+                std::io::stdin().read_line(&mut key_in).map_err(|e| e.to_string())?;
+                let clean = key_in.trim().to_string();
+                if clean.is_empty() {
+                    return Err("Authentication cancelled: empty API key provided.".to_string());
+                }
+                clean
+            };
+            Self::set_key("aistudio", &api_key)?;
+            Self::set_active("aistudio")?;
+            println!("\n✓ Successfully configured and activated Google AI Studio ({})!", provider.default_model);
+            return Ok(());
+        }
+
         if provider.id == "gemini" {
             if let Some(key) = key_arg {
                 let clean = key.trim();
@@ -1841,6 +2661,33 @@ impl ProviderRegistry {
 
         println!("\n✓ Successfully authenticated and activated {} ({})!", provider.name, provider.default_model);
         println!("  Credentials stored securely in {}", Self::config_path().display());
+
+        // Hermes live model discovery
+        println!("🔄 Querying latest live AI models from {} API...", provider.name);
+        match Self::fetch_remote_models_with_key(&provider.id, Some(&api_key), None) {
+            Ok(models) if !models.is_empty() => {
+                println!("✓ Connected! Found {} models from {} API:", models.len(), provider.name);
+                for (idx, m) in models.iter().take(8).enumerate() {
+                    let is_cur = m == &provider.default_model;
+                    let mark = if is_cur { " * (current default)" } else { "" };
+                    println!("   [{}] {:<34}{}", idx + 1, m, mark);
+                }
+                print!("Select default model [1-{} or Enter to keep '{}']: ", models.len().min(8), provider.default_model);
+                let _ = std::io::stdout().flush();
+                let mut m_in = String::new();
+                if std::io::stdin().read_line(&mut m_in).is_ok() {
+                    let trimmed = m_in.trim();
+                    if let Ok(idx) = trimmed.parse::<usize>() {
+                        if idx >= 1 && idx <= models.len() {
+                            let chosen = &models[idx - 1];
+                            let _ = Self::set_model(&provider.id, chosen);
+                            println!("✓ Default model set to: {}", chosen);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
         Ok(())
     }
 

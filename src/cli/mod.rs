@@ -1822,7 +1822,7 @@ complete -F _ntx_completions ntx"#);
             let active = ProviderRegistry::active();
 
             println!("=================================================================================================================");
-            println!("              NITYAKSHA AI PROVIDER GATEWAY (22 Preconfigured Commercial, Local & Cloud Providers)              ");
+            println!("              NITYAKSHA AI PROVIDER GATEWAY (36+ Native Commercial, Local, Cloud & Custom Providers)            ");
             println!("=================================================================================================================");
             println!("  ID             STATUS       CATEGORY          DEFAULT MODEL                  AUTH METHOD");
             println!("-----------------------------------------------------------------------------------------------------------------");
@@ -1843,22 +1843,74 @@ complete -F _ntx_completions ntx"#);
                 println!("  {} {} {} {} {}", id_fmt, status_str, cat_fmt, model_fmt, auth_fmt);
             }
             println!("-----------------------------------------------------------------------------------------------------------------");
-            println!("Active Provider: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
-            println!("Commands & API Key Setup:");
+            if active.is_configured {
+                println!("Active Provider: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
+            } else {
+                println!("Active Provider: \x1b[33m⚠️ NOT CONFIGURED (Run 'ntx provider add' to connect an AI provider)\x1b[0m");
+            }
+            println!("Commands & Setup:");
+            println!("  ntx provider add                - Launch Hermes-grade interactive setup wizard");
             println!("  ntx provider add <id> <key>     - Add API key, activate provider, and query live models");
-            println!("  ntx provider set-key <id> <key> - Set or update API key for a provider");
+            println!("  ntx provider add custom <id> <url> <format> <key> <model> - Register custom endpoint");
             println!("  ntx provider select <id>        - Switch active default provider");
             println!("  ntx provider inspect <id>       - View available models, base URL, and configuration");
             println!("  ntx provider set-url <id> <url> - Set custom base URL (e.g. self-hosted Ollama/vLLM)");
             println!("  ntx provider test <id>          - Test connectivity and latency ping");
             println!("  ntx key <id> <key>              - Directly configure provider API key");
-            println!("  ntx auth login google           - Authenticate with Google OAuth for Gemini");
-            println!("  ntx auth login <id> <key>       - Authenticate provider via API key");
             return;
         }
 
         match args[0].as_str() {
-            "add" | "set-key" | "key" => {
+            "add" => {
+                if args.len() == 1 {
+                    let _ = ProviderRegistry::interactive_setup_wizard();
+                    return;
+                }
+                if args.len() >= 6 && args[1] == "custom" {
+                    use crate::provider::CustomProviderConfig;
+                    let id = args[2].to_lowercase().replace(' ', "-");
+                    let base_url = args[3].clone();
+                    let api_format = args[4].to_lowercase();
+                    let key = if args[5] == "none" || args[5] == "-" { None } else { Some(args[5].clone()) };
+                    let default_model = if args.len() >= 7 { args[6].clone() } else { "default".to_string() };
+
+                    let custom = CustomProviderConfig {
+                        id: id.clone(),
+                        name: id.clone(),
+                        base_url,
+                        api_format,
+                        api_key: key,
+                        default_model,
+                        available_models: Vec::new(),
+                        max_context_window: 128_000,
+                    };
+                    match ProviderRegistry::add_custom_provider(custom) {
+                        Ok(()) => println!("\x1b[32m[SUCCESS]\x1b[0m Custom provider '{}' registered and marked as active.", id),
+                        Err(e) => eprintln!("\x1b[31m[ERROR]\x1b[0m Failed to add custom provider: {}", e),
+                    }
+                    return;
+                }
+                if args.len() >= 3 {
+                    let id = &args[1];
+                    let key = &args[2];
+                    match ProviderRegistry::set_key(id, key) {
+                        Ok(()) => {
+                            let _ = ProviderRegistry::set_active(id);
+                            println!("\x1b[32m[SUCCESS]\x1b[0m API key for '{}' saved successfully. Marked as active provider.", id);
+                            match ProviderRegistry::fetch_remote_models_with_key(id, Some(key), None) {
+                                Ok(models) if !models.is_empty() => {
+                                    println!("\x1b[32m[SUCCESS]\x1b[0m Connected to {} API! Retrieved {} live models.", id, models.len());
+                                }
+                                _ => {}
+                            }
+                        }
+                        Err(e) => eprintln!("\x1b[31m[ERROR]\x1b[0m Failed to save API key: {}", e),
+                    }
+                    return;
+                }
+                let _ = ProviderRegistry::interactive_setup_wizard();
+            }
+            "set-key" | "key" => {
                 if args.len() < 3 {
                     eprintln!("Usage: ntx provider set-key <provider_id> <api_key>\nExample: ntx provider add gemini AIzaSy...\n         ntx provider set-key openai sk-proj-...");
                     return;
@@ -2005,8 +2057,7 @@ complete -F _ntx_completions ntx"#);
     pub fn cmd_key(&self, args: &[String]) {
         use crate::provider::ProviderRegistry;
         if args.is_empty() {
-            eprintln!("Usage: ntx key <provider_id> <api_key>\nExample: ntx key gemini AIzaSy...\n         ntx key openai sk-proj-...");
-            println!("\nRun 'ntx auth status' to see configured keys across all 22 providers.");
+            let _ = ProviderRegistry::interactive_setup_wizard();
             return;
         }
 
@@ -2015,6 +2066,10 @@ complete -F _ntx_completions ntx"#);
         } else {
             // User ran `ntx key <key>` for active provider
             let active = ProviderRegistry::active();
+            if active.id == "unconfigured" {
+                eprintln!("[ERROR] No AI provider selected. Usage: ntx key <provider_id> <api_key>\nExample: ntx key openrouter sk-or-...\n         ntx key gemini AIzaSy...");
+                return;
+            }
             (active.id.clone(), args[0].clone())
         };
 
@@ -2189,8 +2244,10 @@ complete -F _ntx_completions ntx"#);
         println!("  repl                            Start interactive pure Rust REPL shell with cockpit tabs");
         println!();
         println!("AI Provider & API Key Management:");
-        println!("  provider [list]                 List all 22 AI providers (Gemini, Claude, OpenAI, Ollama...)");
+        println!("  provider [list]                 List all 36+ native & custom providers (OpenRouter, Gemini, Kimi, GLM, Alibaba...)");
+        println!("  provider add                    Launch Hermes-grade interactive setup wizard (preconfigured or custom)");
         println!("  provider add <ID> <KEY>         Add / configure API key, activate provider, and query models");
+        println!("  provider add custom <ID> <URL> <FMT> <KEY> <MODEL> Register custom OpenAI or Anthropic endpoint");
         println!("  provider set-key <ID> <KEY>     Set or update API key for any AI provider");
         println!("  provider select <ID>            Select and activate default AI provider");
         println!("  provider inspect <ID>           View provider details, models, and endpoint URL");

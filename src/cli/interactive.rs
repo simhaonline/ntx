@@ -473,13 +473,28 @@ impl InteractiveShell {
             };
 
             // Cockpit Prompt Line with Active View and Telemetry
+            let telemetry_bar = if active_p.is_configured {
+                format!(
+                    "{dim}[{p_name} ({model}) | effort: {effort} | ctx: {pct:.1}% | tok: {tok}]{reset}",
+                    dim = theme.dim,
+                    p_name = active_p.name,
+                    model = active_p.default_model,
+                    effort = reasoning_effort.to_uppercase(),
+                    pct = ctx_pct,
+                    tok = format_num_commas(self.session_total_tokens),
+                    reset = theme.reset
+                )
+            } else {
+                format!(
+                    "{warning}[⚠️  AI Provider Unconfigured | type '/provider add' or '/key' to setup]{reset}",
+                    warning = theme.warning,
+                    reset = theme.reset
+                )
+            };
+
             print!(
-                "\n{dim}[{model} | effort: {effort} | ctx: {pct:.1}% | tok: {tok}]{reset}\n{primary}{glyph} [{view}] ❯{reset} ",
-                dim = theme.dim,
-                model = active_p.default_model,
-                effort = reasoning_effort.to_uppercase(),
-                pct = ctx_pct,
-                tok = format_num_commas(self.session_total_tokens),
+                "\n{}\n{primary}{glyph} [{view}] ❯{reset} ",
+                telemetry_bar,
                 primary = theme.primary,
                 glyph = theme.prompt_glyph,
                 view = self.current_view.title(),
@@ -569,14 +584,19 @@ impl InteractiveShell {
         );
         print_box_line(theme.accent, &line1, inner_width, theme.reset);
 
+        let ai_desc = if active_p.is_configured {
+            format!("{p_name} ({model})", p_name = active_p.name, model = active_p.default_model)
+        } else {
+            "⚠️ Not Configured (type /provider add)".to_string()
+        };
+
         let line2 = format!(
-            " {dim}Dir: {dir} [{trusted}] │ Git: {git} │ AI: {p_name} ({model}) │ Session: {sid}{reset}",
+            " {dim}Dir: {dir} [{trusted}] │ Git: {git} │ AI: {ai} │ Session: {sid}{reset}",
             dim = theme.dim,
             dir = clean_path(&self.current_dir, 26),
             trusted = trusted_str,
             git = git_info,
-            p_name = active_p.name,
-            model = active_p.default_model,
+            ai = ai_desc,
             sid = clean_path(&self.session_id, 14),
             reset = theme.reset
         );
@@ -645,12 +665,25 @@ impl InteractiveShell {
         );
 
         // Section A: Active AI Provider & Model Gateway
-        let line_p = format!("  {bold}Active AI Provider :{reset} {primary}{:<24}{reset} [Category: {:<14}] (Auth: {})",
-            active_p.name, active_p.category, active_p.auth_summary, primary = theme.primary, bold = theme.bold, reset = theme.reset);
-        let line_m = format!("  {bold}Active AI Model    :{reset} {accent}{:<24}{reset} [Max Context: {} / {} tokens]",
-            active_p.default_model, format_num_commas(ctx_limit), format_tokens_short(ctx_limit), accent = theme.accent, bold = theme.bold, reset = theme.reset);
-        let line_r = format!("  {bold}Reasoning Level    :{reset} {accent}{:<24}{reset} [Portal: {}]",
-            reasoning_effort.to_uppercase(), ProviderRegistry::portal_url(&active_p.id), accent = theme.accent, bold = theme.bold, reset = theme.reset);
+        let (line_p, line_m, line_r) = if active_p.is_configured {
+            (
+                format!("  {bold}Active AI Provider :{reset} {primary}{:<24}{reset} [Category: {:<14}] (Auth: {})",
+                    active_p.name, active_p.category, active_p.auth_summary, primary = theme.primary, bold = theme.bold, reset = theme.reset),
+                format!("  {bold}Active AI Model    :{reset} {accent}{:<24}{reset} [Max Context: {} / {} tokens]",
+                    active_p.default_model, format_num_commas(ctx_limit), format_tokens_short(ctx_limit), accent = theme.accent, bold = theme.bold, reset = theme.reset),
+                format!("  {bold}Reasoning Level    :{reset} {accent}{:<24}{reset} [Portal: {}]",
+                    reasoning_effort.to_uppercase(), ProviderRegistry::portal_url(&active_p.id), accent = theme.accent, bold = theme.bold, reset = theme.reset),
+            )
+        } else {
+            (
+                format!("  {bold}Active AI Provider :{reset} {warning}⚠️  NO AI PROVIDER CONFIGURED{reset}  (Type '/provider add' or '/key' to setup)",
+                    warning = theme.warning, bold = theme.bold, reset = theme.reset),
+                format!("  {bold}Quick Configuration:{reset} {accent}/provider add{reset} (Hermes setup wizard) or {accent}/key <id> <key>{reset}",
+                    accent = theme.accent, bold = theme.bold, reset = theme.reset),
+                format!("  {bold}Supported Backends :{reset} 36+ Native Providers (OpenRouter, Gemini, Kimi, GLM, Alibaba, Grok, etc.)",
+                    bold = theme.bold, reset = theme.reset),
+            )
+        };
 
         print_box_line(theme.accent, &line_p, inner_width, theme.reset);
         print_box_line(theme.accent, &line_m, inner_width, theme.reset);
@@ -911,10 +944,21 @@ impl InteractiveShell {
             theme.reset,
         );
 
-        let p1 = format!("  {bold}Active AI Provider :{reset} {primary}{}{reset} [{}]", active_p.name, active_p.category, primary = theme.primary, bold = theme.bold, reset = theme.reset);
-        let p2 = format!("  {bold}Active AI Model    :{reset} {accent}{}{reset} (Reasoning: {})", active_p.default_model, reasoning_effort.to_uppercase(), accent = theme.accent, bold = theme.bold, reset = theme.reset);
-        let p3 = format!("  {bold}Model Context Limit:{reset} {accent}{} tokens{reset} ({})",
-            format_num_commas(ctx_limit), format_tokens_short(ctx_limit), bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let (p1, p2, p3) = if active_p.is_configured {
+            (
+                format!("  {bold}Active AI Provider :{reset} {primary}{}{reset} [{}]", active_p.name, active_p.category, primary = theme.primary, bold = theme.bold, reset = theme.reset),
+                format!("  {bold}Active AI Model    :{reset} {accent}{}{reset} (Reasoning: {})", active_p.default_model, reasoning_effort.to_uppercase(), accent = theme.accent, bold = theme.bold, reset = theme.reset),
+                format!("  {bold}Model Context Limit:{reset} {accent}{} tokens{reset} ({})",
+                    format_num_commas(ctx_limit), format_tokens_short(ctx_limit), bold = theme.bold, accent = theme.accent, reset = theme.reset),
+            )
+        } else {
+            (
+                format!("  {bold}Active AI Provider :{reset} {warning}⚠️  NO AI PROVIDER CONFIGURED{reset} (Type '/provider add' to setup)",
+                    warning = theme.warning, bold = theme.bold, reset = theme.reset),
+                format!("  {bold}Active AI Model    :{reset} {dim}none{reset}", bold = theme.bold, dim = theme.dim, reset = theme.reset),
+                format!("  {bold}Model Context Limit:{reset} {dim}none{reset}", bold = theme.bold, dim = theme.dim, reset = theme.reset),
+            )
+        };
 
         print_box_line(theme.accent, &p1, inner_width, theme.reset);
         print_box_line(theme.accent, &p2, inner_width, theme.reset);
@@ -1050,7 +1094,7 @@ impl InteractiveShell {
 
         print_box_top(
             theme.accent,
-            Some(&format!("{bold}{accent}🌐 AI PROVIDER GATEWAY & MULTI-MODEL ROUTER (22 Native Backends){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            Some(&format!("{bold}{accent}🌐 AI PROVIDER GATEWAY & MULTI-MODEL ROUTER (36+ Native & Custom Backends){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
             inner_width,
             theme.reset,
         );
@@ -1084,11 +1128,13 @@ impl InteractiveShell {
             theme.reset,
         );
 
+        let q0 = format!("    • {accent}/provider add{reset} (or {accent}/add{reset})  - Hermes setup wizard (preconfigured or custom endpoints)", accent = theme.accent, reset = theme.reset);
         let q1 = format!("    • {accent}/provider [id]{reset}          - Select provider & switch active backend", accent = theme.accent, reset = theme.reset);
         let q2 = format!("    • {accent}/key [id] [key]{reset}         - Configure API key directly & fetch live models", accent = theme.accent, reset = theme.reset);
         let q3 = format!("    • {accent}/model [name|idx]{reset}       - Query provider API for live models & switch default", accent = theme.accent, reset = theme.reset);
         let q4 = format!("    • {accent}/effort [level]{reset}         - Set reasoning effort (low, medium, high, max, off)", accent = theme.accent, reset = theme.reset);
 
+        print_box_line(theme.accent, &q0, inner_width, theme.reset);
         print_box_line(theme.accent, &q1, inner_width, theme.reset);
         print_box_line(theme.accent, &q2, inner_width, theme.reset);
         print_box_line(theme.accent, &q3, inner_width, theme.reset);
@@ -1315,16 +1361,33 @@ impl InteractiveShell {
                     self.interactive_select_model_and_reasoning(&active_p.id);
                 }
             }
+            "add" => {
+                let _ = ProviderRegistry::interactive_setup_wizard();
+            }
             "provider" | "providers" | "ai" => {
                 if parts.len() > 1 {
                     let sub = parts[1].to_lowercase();
-                    if (sub == "add" || sub == "set-key" || sub == "key") && parts.len() >= 4 {
+                    if sub == "add" || sub == "wizard" || sub == "setup" || sub == "custom" {
+                        if parts.len() >= 4 {
+                            let id = parts[2];
+                            let key = parts[3..].join(" ");
+                            self.interactive_set_api_key(Some(id), Some(&key));
+                        } else if parts.len() == 3 {
+                            let id = parts[2];
+                            self.interactive_set_api_key(Some(id), None);
+                        } else {
+                            let _ = ProviderRegistry::interactive_setup_wizard();
+                        }
+                    } else if (sub == "set-key" || sub == "key") && parts.len() >= 4 {
                         let id = parts[2];
                         let key = parts[3..].join(" ");
                         self.interactive_set_api_key(Some(id), Some(&key));
-                    } else if (sub == "add" || sub == "set-key" || sub == "key") && parts.len() == 3 {
+                    } else if (sub == "set-key" || sub == "key") && parts.len() == 3 {
                         let id = parts[2];
                         self.interactive_set_api_key(Some(id), None);
+                    } else if sub == "select" && parts.len() >= 3 {
+                        let id = parts[2];
+                        self.interactive_configure_provider(id);
                     } else if parts.len() >= 3 {
                         let id = parts[1];
                         let key = parts[2..].join(" ");
@@ -1424,6 +1487,10 @@ impl InteractiveShell {
         let active_p = ProviderRegistry::active();
 
         let (target_id, passed_key) = if let Some(t) = target_opt {
+            if t == "add" || t == "wizard" {
+                let _ = ProviderRegistry::interactive_setup_wizard();
+                return;
+            }
             if ProviderRegistry::get(t).is_some() {
                 (t.to_string(), key_opt.map(|s| s.to_string()))
             } else if t.starts_with("sk-") || t.starts_with("AIza") || t.starts_with("gsk_") || t.len() > 20 {
@@ -1431,6 +1498,9 @@ impl InteractiveShell {
             } else {
                 (t.to_string(), key_opt.map(|s| s.to_string()))
             }
+        } else if active_p.id == "unconfigured" || !active_p.is_configured {
+            let _ = ProviderRegistry::interactive_setup_wizard();
+            return;
         } else {
             (active_p.id.clone(), key_opt.map(|s| s.to_string()))
         };
