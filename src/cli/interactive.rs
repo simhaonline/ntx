@@ -1,11 +1,13 @@
 //! NITYAKSHA AGENT META-HARNESS & SWARM COCKPIT (Pure Native Rust)
-//! Inspired by Ruflo / Claude-Flow agent swarm orchestration architectures.
+//! Sovereign autonomous multi-agent swarm orchestration architecture.
 //! Features multi-panel TUI cockpit, real-time ASCII/Unicode progress gauges,
 //! multi-agent swarm hierarchy topologies, method of loci memory visualizer,
 //! workflow DAG tracers, multi-model gateway switcher, and token/cost telemetry.
 
 use crate::db::MemoryEngine;
-use crate::provider::ProviderRegistry;
+use crate::provider::{GoogleOAuthEngine, ProviderRegistry};
+use rustyline::DefaultEditor;
+use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
@@ -300,6 +302,17 @@ impl InteractiveShell {
         PathBuf::from("interactive.json")
     }
 
+    pub fn history_file() -> PathBuf {
+        if let Ok(home) = std::env::var("HOME") {
+            let p = PathBuf::from(home).join(".config/nityaksha/history.txt");
+            if let Some(parent) = p.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            return p;
+        }
+        PathBuf::from(".nityaksha_history")
+    }
+
     pub fn load_config() -> InteractiveConfig {
         let path = Self::config_file();
         if path.exists() {
@@ -456,6 +469,12 @@ impl InteractiveShell {
         // Render Initial Cockpit View
         self.render_active_view();
 
+        let mut rl = DefaultEditor::new().ok();
+        let hist_path = Self::history_file();
+        if let Some(ref mut ed) = rl {
+            let _ = ed.load_history(&hist_path);
+        }
+
         loop {
             let theme = self.get_theme();
             let active_p = ProviderRegistry::active();
@@ -492,7 +511,7 @@ impl InteractiveShell {
                 )
             };
 
-            print!(
+            let prompt_prefix = format!(
                 "\n{}\n{primary}{glyph} [{view}] ❯{reset} ",
                 telemetry_bar,
                 primary = theme.primary,
@@ -500,17 +519,62 @@ impl InteractiveShell {
                 view = self.current_view.title(),
                 reset = theme.reset
             );
-            let _ = io::stdout().flush();
 
-            let mut line = String::new();
-            match io::stdin().read_line(&mut line) {
-                Ok(0) | Err(_) => break,
-                Ok(_) => {}
-            }
+            let line = if let Some(ref mut ed) = rl {
+                match ed.readline(&prompt_prefix) {
+                    Ok(l) => {
+                        let t = l.trim().to_string();
+                        if !t.is_empty() {
+                            let _ = ed.add_history_entry(&t);
+                            let _ = ed.save_history(&hist_path);
+                        }
+                        t
+                    }
+                    Err(ReadlineError::Interrupted) => {
+                        println!();
+                        continue;
+                    }
+                    Err(ReadlineError::Eof) => {
+                        println!("{}Exiting Nityaksha Concierge Platform. Goodbye!{}", theme.muted, theme.reset);
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("Line editor error: {}", e);
+                        break;
+                    }
+                }
+            } else {
+                print!("{}", prompt_prefix);
+                let _ = io::stdout().flush();
+                let mut l = String::new();
+                match io::stdin().read_line(&mut l) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => l.trim().to_string(),
+                }
+            };
 
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 continue;
+            }
+
+            // If viewing Providers cockpit, typing a number (1-37) or provider name selects and configures that provider!
+            if self.current_view == CockpitView::Providers {
+                if let Ok(idx) = trimmed.parse::<usize>() {
+                    let total_providers = ProviderRegistry::list_all().len();
+                    if idx >= 1 && idx <= total_providers {
+                        self.interactive_configure_provider(trimmed);
+                        continue;
+                    }
+                } else if trimmed.eq_ignore_ascii_case("add") || trimmed.eq_ignore_ascii_case("custom") {
+                    let _ = ProviderRegistry::interactive_setup_wizard();
+                    continue;
+                } else if let Some(p) = ProviderRegistry::get(trimmed) {
+                    if p.id != "unconfigured" {
+                        self.interactive_configure_provider(&p.id);
+                        continue;
+                    }
+                }
             }
 
             // 1. Check if user typed a quick View Switcher hotkey (1-6, ?, o, s, m, c, w, a, tab, next, prev)
@@ -550,7 +614,7 @@ impl InteractiveShell {
     }
 
     // ==============================================================================
-    // 6. COCKPIT VIEW RENDERERS (Ruflo-Grade Pure Rust TUI)
+    // 6. COCKPIT VIEW RENDERERS (Nityaksha Pure Rust TUI)
     // ==============================================================================
 
     pub fn render_active_view(&self) {
@@ -678,7 +742,7 @@ impl InteractiveShell {
             (
                 format!("  {bold}Active AI Provider :{reset} {warning}⚠️  NO AI PROVIDER CONFIGURED{reset}  (Type '/provider add' or '/key' to setup)",
                     warning = theme.warning, bold = theme.bold, reset = theme.reset),
-                format!("  {bold}Quick Configuration:{reset} {accent}/provider add{reset} (Hermes setup wizard) or {accent}/key <id> <key>{reset}",
+                format!("  {bold}Quick Configuration:{reset} {accent}/provider add{reset} (Interactive setup wizard) or {accent}/key <id> <key>{reset}",
                     accent = theme.accent, bold = theme.bold, reset = theme.reset),
                 format!("  {bold}Supported Backends :{reset} 36+ Native Providers (OpenRouter, Gemini, Kimi, GLM, Alibaba, Grok, etc.)",
                     bold = theme.bold, reset = theme.reset),
@@ -768,7 +832,7 @@ impl InteractiveShell {
 
         print_box_top(
             theme.accent,
-            Some(&format!("{bold}{accent}🐝 AUTONOMOUS MULTI-AGENT SWARM TOPOLOGY (Ruflo Meta-Harness){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            Some(&format!("{bold}{accent}🐝 AUTONOMOUS MULTI-AGENT SWARM TOPOLOGY (Nityaksha Swarm Engine){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
             inner_width,
             theme.reset,
         );
@@ -1128,7 +1192,7 @@ impl InteractiveShell {
             theme.reset,
         );
 
-        let q0 = format!("    • {accent}/provider add{reset} (or {accent}/add{reset})  - Hermes setup wizard (preconfigured or custom endpoints)", accent = theme.accent, reset = theme.reset);
+        let q0 = format!("    • {accent}/provider add{reset} (or {accent}/add{reset})  - Interactive guided setup wizard (preconfigured or custom endpoints)", accent = theme.accent, reset = theme.reset);
         let q1 = format!("    • {accent}/provider [id]{reset}          - Select provider & switch active backend", accent = theme.accent, reset = theme.reset);
         let q2 = format!("    • {accent}/key [id] [key]{reset}         - Configure API key directly & fetch live models", accent = theme.accent, reset = theme.reset);
         let q3 = format!("    • {accent}/model [name|idx]{reset}       - Query provider API for live models & switch default", accent = theme.accent, reset = theme.reset);
@@ -1358,7 +1422,7 @@ impl InteractiveShell {
                         println!("{}Invalid model index or name. Type /model to see list.{}", theme.warning, theme.reset);
                     }
                 } else {
-                    self.interactive_select_model_and_reasoning(&active_p.id);
+                    self.interactive_select_model_and_reasoning(&active_p.id, None);
                 }
             }
             "add" => {
@@ -1398,6 +1462,21 @@ impl InteractiveShell {
                 } else {
                     self.set_view(CockpitView::Providers);
                     self.render_active_view();
+                    println!("\n  {}Direct Configuration:{} Enter provider number (1-{}) or ID to configure, 'add' for custom, or Enter to continue:",
+                        theme.accent, theme.reset, ProviderRegistry::list_all().len());
+                    print!("  Select > ");
+                    let _ = io::stdout().flush();
+                    let mut pick = String::new();
+                    if io::stdin().read_line(&mut pick).is_ok() {
+                        let t = pick.trim();
+                        if !t.is_empty() {
+                            if t.eq_ignore_ascii_case("add") || t.eq_ignore_ascii_case("custom") {
+                                let _ = ProviderRegistry::interactive_setup_wizard();
+                            } else {
+                                self.interactive_configure_provider(t);
+                            }
+                        }
+                    }
                 }
             }
             "auth" | "login" | "logout" => {
@@ -1580,59 +1659,124 @@ impl InteractiveShell {
 
     pub fn interactive_configure_provider(&mut self, provider_id: &str) {
         let theme = self.get_theme();
-        if let Err(e) = ProviderRegistry::set_active(provider_id) {
-            println!("{}Error: {}{}", theme.warning, e, theme.reset);
-            return;
-        }
+        let target_provider = match ProviderRegistry::get(provider_id) {
+            Some(p) => p,
+            None => {
+                println!("{}Error: Unknown provider '{}'. Type /provider to see available options (1-{}).{}",
+                    theme.warning, provider_id, ProviderRegistry::list_all().len(), theme.reset);
+                return;
+            }
+        };
 
-        let p = ProviderRegistry::active();
         let cols = terminal_cols().clamp(80, 240);
         let inner_width = cols.saturating_sub(2);
 
         println!();
         print_box_top(
             theme.accent,
-            Some(&format!("{bold}{accent}⚙️  CONFIGURE AI PROVIDER: {}{reset} [{}]", p.name, p.id, bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            Some(&format!("{bold}{accent}⚙️  INTERACTIVE SETUP: {}{reset} [{}]", target_provider.name, target_provider.id, bold = theme.bold, accent = theme.accent, reset = theme.reset)),
             inner_width,
             theme.reset,
         );
-        let l1 = format!("  Category : {:<16} | Auth Summary: {}", p.category, p.auth_summary);
+        let l1 = format!("  Category     : {:<16} | Status: {}", target_provider.category, target_provider.auth_summary);
+        let l2 = format!("  Official URL : {}{}{}", theme.accent, ProviderRegistry::portal_url(&target_provider.id), theme.reset);
+        let l3 = format!("  Environment  : ${}", target_provider.env_var);
         print_box_line(theme.accent, &l1, inner_width, theme.reset);
+        print_box_line(theme.accent, &l2, inner_width, theme.reset);
+        print_box_line(theme.accent, &l3, inner_width, theme.reset);
+        print_box_bottom(theme.accent, inner_width, theme.reset);
 
-        if !p.is_configured && p.auth_type != "none" {
-            print_box_divider(theme.accent, None, inner_width, theme.reset);
-            let l2 = format!("  {warning}⚠️  API key is required for {}.{reset}", p.name, warning = theme.warning, reset = theme.reset);
-            let l3 = format!("  Official Console: {}{}{}", theme.accent, ProviderRegistry::portal_url(&p.id), theme.reset);
-            print_box_line(theme.accent, &l2, inner_width, theme.reset);
-            print_box_line(theme.accent, &l3, inner_width, theme.reset);
-            print_box_bottom(theme.accent, inner_width, theme.reset);
-
-            print!("Enter API key for {} (or press Enter to skip / use curated models): ", p.name);
-            let _ = io::stdout().flush();
-            let mut key_buf = String::new();
-            let _ = io::stdin().read_line(&mut key_buf);
-            let clean_k = key_buf.trim();
-            if !clean_k.is_empty() {
-                let _ = ProviderRegistry::set_key(&p.id, clean_k);
-                println!("{}✓ API key saved for {}.{}", theme.success, p.name, theme.reset);
+        // Step 1: Authentication / Credentials
+        let mut key_for_query: Option<String> = ProviderRegistry::resolve_raw_key(&target_provider);
+        if target_provider.auth_type == "none" {
+            println!("{}✓ Local zero-credential provider ({}). Ready for connection.{}", theme.success, target_provider.name, theme.reset);
+        } else if target_provider.id == "gemini" {
+            let has_creds = target_provider.is_configured;
+            if has_creds {
+                println!("{}✓ Google Gemini is currently configured with active credentials.{}", theme.success, theme.reset);
+                print!("Update API key or OAuth session? [y/N]: ");
+                let _ = io::stdout().flush();
+                let mut ans = String::new();
+                let _ = io::stdin().read_line(&mut ans);
+                if ans.trim().eq_ignore_ascii_case("y") {
+                    let _ = ProviderRegistry::login_provider(Some("gemini"), None);
+                    key_for_query = ProviderRegistry::resolve_raw_key(&target_provider);
+                }
+            } else {
+                println!("\n{}🔑 STEP 1/4: Authentication for Google Gemini{}", theme.bold, theme.reset);
+                println!("  [1] Gemini API Key (Recommended: instant, all Gemini 2.0/2.5 models)");
+                println!("      Get key at: https://aistudio.google.com/app/apikey");
+                println!("  [2] Google OAuth 2.0 PKCE (Browser login)");
+                print!("Select option [1-2 | Enter for API Key]: ");
+                let _ = io::stdout().flush();
+                let mut opt = String::new();
+                let _ = io::stdin().read_line(&mut opt);
+                if opt.trim() == "2" {
+                    let _ = GoogleOAuthEngine::interactive_login(None, None);
+                } else {
+                    print!("Enter Gemini API Key (AIza...): ");
+                    let _ = io::stdout().flush();
+                    let mut k = String::new();
+                    let _ = io::stdin().read_line(&mut k);
+                    let clean = k.trim();
+                    if !clean.is_empty() {
+                        let _ = ProviderRegistry::set_key("gemini", clean);
+                        key_for_query = Some(clean.to_string());
+                    }
+                }
             }
         } else {
-            print_box_bottom(theme.accent, inner_width, theme.reset);
+            if target_provider.is_configured {
+                println!("{}✓ {} currently has active credentials configured.{}", theme.success, target_provider.name, theme.reset);
+                print!("Update API key? [y/N]: ");
+                let _ = io::stdout().flush();
+                let mut ans = String::new();
+                let _ = io::stdin().read_line(&mut ans);
+                if ans.trim().eq_ignore_ascii_case("y") {
+                    print!("Enter new API Key for {}: ", target_provider.name);
+                    let _ = io::stdout().flush();
+                    let mut k = String::new();
+                    let _ = io::stdin().read_line(&mut k);
+                    let clean = k.trim();
+                    if !clean.is_empty() {
+                        let _ = ProviderRegistry::set_key(&target_provider.id, clean);
+                        key_for_query = Some(clean.to_string());
+                    }
+                }
+            } else {
+                println!("\n{}🔑 STEP 1/4: API Key Required for {}{}", theme.bold, target_provider.name, theme.reset);
+                println!("  Get your API key at: {}{}{}", theme.accent, ProviderRegistry::portal_url(&target_provider.id), theme.reset);
+                print!("Enter API Key for {}: ", target_provider.name);
+                let _ = io::stdout().flush();
+                let mut k = String::new();
+                let _ = io::stdin().read_line(&mut k);
+                let clean = k.trim();
+                if clean.is_empty() {
+                    println!("{}No API key entered. Setup aborted.{}", theme.warning, theme.reset);
+                    return;
+                }
+                let _ = ProviderRegistry::set_key(&target_provider.id, clean);
+                key_for_query = Some(clean.to_string());
+            }
         }
 
-        self.interactive_select_model_and_reasoning(&p.id);
+        // Set as active provider
+        let _ = ProviderRegistry::set_active(&target_provider.id);
+
+        // Step 2, 3, 4: Select Model & Reasoning Effort
+        self.interactive_select_model_and_reasoning(&target_provider.id, key_for_query.as_deref());
     }
 
-    fn interactive_select_model_and_reasoning(&self, provider_id: &str) {
+    fn interactive_select_model_and_reasoning(&self, provider_id: &str, key_override: Option<&str>) {
         let theme = self.get_theme();
-        let active = ProviderRegistry::active();
+        let active = ProviderRegistry::get(provider_id).unwrap_or_else(|| ProviderRegistry::active());
         let cols = terminal_cols().clamp(80, 240);
         let inner_width = cols.saturating_sub(2);
 
-        println!("\n{}🔄 Querying latest live AI models from {} API...{}", theme.dim, active.name, theme.reset);
-        let models = match ProviderRegistry::fetch_remote_models_with_key(provider_id, None, None) {
+        println!("\n{}🔄 STEP 2/4: Querying live AI models from {} API...{}", theme.dim, active.name, theme.reset);
+        let models = match ProviderRegistry::fetch_remote_models_with_key(provider_id, key_override, None) {
             Ok(m) if !m.is_empty() => {
-                println!("{}✓ Retrieved {} live models from {} API.{}", theme.success, m.len(), active.name, theme.reset);
+                println!("{}✓ Successfully connected! Retrieved {} live models from {} API.{}", theme.success, m.len(), active.name, theme.reset);
                 m
             }
             _ => active.available_models.clone(),
@@ -1646,7 +1790,7 @@ impl InteractiveShell {
             theme.reset,
         );
 
-        for (i, m) in models.iter().enumerate() {
+        for (i, m) in models.iter().take(8).enumerate() {
             let is_active = m == &active.default_model;
             let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
             let ctx = active.context_window_for_model(m);
@@ -1661,7 +1805,7 @@ impl InteractiveShell {
         }
         print_box_bottom(theme.accent, inner_width, theme.reset);
 
-        print!("Select model [1-{} or model name | Enter for '{}']: ", models.len(), active.default_model);
+        print!("Select model [1-{} or model name | Enter for '{}']: ", models.len().min(8), active.default_model);
         let _ = io::stdout().flush();
         let mut model_choice = String::new();
         let _ = io::stdin().read_line(&mut model_choice);
@@ -1677,9 +1821,9 @@ impl InteractiveShell {
 
         // Configure Reasoning Effort
         let current_effort = ProviderRegistry::get_reasoning_effort();
-        println!("\n{}Reasoning & Thinking Effort Options:{}", theme.bold, theme.reset);
+        println!("\n{}🧠 STEP 3/4: Configure Reasoning & Thinking Effort{}", theme.bold, theme.reset);
         println!("  [1] low    - Fast thinking (2,048 tokens budget) | Minimal latency");
-        println!("  [2] medium - Balanced reasoning (4,096 tokens budget) | Default");
+        println!("  [2] medium - Balanced reasoning (4,096 tokens budget) | Recommended");
         println!("  [3] high   - Deep step-by-step thinking (8,192 tokens budget) | High precision");
         println!("  [4] max    - Exhaustive architectural reasoning (16,384 tokens budget)");
         println!("  [5] off    - Standard output (0 reasoning tokens) | Instant response");
@@ -1692,12 +1836,26 @@ impl InteractiveShell {
             let _ = ProviderRegistry::set_reasoning_effort(trimmed_eff);
         }
 
-        let final_active = ProviderRegistry::active();
+        let final_active = ProviderRegistry::get(provider_id).unwrap_or_else(|| ProviderRegistry::active());
         let final_ctx = final_active.context_window_for_model(&final_active.default_model);
         let final_eff = ProviderRegistry::get_reasoning_effort().to_uppercase();
-        println!("\n{}✓ Configured: {} | Model: {} (max window: {}) | Reasoning: {}{}",
-            theme.success, final_active.name, final_active.default_model,
-            format_tokens_short(final_ctx), final_eff, theme.reset);
+
+        println!();
+        print_box_top(
+            theme.success,
+            Some(&format!("{bold}{success}✅ STEP 4/4: CONFIGURATION COMPLETE{reset}", bold = theme.bold, success = theme.success, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+        let c1 = format!("  Active Provider  : {bold}{}{reset} [{}]", final_active.name, final_active.id, bold = theme.bold, reset = theme.reset);
+        let c2 = format!("  Default AI Model : {bold}{}{reset} (Max Context: {})", final_active.default_model, format_tokens_short(final_ctx), bold = theme.bold, reset = theme.reset);
+        let c3 = format!("  Reasoning Level  : {bold}{}{reset}", final_eff, bold = theme.bold, reset = theme.reset);
+        let c4 = format!("  Operating Status : {success}ACTIVE & READY FOR AUTONOMOUS EXECUTION{reset}", success = theme.success, reset = theme.reset);
+        print_box_line(theme.success, &c1, inner_width, theme.reset);
+        print_box_line(theme.success, &c2, inner_width, theme.reset);
+        print_box_line(theme.success, &c3, inner_width, theme.reset);
+        print_box_line(theme.success, &c4, inner_width, theme.reset);
+        print_box_bottom(theme.success, inner_width, theme.reset);
     }
 
     pub fn run_doctor(&self) {
@@ -1768,18 +1926,25 @@ impl InteractiveShell {
     }
 
     // ==============================================================================
-    // 9. PROMPT EXECUTION & TURN TELEMETRY CARD (Ruflo Streaming Style)
+    // 9. PROMPT EXECUTION & TURN TELEMETRY CARD (Nityaksha Native Turn Stream)
     // ==============================================================================
 
     fn execute_user_prompt(&mut self, prompt: &str, turn: usize) {
         let theme = self.get_theme();
         let active_p = ProviderRegistry::active();
+        if active_p.id == "unconfigured" || (!active_p.is_configured && active_p.auth_type != "none") {
+            println!("\n{}⚠️  NO AI PROVIDER CONFIGURED{}", theme.warning, theme.reset);
+            println!("Nityaksha requires at least one configured AI provider to execute queries.");
+            println!("Launching Interactive Provider Setup Wizard...\n");
+            let _ = ProviderRegistry::interactive_setup_wizard();
+            return;
+        }
         let effort = ProviderRegistry::get_reasoning_effort();
 
         let cols = terminal_cols().clamp(80, 240);
         let inner_width = cols.saturating_sub(2);
 
-        // Ruflo Turn Execution Card Box
+        // Nityaksha Turn Execution Card Box
         println!();
         print_box_top(
             theme.accent,
@@ -1837,7 +2002,7 @@ impl InteractiveShell {
                 // Print AI Response Markdown
                 println!("{}\n", result.text);
 
-                // Print Ruflo Turn Telemetry Card Box
+                // Print Nityaksha Turn Telemetry Card Box
                 let gauge_w = (cols.saturating_sub(44)).clamp(16, 40);
                 let ctx_gauge = render_progress_bar(ctx_pct, gauge_w, theme.accent, theme.dim, theme.reset);
                 let turn_cost = estimate_cost_usd(&result.provider, &result.model, result.input_tokens, result.output_tokens);

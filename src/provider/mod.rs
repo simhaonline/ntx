@@ -183,7 +183,7 @@ impl ProviderRegistry {
         Ok(())
     }
 
-    /// All 21+ preconfigured providers modeled for enterprise agents and Hermes parity
+    /// All 37+ preconfigured providers modeled for enterprise agents and sovereign workloads
     pub fn list_all() -> Vec<ProviderDefinition> {
         let config = Self::load_config();
         let google_creds = GoogleOAuthEngine::load_credentials();
@@ -219,7 +219,7 @@ impl ProviderRegistry {
             },
             ProviderDefinition {
                 id: "nous".to_string(),
-                name: "Nous Portal (Hermes Agent)".to_string(),
+                name: "Nous Portal".to_string(),
                 category: "Agent Native".to_string(),
                 base_url: "https://api.nousresearch.com/v1".to_string(),
                 default_model: "hermes-3-llama-3.1-405b".to_string(),
@@ -232,7 +232,7 @@ impl ProviderRegistry {
                 api_format: "openai".to_string(),
                 auth_type: "api_key".to_string(),
                 env_var: "NOUS_API_KEY".to_string(),
-                description: "Native Hermes Agent subscription gateway with integrated web search, code interpreter, and reasoning tools.".to_string(),
+                description: "Nous Portal enterprise inference gateway with integrated web search, code interpreter, and reasoning tools.".to_string(),
                 is_configured: false,
                 is_active: false,
                 auth_summary: String::new(),
@@ -1163,9 +1163,41 @@ impl ProviderRegistry {
         enriched
     }
 
-    /// Retrieve single provider by id
+    /// Retrieve single provider by id, 1-based index, or alias
     pub fn get(id: &str) -> Option<ProviderDefinition> {
-        Self::list_all().into_iter().find(|p| p.id.eq_ignore_ascii_case(id))
+        let all = Self::list_all();
+        let trimmed = id.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        // 1. Direct 1-based index from numbered provider listings (e.g. "1" -> gemini)
+        if let Ok(idx) = trimmed.parse::<usize>() {
+            if idx >= 1 && idx <= all.len() {
+                return Some(all[idx - 1].clone());
+            }
+        }
+
+        // 2. Exact ID match (case-insensitive)
+        if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(trimmed)) {
+            return Some(p.clone());
+        }
+
+        // 3. Normalized alias match
+        if let Some(norm) = Self::normalize_id(trimmed) {
+            if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(norm)) {
+                return Some(p.clone());
+            }
+        }
+
+        // 4. Exact or case-insensitive match on name or env_var
+        if let Some(p) = all.iter().find(|p| p.name.eq_ignore_ascii_case(trimmed) || p.env_var.eq_ignore_ascii_case(trimmed)) {
+            return Some(p.clone());
+        }
+
+        // 5. Substring match on id or name
+        let lower = trimmed.to_lowercase();
+        all.into_iter().find(|p| p.id.to_lowercase().contains(&lower) || p.name.to_lowercase().contains(&lower))
     }
 
     pub fn unconfigured_sentinel() -> ProviderDefinition {
@@ -2204,18 +2236,18 @@ impl ProviderRegistry {
         }
 
         println!("\n  Authentication Shortcuts:");
-        println!("    ntx provider add               - Hermes-style interactive setup wizard (preconfigured or custom)");
+        println!("    ntx provider add               - Interactive guided setup wizard (preconfigured or custom)");
         println!("    ntx provider add <id> <key>    - Add API key, activate provider, and query live models");
         println!("    ntx auth login [provider]      - Authenticate specific provider (gemini, claude, openai, etc.)");
         println!("    ntx auth logout [provider]     - Revoke credentials or clear API keys");
         println!("    ntx provider list              - View all 36+ available models and endpoints");
     }
 
-    /// Hermes-style interactive provider setup wizard
+    /// Interactive provider setup wizard
     pub fn interactive_setup_wizard() -> Result<String, String> {
         let all = Self::list_all();
         println!("\n┌────────────────────────────────────────────────────────────────────────┐");
-        println!("│ 🚀 HERMES-GRADE AI PROVIDER SETUP WIZARD                               │");
+        println!("│ 🚀 NITYAKSHA AI PROVIDER ONBOARDING & SETUP WIZARD                     │");
         println!("├────────────────────────────────────────────────────────────────────────┤");
         println!("│ Connect any commercial, inference cloud, local, or custom LLM endpoint.│");
         println!("│                                                                        │");
@@ -2425,7 +2457,7 @@ impl ProviderRegistry {
 
         // 1. Resolve target provider
         let target_id = if let Some(arg) = provider_arg {
-            Self::normalize_id(arg).unwrap_or(arg).to_string()
+            Self::get(arg).map(|p| p.id).unwrap_or_else(|| Self::normalize_id(arg).unwrap_or(arg).to_string())
         } else {
             // Interactive Selection
             println!("\n┌────────────────────────────────────────────────────────────────────────┐");
@@ -2662,7 +2694,7 @@ impl ProviderRegistry {
         println!("\n✓ Successfully authenticated and activated {} ({})!", provider.name, provider.default_model);
         println!("  Credentials stored securely in {}", Self::config_path().display());
 
-        // Hermes live model discovery
+        // Live model discovery from provider endpoint
         println!("🔄 Querying latest live AI models from {} API...", provider.name);
         match Self::fetch_remote_models_with_key(&provider.id, Some(&api_key), None) {
             Ok(models) if !models.is_empty() => {

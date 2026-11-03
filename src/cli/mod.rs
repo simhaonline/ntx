@@ -1849,7 +1849,7 @@ complete -F _ntx_completions ntx"#);
                 println!("Active Provider: \x1b[33m⚠️ NOT CONFIGURED (Run 'ntx provider add' to connect an AI provider)\x1b[0m");
             }
             println!("Commands & Setup:");
-            println!("  ntx provider add                - Launch Hermes-grade interactive setup wizard");
+            println!("  ntx provider add                - Launch interactive guided setup wizard");
             println!("  ntx provider add <id> <key>     - Add API key, activate provider, and query live models");
             println!("  ntx provider add custom <id> <url> <format> <key> <model> - Register custom endpoint");
             println!("  ntx provider select <id>        - Switch active default provider");
@@ -1908,6 +1908,10 @@ complete -F _ntx_completions ntx"#);
                     }
                     return;
                 }
+                if args.len() == 2 {
+                    let _ = ProviderRegistry::login_provider(Some(&args[1]), None);
+                    return;
+                }
                 let _ = ProviderRegistry::interactive_setup_wizard();
             }
             "set-key" | "key" => {
@@ -1957,16 +1961,23 @@ complete -F _ntx_completions ntx"#);
             }
             "select" | "use" | "set-active" => {
                 if args.len() < 2 {
-                    eprintln!("Usage: ntx provider select <id>");
+                    eprintln!("Usage: ntx provider select <id|index>");
                     return;
                 }
                 let id = &args[1];
-                match ProviderRegistry::set_active(id) {
-                    Ok(()) => {
-                        let active = ProviderRegistry::active();
-                        println!("[SUCCESS] Active provider switched to: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
+                if let Some(p) = ProviderRegistry::get(id) {
+                    if !p.is_configured && p.auth_type != "none" {
+                        println!("\x1b[33m[NOTICE] Provider '{}' is unconfigured ($" , p.name);
+                        println!("Run 'ntx provider add {} <api_key>' to configure credentials.\x1b[0m", p.id);
                     }
-                    Err(e) => eprintln!("[ERROR] Failed to switch provider: {}", e),
+                    match ProviderRegistry::set_active(&p.id) {
+                        Ok(()) => {
+                            println!("[SUCCESS] Active provider switched to: \x1b[32m{} ({})\x1b[0m", p.name, p.default_model);
+                        }
+                        Err(e) => eprintln!("[ERROR] Failed to switch provider: {}", e),
+                    }
+                } else {
+                    eprintln!("[ERROR] Unknown provider '{}'. Run 'ntx provider list' for available options (1-37).", id);
                 }
             }
             "set-url" => {
@@ -2239,13 +2250,13 @@ complete -F _ntx_completions ntx"#);
         println!("  -v, --version                   Output version and runtime details");
         println!("  -h, --help                      Display this help screen\n");
         println!("Commands:");
-        println!("  tui | cockpit [VIEW]            Launch Ruflo-grade full-screen interactive TUI cockpit");
+        println!("  tui | cockpit [VIEW]            Launch full-screen interactive TUI cockpit");
         println!("  swarm                           Open Autonomous Multi-Agent Swarm cockpit directly");
         println!("  repl                            Start interactive pure Rust REPL shell with cockpit tabs");
         println!();
         println!("AI Provider & API Key Management:");
         println!("  provider [list]                 List all 36+ native & custom providers (OpenRouter, Gemini, Kimi, GLM, Alibaba...)");
-        println!("  provider add                    Launch Hermes-grade interactive setup wizard (preconfigured or custom)");
+        println!("  provider add                    Launch interactive guided setup wizard (preconfigured or custom)");
         println!("  provider add <ID> <KEY>         Add / configure API key, activate provider, and query models");
         println!("  provider add custom <ID> <URL> <FMT> <KEY> <MODEL> Register custom OpenAI or Anthropic endpoint");
         println!("  provider set-key <ID> <KEY>     Set or update API key for any AI provider");
