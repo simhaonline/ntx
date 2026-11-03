@@ -1783,7 +1783,7 @@ complete -F _ntx_completions ntx"#);
             let active = ProviderRegistry::active();
 
             println!("=================================================================================================================");
-            println!("              NITYAKSHA AI PROVIDER GATEWAY (21 Preconfigured Commercial, Local & Cloud Providers)              ");
+            println!("              NITYAKSHA AI PROVIDER GATEWAY (22 Preconfigured Commercial, Local & Cloud Providers)              ");
             println!("=================================================================================================================");
             println!("  ID             STATUS       CATEGORY          DEFAULT MODEL                  AUTH METHOD");
             println!("-----------------------------------------------------------------------------------------------------------------");

@@ -28,7 +28,7 @@ pub struct CliPalette {
 pub const THEMES: &[CliPalette] = &[
     CliPalette {
         id: "rust",
-        name: "🦀 Rust Orange & Deep Navy (Official Nityaksha Brand)",
+        name: "◈ Nityaksha Orbit (Rust Orange & Deep Navy)",
         primary: "\x1b[38;2;192;90;40m",
         accent: "\x1b[38;2;14;165;233m",
         success: "\x1b[38;2;16;185;129m",
@@ -37,7 +37,7 @@ pub const THEMES: &[CliPalette] = &[
         dim: "\x1b[90m",
         bold: "\x1b[1m",
         reset: "\x1b[0m",
-        prompt_glyph: "🦀 ntx ❯",
+        prompt_glyph: "◈ ntx ❯",
     },
     CliPalette {
         id: "cyan",
@@ -54,7 +54,7 @@ pub const THEMES: &[CliPalette] = &[
     },
     CliPalette {
         id: "emerald",
-        name: "🟢 Matrix Emerald (Monochrome Terminal Classic)",
+        name: "🟢 Terminal Emerald (Monochrome Console Classic)",
         primary: "\x1b[92m",
         accent: "\x1b[32m",
         success: "\x1b[92m",
@@ -291,6 +291,7 @@ impl InteractiveShell {
             let git_info = self.git_branch.as_deref().unwrap_or("none");
             let active_p = ProviderRegistry::active();
             let ctx_limit = active_p.context_window_for_model(&active_p.default_model);
+            let reasoning_effort = ProviderRegistry::get_reasoning_effort();
 
             let history_tokens: usize = self.conversation_history
                 .iter()
@@ -302,14 +303,15 @@ impl InteractiveShell {
                 0.0
             };
 
-            // Status Line Prompt with live model, context percentage, and token counter
+            // Status Line Prompt with live model, reasoning effort, context percentage, and token counter
             print!(
-                "\n{dim}[dir: {dir} | git: {git} | {trusted}] [{model} | ctx: {pct:.2}% of {ctx_win} | tokens: {tok}]{reset}\n{primary}{glyph}{reset} ",
+                "\n{dim}[dir: {dir} | git: {git} | {trusted}] [{model} | effort: {effort} | ctx: {pct:.2}% of {ctx_win} | tokens: {tok}]{reset}\n{primary}{glyph}{reset} ",
                 dim = theme.dim,
-                dir = clean_path(&self.current_dir, 32),
+                dir = clean_path(&self.current_dir, 28),
                 git = git_info,
                 trusted = trusted_label,
                 model = active_p.default_model,
+                effort = reasoning_effort,
                 pct = ctx_pct,
                 ctx_win = format_tokens_short(ctx_limit),
                 tok = format_num_commas(self.session_total_tokens),
@@ -367,18 +369,27 @@ impl InteractiveShell {
             format!("{}READ-ONLY (Untrusted){}", theme.warning, theme.reset)
         };
         let ctx_limit = active_p.context_window_for_model(&active_p.default_model);
+        let reasoning_eff = ProviderRegistry::get_reasoning_effort().to_uppercase();
+        let reasoning_color = match reasoning_eff.as_str() {
+            "HIGH" | "MAX" => theme.accent,
+            "MEDIUM" => theme.primary,
+            "LOW" => theme.dim,
+            _ => theme.muted,
+        };
 
         println!("\n{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {primary}NITYAKSHA — An AI Concierge Platform (v1.0.0 Pure Rust Native){reset}", primary = theme.primary, reset = theme.reset);
+        println!("  {primary}◈ NITYAKSHA — AI Concierge & Swarm Orchestration Engine (v1.0.0 Pure Rust){reset}", primary = theme.primary, reset = theme.reset);
         println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
         println!("  Session ID  : {accent}{}{reset}", sid, accent = theme.accent, reset = theme.reset);
         println!("  Workspace   : {}{}{} ({})", theme.bold, self.current_dir, theme.reset, trusted_str);
         if let Some(ref branch) = self.git_branch {
             println!("  Git Branch  : {accent}{}{reset}", branch, accent = theme.accent, reset = theme.reset);
         }
-        println!("  AI Provider : {primary}{}{reset} (model: {bold}{}{reset} | context window: {accent}{} tokens / {}{reset})",
-            active_p.name, active_p.default_model, format_num_commas(ctx_limit), format_tokens_short(ctx_limit),
-            primary = theme.primary, bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        println!("  AI Provider : {primary}{}{reset} [{}]", active_p.name, active_p.category, primary = theme.primary, reset = theme.reset);
+        println!("  Active Model: {bold}{}{reset} (max window: {accent}{} tokens / {}{reset})",
+            active_p.default_model, format_num_commas(ctx_limit), format_tokens_short(ctx_limit),
+            bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        println!("  Reasoning   : {color}{}{reset} (use '/effort' to switch)", reasoning_eff, color = reasoning_color, reset = theme.reset);
         println!("  Auth State  : {}", active_p.auth_summary);
         if let Some(ref bot) = self.config.active_bot {
             println!("  Active Bot  : {accent}{}{reset}", bot, accent = theme.accent, reset = theme.reset);
@@ -386,7 +397,7 @@ impl InteractiveShell {
         println!("  Theme       : {}", theme.name);
         println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
         println!("  {}Type your prompt to chat, or execute guided commands:{}", theme.dim, theme.reset);
-        println!("  {a}/help{r}  •  {a}/provider{r}  •  {a}/auth{r}  •  {a}/model{r}  •  {a}/tokens{r}  •  {a}/theme{r}  •  {a}/bot{r}  •  {a}/workflow{r}  •  {a}/doctor{r}  •  {a}/exit{r}", a = theme.accent, r = theme.reset);
+        println!("  {a}/help{r} • {a}/provider{r} • {a}/model{r} • {a}/effort{r} • {a}/tokens{r} • {a}/swarm{r} • {a}/auth{r} • {a}/bot{r} • {a}/workflow{r} • {a}/exit{r}", a = theme.accent, r = theme.reset);
         println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
     }
 
@@ -401,7 +412,9 @@ impl InteractiveShell {
             "provider" | "providers" |
             "auth" | "login" | "logout" |
             "model" | "models" |
+            "effort" | "reasoning" | "thinking" |
             "tokens" | "token" | "context" |
+            "swarm" | "swarms" | "topology" |
             "theme" | "themes" |
             "trust" |
             "bot" | "bots" | "persona" |
@@ -433,10 +446,12 @@ impl InteractiveShell {
                 println!("  {accent}💡 NITYAKSHA INTERACTIVE GUIDED COMMANDS REFERENCE{reset}", accent = theme.accent, reset = theme.reset);
                 println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
                 println!("  {accent}/help{reset}                   - Show this comprehensive reference guide", accent = theme.accent, reset = theme.reset);
-                println!("  {accent}/provider [id]{reset}          - Switch AI provider (21 backends: Gemini, Claude, OpenAI...)", accent = theme.accent, reset = theme.reset);
-                println!("  {accent}/auth [login|logout]{reset}    - Authenticate via Google OAuth or API keys", accent = theme.accent, reset = theme.reset);
-                println!("  {accent}/model [name|idx]{reset}       - Inspect or switch active model & context window", accent = theme.accent, reset = theme.reset);
+                println!("  {accent}/provider [id]{reset}          - Select AI provider (22 backends: Gemini, Claude, Ollama Cloud...)", accent = theme.accent, reset = theme.reset);
+                println!("  {accent}/model [name|idx]{reset}       - Fetch and switch active model & context window", accent = theme.accent, reset = theme.reset);
+                println!("  {accent}/effort [level]{reset}         - Set reasoning / thinking effort (low, medium, high, max, off)", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/tokens{reset} or {accent}/context{reset}    - Display token telemetry and context window utilization", accent = theme.accent, reset = theme.reset);
+                println!("  {accent}/swarm{reset} or {accent}/topology{reset}   - Inspect autonomous multi-agent swarm hierarchy", accent = theme.accent, reset = theme.reset);
+                println!("  {accent}/auth [login|logout]{reset}    - Authenticate via Google OAuth or provider API keys", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/theme{reset}                  - Select CLI color palette (Rust, Cyan, Emerald, Neon)", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/trust{reset}                  - View or toggle workspace directory trust authorization", accent = theme.accent, reset = theme.reset);
                 println!("  {accent}/bot [id]{reset}               - Switch autonomous bot persona (coding, architect...)", accent = theme.accent, reset = theme.reset);
@@ -448,6 +463,59 @@ impl InteractiveShell {
                 println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
                 println!("  {}Tip: Commands work with or without the leading '/' (e.g. 'help' or '/help').{}", theme.dim, theme.reset);
                 println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+            }
+            "swarm" | "swarms" | "topology" => {
+                let cols = terminal_cols().clamp(72, 160);
+                let border = "═".repeat(cols);
+
+                println!("\n{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+                println!("  {accent}◈ NITYAKSHA AUTONOMOUS MULTI-AGENT SWARM TOPOLOGY{reset}", accent = theme.accent, reset = theme.reset);
+                println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+                println!("  ╭─────────────────────────────────────────────────────────────────────────────╮");
+                println!("  │ [👑 Queen Coordinator]  - Intent Router, AST Pruner & Synthesis Gate        │");
+                println!("  │   ├── [⚙️  Code Engineer]  - AST Pruner, Cargo Runner, Test Synthesizer     │");
+                println!("  │   ├── [🏛️  Architect]      - Relational WAL, Memory Engine & Schema Graph   │");
+                println!("  │   ├── [🛡️  RedTeam Shield] - IBAC Isolation, Prompt Delimiter Jail & SRE    │");
+                println!("  │   └── [📊 Quant Specialist]- Indicator Pipeline, Pine QA & CVD Stream Engine│");
+                println!("  ╰─────────────────────────────────────────────────────────────────────────────╯");
+                println!("  Active Personas: 5 Autonomous Bots ready in Relational Store");
+                println!("  Commands       : '/bot <id>' to switch persona, '/workflow' to run DAG workflows");
+                println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+            }
+            "effort" | "reasoning" | "thinking" => {
+                if parts.len() > 1 {
+                    let level = parts[1];
+                    match ProviderRegistry::set_reasoning_effort(level) {
+                        Ok(()) => {
+                            let updated = ProviderRegistry::get_reasoning_effort().to_uppercase();
+                            println!("{}✓ Reasoning effort switched to: {}{}", theme.success, updated, theme.reset);
+                        }
+                        Err(e) => eprintln!("{}Error: {}{}", theme.warning, e, theme.reset),
+                    }
+                } else {
+                    let current = ProviderRegistry::get_reasoning_effort();
+                    println!("\n{}Reasoning & Thinking Effort Configuration:{}", theme.bold, theme.reset);
+                    println!("  Current Level: {bold}{}{reset}", current.to_uppercase(), bold = theme.bold, reset = theme.reset);
+                    println!("  [1] low    - Fast thinking (2,048 tokens budget) | Minimal latency");
+                    println!("  [2] medium - Balanced reasoning (4,096 tokens budget) | Default");
+                    println!("  [3] high   - Deep step-by-step thinking (8,192 tokens budget) | High precision");
+                    println!("  [4] max    - Exhaustive architectural reasoning (16,384 tokens budget)");
+                    println!("  [5] off    - Standard output (0 reasoning tokens) | Instant response");
+                    print!("\nSelect reasoning level [1-5 or level name | Enter to keep]: ");
+                    let _ = io::stdout().flush();
+                    let mut choice = String::new();
+                    let _ = io::stdin().read_line(&mut choice);
+                    let trimmed = choice.trim();
+                    if !trimmed.is_empty() {
+                        match ProviderRegistry::set_reasoning_effort(trimmed) {
+                            Ok(()) => {
+                                let updated = ProviderRegistry::get_reasoning_effort().to_uppercase();
+                                println!("{}✓ Reasoning effort set to: {}{}", theme.success, updated, theme.reset);
+                            }
+                            Err(e) => eprintln!("{}Error: {}{}", theme.warning, e, theme.reset),
+                        }
+                    }
+                }
             }
             "model" | "models" => {
                 let active_p = ProviderRegistry::active();
@@ -478,24 +546,32 @@ impl InteractiveShell {
                         println!("{}Invalid model index or name. Type /model to see list.{}", theme.warning, theme.reset);
                     }
                 } else {
+                    println!("\n{}Fetching available AI models from {} API...{}", theme.dim, active_p.name, theme.reset);
+                    let models = ProviderRegistry::fetch_remote_models(&active_p.id);
+
                     println!("\n{}Available AI Models for {} (Active Provider):{}", theme.bold, active_p.name, theme.reset);
                     println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
-                    for (i, m) in active_p.available_models.iter().enumerate() {
+                    for (i, m) in models.iter().enumerate() {
                         let is_active = m == &active_p.default_model;
                         let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
                         let ctx = active_p.context_window_for_model(m);
-                        println!("  [{}] {} {:<32} - Max Context: {:>10} tokens ({})",
-                            i + 1, mark, m, format_num_commas(ctx), format_tokens_short(ctx));
+                        let reasoning_tag = if active_p.is_reasoning_capable(m) {
+                            format!(" {}[Reasoning Capable]{}", theme.accent, theme.reset)
+                        } else {
+                            "".to_string()
+                        };
+                        println!("  [{:2}] {} {:<32} - Max Context: {:>10} tokens ({}){}",
+                            i + 1, mark, m, format_num_commas(ctx), format_tokens_short(ctx), reasoning_tag);
                     }
                     println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
-                    print!("Enter model index [1-{}] or model name [Enter to cancel]: ", active_p.available_models.len());
+                    print!("Enter model index [1-{}] or model name [Enter to cancel]: ", models.len());
                     let _ = io::stdout().flush();
                     let mut choice = String::new();
                     let _ = io::stdin().read_line(&mut choice);
                     let trimmed = choice.trim();
                     if let Ok(idx) = trimmed.parse::<usize>() {
-                        if idx >= 1 && idx <= active_p.available_models.len() {
-                            let chosen = &active_p.available_models[idx - 1];
+                        if idx >= 1 && idx <= models.len() {
+                            let chosen = &models[idx - 1];
                             let _ = ProviderRegistry::set_model(&active_p.id, chosen);
                             let ctx = active_p.context_window_for_model(chosen);
                             println!("{}✓ Switched model for {} to: {} (context limit: {} tokens / {}){}",
@@ -517,8 +593,7 @@ impl InteractiveShell {
                     let id = parts[1];
                     match ProviderRegistry::set_active(id) {
                         Ok(()) => {
-                            let active = ProviderRegistry::active();
-                            println!("{}✓ Switched active provider to: {} ({}){}", theme.success, active.name, active.default_model, theme.reset);
+                            self.interactive_select_model_and_reasoning(id);
                         }
                         Err(e) => eprintln!("{}Error: {}{}", theme.warning, e, theme.reset),
                     }
@@ -528,8 +603,8 @@ impl InteractiveShell {
                     for (i, p) in providers.iter().enumerate() {
                         let active_mark = if p.is_active { "*" } else { " " };
                         let ctx = p.context_window_for_model(&p.default_model);
-                        println!("  [{:2}] {}{:<12} - {:<26} (model: {:<24} | ctx: {})",
-                            i + 1, active_mark, p.id, p.name, p.default_model, format_tokens_short(ctx));
+                        println!("  [{:2}] {}{:<14} - {:<26} [{:<18}] (default: {} | ctx: {})",
+                            i + 1, active_mark, p.id, p.name, p.category, p.default_model, format_tokens_short(ctx));
                     }
                     print!("\nEnter provider ID or number to activate [Enter to cancel]: ");
                     let _ = io::stdout().flush();
@@ -538,15 +613,14 @@ impl InteractiveShell {
                     let trimmed = choice.trim();
                     if let Ok(idx) = trimmed.parse::<usize>() {
                         if idx >= 1 && idx <= providers.len() {
-                            let _ = ProviderRegistry::set_active(&providers[idx - 1].id);
-                            let active = ProviderRegistry::active();
-                            println!("{}✓ Switched active provider to: {} ({}){}", theme.success, active.name, active.default_model, theme.reset);
+                            let target_id = &providers[idx - 1].id;
+                            let _ = ProviderRegistry::set_active(target_id);
+                            self.interactive_select_model_and_reasoning(target_id);
                             return;
                         }
                     } else if !trimmed.is_empty() {
                         let _ = ProviderRegistry::set_active(trimmed);
-                        let active = ProviderRegistry::active();
-                        println!("{}✓ Switched active provider to: {} ({}){}", theme.success, active.name, active.default_model, theme.reset);
+                        self.interactive_select_model_and_reasoning(trimmed);
                     }
                 }
             }
@@ -646,6 +720,71 @@ impl InteractiveShell {
         }
     }
 
+    /// Interactive helper to let user select an AI model from the provider, followed by reasoning level
+    fn interactive_select_model_and_reasoning(&self, provider_id: &str) {
+        let theme = self.get_theme();
+        let active = ProviderRegistry::active();
+        let cols = terminal_cols().clamp(72, 160);
+        let thin_border = "─".repeat(cols);
+
+        println!("\n{}Fetching live models from {} API...{}", theme.dim, active.name, theme.reset);
+        let models = ProviderRegistry::fetch_remote_models(provider_id);
+
+        println!("\n{}Select AI Model for {}:{}", theme.bold, active.name, theme.reset);
+        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        for (i, m) in models.iter().enumerate() {
+            let is_active = m == &active.default_model;
+            let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
+            let ctx = active.context_window_for_model(m);
+            let reasoning_tag = if active.is_reasoning_capable(m) {
+                format!(" {}[Reasoning Capable]{}", theme.accent, theme.reset)
+            } else {
+                "".to_string()
+            };
+            println!("  [{:2}] {} {:<32} - Max Context: {:>10} tokens ({}){}",
+                i + 1, mark, m, format_num_commas(ctx), format_tokens_short(ctx), reasoning_tag);
+        }
+        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+
+        print!("Select model [1-{} or model name | Enter for '{}']: ", models.len(), active.default_model);
+        let _ = io::stdout().flush();
+        let mut model_choice = String::new();
+        let _ = io::stdin().read_line(&mut model_choice);
+        let trimmed_m = model_choice.trim();
+        if let Ok(idx) = trimmed_m.parse::<usize>() {
+            if idx >= 1 && idx <= models.len() {
+                let chosen = &models[idx - 1];
+                let _ = ProviderRegistry::set_model(&active.id, chosen);
+            }
+        } else if !trimmed_m.is_empty() {
+            let _ = ProviderRegistry::set_model(&active.id, trimmed_m);
+        }
+
+        // Configure Reasoning / Thinking Effort
+        let current_effort = ProviderRegistry::get_reasoning_effort();
+        println!("\n{}Reasoning & Thinking Effort Options:{}", theme.bold, theme.reset);
+        println!("  [1] low    - Fast thinking (2,048 tokens budget) | Minimal latency");
+        println!("  [2] medium - Balanced reasoning (4,096 tokens budget) | Default");
+        println!("  [3] high   - Deep step-by-step thinking (8,192 tokens budget) | High precision");
+        println!("  [4] max    - Exhaustive architectural reasoning (16,384 tokens budget)");
+        println!("  [5] off    - Standard output (0 reasoning tokens) | Instant response");
+        print!("Select Reasoning Effort [1-5 or name | Enter to keep '{}']: ", current_effort);
+        let _ = io::stdout().flush();
+        let mut eff_choice = String::new();
+        let _ = io::stdin().read_line(&mut eff_choice);
+        let trimmed_eff = eff_choice.trim();
+        if !trimmed_eff.is_empty() {
+            let _ = ProviderRegistry::set_reasoning_effort(trimmed_eff);
+        }
+
+        let final_active = ProviderRegistry::active();
+        let final_ctx = final_active.context_window_for_model(&final_active.default_model);
+        let final_eff = ProviderRegistry::get_reasoning_effort().to_uppercase();
+        println!("\n{}✓ Configured: {} | Model: {} (max window: {}) | Reasoning: {}{}",
+            theme.success, final_active.name, final_active.default_model,
+            format_tokens_short(final_ctx), final_eff, theme.reset);
+    }
+
     fn show_token_telemetry(&self) {
         let theme = self.get_theme();
         let active_p = ProviderRegistry::active();
@@ -663,12 +802,14 @@ impl InteractiveShell {
             0.0
         };
         let remaining = ctx_limit.saturating_sub(history_tokens);
+        let reasoning_eff = ProviderRegistry::get_reasoning_effort().to_uppercase();
 
         println!("\n{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
         println!("  {accent}📊 TOKEN & CONTEXT UTILIZATION TELEMETRY{reset}", accent = theme.accent, reset = theme.reset);
         println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  Active Provider      : {bold}{}{reset}", active_p.name, bold = theme.bold, reset = theme.reset);
+        println!("  Active Provider      : {bold}{}{reset} [{}]", active_p.name, active_p.category, bold = theme.bold, reset = theme.reset);
         println!("  Active Model         : {bold}{}{reset}", active_p.default_model, bold = theme.bold, reset = theme.reset);
+        println!("  Reasoning Level      : {accent}{}{reset}", reasoning_eff, accent = theme.accent, reset = theme.reset);
         println!("  Model Context Limit  : {accent}{} tokens{reset} ({})", format_num_commas(ctx_limit), format_tokens_short(ctx_limit), accent = theme.accent, reset = theme.reset);
         println!("  Active Context Used  : {accent}{} tokens{reset} ({:.2}% of model limit)", format_num_commas(history_tokens), ctx_pct, accent = theme.accent, reset = theme.reset);
         println!("  Available Headroom   : {success}{} tokens remaining{reset}", format_num_commas(remaining), success = theme.success, reset = theme.reset);
@@ -683,8 +824,10 @@ impl InteractiveShell {
     fn execute_user_prompt(&mut self, prompt: &str, sid: &str, turn: usize) {
         let theme = self.get_theme();
         let active_p = ProviderRegistry::active();
+        let effort = ProviderRegistry::get_reasoning_effort();
 
-        println!("{}Dispatching turn #{} to {} ({})...{}", theme.dim, turn, active_p.name, active_p.default_model, theme.reset);
+        println!("{}Dispatching turn #{} to {} ({} | effort={})...{}",
+            theme.dim, turn, active_p.name, active_p.default_model, effort, theme.reset);
 
         let system_prompt = if let Some(ref bot_id) = self.config.active_bot {
             if let Some(bot) = self.engine.relational.get_bot(bot_id) {
@@ -730,10 +873,11 @@ impl InteractiveShell {
                 // Print Token and Telemetry Footer
                 println!("\n{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
                 println!(
-                    "  {dim}[{provider} | model={model} | latency={ms}ms | session={sid}]{reset}",
+                    "  {dim}[{provider} | model={model} | effort={effort} | latency={ms}ms | session={sid}]{reset}",
                     dim = theme.dim,
                     provider = result.provider,
                     model = result.model,
+                    effort = effort,
                     ms = result.duration_ms,
                     sid = clean_path(sid, 16),
                     reset = theme.reset
@@ -772,7 +916,7 @@ impl InteractiveShell {
                 println!("\n{}Guided Resolution Options:{}", theme.bold, theme.reset);
                 println!("  • To authenticate Gemini : {accent}/auth login gemini <api_key>{reset}  (or {accent}/auth login google{reset})", accent = theme.accent, reset = theme.reset);
                 println!("  • To get free API key    : https://aistudio.google.com/app/apikey");
-                println!("  • To switch AI provider  : {accent}/provider{reset} (21 supported models)", accent = theme.accent, reset = theme.reset);
+                println!("  • To switch AI provider  : {accent}/provider{reset} (22 supported models)", accent = theme.accent, reset = theme.reset);
                 println!("  • To use zero-auth local : {accent}/provider ollama{reset} or {accent}/provider lmstudio{reset}", accent = theme.accent, reset = theme.reset);
                 println!("  • For system diagnostics : {accent}/doctor{reset}", accent = theme.accent, reset = theme.reset);
             }

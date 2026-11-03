@@ -145,26 +145,59 @@ fn handle_connection(
         return Ok(());
     }
 
-    if (method == "GET" || method == "HEAD") && (uri == "/hero.png" || uri == "/brand/hero.png") {
-        let p1 = std::path::Path::new("/root/install/hero.png");
-        let p2 = std::path::Path::new("hero.png");
-        let bytes = if p1.exists() {
-            std::fs::read(p1).unwrap_or_default()
-        } else if p2.exists() {
-            std::fs::read(p2).unwrap_or_default()
+    if (method == "GET" || method == "HEAD") && (uri.starts_with("/assets/") || uri == "/hero.png" || uri == "/brand/hero.png") {
+        let clean_filename = if uri == "/hero.png" || uri == "/brand/hero.png" {
+            "hero.png".to_string()
         } else {
-            Vec::new()
+            let without_prefix = uri.trim_start_matches("/assets/");
+            without_prefix.split('?').next().unwrap_or("").replace("..", "")
         };
-        if !bytes.is_empty() {
-            let resp = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: public, max-age=86400\r\n\r\n",
-                bytes.len()
-            );
-            stream.write_all(resp.as_bytes())?;
-            if method == "GET" {
-                stream.write_all(&bytes)?;
+
+        let p1 = std::path::Path::new("/root/install/assets").join(&clean_filename);
+        let p2 = std::path::Path::new("src/assets").join(&clean_filename);
+        let p3 = std::path::Path::new("/root/install/nityaksha-core/src/assets").join(&clean_filename);
+        let p4 = std::path::Path::new("brand").join(&clean_filename);
+
+        let target_path = if p1.exists() {
+            Some(p1)
+        } else if p2.exists() {
+            Some(p2)
+        } else if p3.exists() {
+            Some(p3)
+        } else if p4.exists() {
+            Some(p4)
+        } else {
+            None
+        };
+
+        if let Some(path) = target_path {
+            if let Ok(bytes) = std::fs::read(&path) {
+                let mime = if clean_filename.ends_with(".png") {
+                    "image/png"
+                } else if clean_filename.ends_with(".svg") {
+                    "image/svg+xml"
+                } else if clean_filename.ends_with(".ico") {
+                    "image/x-icon"
+                } else if clean_filename.ends_with(".jpg") || clean_filename.ends_with(".jpeg") {
+                    "image/jpeg"
+                } else if clean_filename.ends_with(".css") {
+                    "text/css"
+                } else if clean_filename.ends_with(".js") {
+                    "application/javascript"
+                } else {
+                    "application/octet-stream"
+                };
+
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: public, max-age=86400\r\n\r\n",
+                    mime, bytes.len()
+                );
+                stream.write_all(resp.as_bytes())?;
+                if method == "GET" {
+                    stream.write_all(&bytes)?;
+                }
+                return Ok(());
             }
-            return Ok(());
         }
     }
 

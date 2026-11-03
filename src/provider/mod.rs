@@ -66,6 +66,16 @@ impl ProviderDefinition {
             self.max_context_window
         }
     }
+    pub fn is_reasoning_capable(&self, model: &str) -> bool {
+        let m = model.to_lowercase();
+        m.contains("r1")
+            || m.contains("o1")
+            || m.contains("o3")
+            || m.contains("thinking")
+            || m.contains("reason")
+            || m.contains("claude-3-7")
+            || m.contains("gemini-2.0")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,12 +90,30 @@ pub struct PromptExecutionResult {
     pub provider: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderConfigStore {
     pub active_provider: String,
     pub keys: HashMap<String, String>,
     pub custom_urls: HashMap<String, String>,
     pub custom_models: HashMap<String, String>,
+    #[serde(default = "default_reasoning_effort")]
+    pub reasoning_effort: String,
+}
+
+fn default_reasoning_effort() -> String {
+    "medium".to_string()
+}
+
+impl Default for ProviderConfigStore {
+    fn default() -> Self {
+        Self {
+            active_provider: "gemini".to_string(),
+            keys: HashMap::new(),
+            custom_urls: HashMap::new(),
+            custom_models: HashMap::new(),
+            reasoning_effort: default_reasoning_effort(),
+        }
+    }
 }
 
 pub struct ProviderRegistry;
@@ -117,12 +145,7 @@ impl ProviderRegistry {
                 }
             }
         }
-        ProviderConfigStore {
-            active_provider: "gemini".to_string(),
-            keys: HashMap::new(),
-            custom_urls: HashMap::new(),
-            custom_models: HashMap::new(),
-        }
+        ProviderConfigStore::default()
     }
 
     /// Save configuration
@@ -482,8 +505,8 @@ impl ProviderRegistry {
             },
             ProviderDefinition {
                 id: "ollama".to_string(),
-                name: "Ollama (Local / Sovereign)".to_string(),
-                category: "Local / Sovereign".to_string(),
+                name: "Ollama (Local)".to_string(),
+                category: "Local Runtime".to_string(),
                 base_url: "http://127.0.0.1:11434".to_string(),
                 default_model: "llama3.3:latest".to_string(),
                 available_models: vec![
@@ -495,7 +518,7 @@ impl ProviderRegistry {
                 api_format: "ollama".to_string(),
                 auth_type: "none".to_string(),
                 env_var: "OLLAMA_HOST".to_string(),
-                description: "Zero-cloud local inference on consumer hardware with 100% data sovereignty and air-gapped security.".to_string(),
+                description: "Local GGUF model execution on consumer hardware with zero external cloud dependencies.".to_string(),
                 is_configured: true,
                 is_active: false,
                 auth_summary: "Localhost / No Auth".to_string(),
@@ -504,9 +527,34 @@ impl ProviderRegistry {
                 max_context_window: 32_768,
             },
             ProviderDefinition {
+                id: "ollama-cloud".to_string(),
+                name: "Ollama Cloud".to_string(),
+                category: "Cloud Infrastructure".to_string(),
+                base_url: "https://api.ollama.com/v1".to_string(),
+                default_model: "llama3.3:70b".to_string(),
+                available_models: vec![
+                    "llama3.3:70b".to_string(),
+                    "llama3.3:8b".to_string(),
+                    "deepseek-r1:70b".to_string(),
+                    "deepseek-r1:8b".to_string(),
+                    "qwen2.5:72b".to_string(),
+                    "phi4:latest".to_string(),
+                ],
+                api_format: "openai".to_string(),
+                auth_type: "api_key".to_string(),
+                env_var: "OLLAMA_API_KEY".to_string(),
+                description: "Managed high-speed inference on official Ollama Cloud with API key authentication.".to_string(),
+                is_configured: false,
+                is_active: false,
+                auth_summary: String::new(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 128_000,
+            },
+            ProviderDefinition {
                 id: "lmstudio".to_string(),
                 name: "LM Studio (Local)".to_string(),
-                category: "Local / Sovereign".to_string(),
+                category: "Local Runtime".to_string(),
                 base_url: "http://127.0.0.1:1234/v1".to_string(),
                 default_model: "local-model".to_string(),
                 available_models: vec!["local-model".to_string()],
@@ -524,7 +572,7 @@ impl ProviderRegistry {
             ProviderDefinition {
                 id: "vllm".to_string(),
                 name: "vLLM (Cluster Runtime)".to_string(),
-                category: "Local / Sovereign".to_string(),
+                category: "Local Runtime".to_string(),
                 base_url: "http://127.0.0.1:8000/v1".to_string(),
                 default_model: "default".to_string(),
                 available_models: vec!["default".to_string()],
@@ -708,6 +756,154 @@ impl ProviderRegistry {
         let mut config = Self::load_config();
         config.custom_models.insert(p.id, model.trim().to_string());
         Self::save_config(&config)
+    }
+
+    /// Retrieve active reasoning / thinking effort
+    pub fn get_reasoning_effort() -> String {
+        let config = Self::load_config();
+        if config.reasoning_effort.is_empty() {
+            "medium".to_string()
+        } else {
+            config.reasoning_effort
+        }
+    }
+
+    /// Set reasoning effort (low, medium, high, max, off)
+    pub fn set_reasoning_effort(effort: &str) -> Result<(), String> {
+        let eff = effort.trim().to_lowercase();
+        let valid = match eff.as_str() {
+            "low" | "medium" | "high" | "max" | "off" => eff,
+            "1" => "low".to_string(),
+            "2" => "medium".to_string(),
+            "3" => "high".to_string(),
+            "4" => "max".to_string(),
+            "5" => "off".to_string(),
+            _ => return Err(format!("Invalid reasoning effort '{}'. Valid levels: low, medium, high, max, off.", effort)),
+        };
+        let mut config = Self::load_config();
+        config.reasoning_effort = valid;
+        Self::save_config(&config)
+    }
+
+    /// Dynamically fetch live model list from provider API with fallback to curated models
+    pub fn fetch_remote_models(provider_id: &str) -> Vec<String> {
+        let provider = match Self::get(provider_id) {
+            Some(p) => p,
+            None => return Vec::new(),
+        };
+
+        if provider.id == "gemini" {
+            let oauth_token = GoogleOAuthEngine::get_valid_access_token().ok();
+            let raw_key = Self::resolve_raw_key(&provider);
+            let url = if let Some(ref key) = raw_key {
+                format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", key)
+            } else if oauth_token.is_some() {
+                "https://generativelanguage.googleapis.com/v1beta/models".to_string()
+            } else {
+                return provider.available_models;
+            };
+
+            let mut cmd = Command::new("curl");
+            cmd.arg("-s").arg("--max-time").arg("6").arg("-X").arg("GET").arg(&url);
+            if let Some(ref token) = oauth_token {
+                if raw_key.is_none() {
+                    cmd.arg("-H").arg(format!("Authorization: Bearer {}", token));
+                }
+            }
+            if let Ok(output) = cmd.output() {
+                let resp_str = String::from_utf8_lossy(&output.stdout);
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
+                    if let Some(models) = val.pointer("/models").and_then(|v| v.as_array()) {
+                        let mut list = Vec::new();
+                        for m in models {
+                            if let Some(methods) = m.get("supportedGenerationMethods").and_then(|v| v.as_array()) {
+                                let has_gen = methods.iter().any(|method| method.as_str() == Some("generateContent"));
+                                if has_gen {
+                                    if let Some(name) = m.get("name").and_then(|v| v.as_str()) {
+                                        let clean = name.strip_prefix("models/").unwrap_or(name);
+                                        list.push(clean.to_string());
+                                    }
+                                }
+                            }
+                        }
+                        if !list.is_empty() {
+                            return list;
+                        }
+                    }
+                }
+            }
+        } else if provider.id == "ollama" {
+            let base = provider.base_url.trim_end_matches('/');
+            let url = format!("{}/api/tags", base);
+            let mut cmd = Command::new("curl");
+            cmd.arg("-s").arg("--max-time").arg("4").arg(&url);
+            if let Ok(output) = cmd.output() {
+                let resp_str = String::from_utf8_lossy(&output.stdout);
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
+                    if let Some(models) = val.get("models").and_then(|v| v.as_array()) {
+                        let list: Vec<String> = models.iter()
+                            .filter_map(|m| m.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                            .collect();
+                        if !list.is_empty() {
+                            return list;
+                        }
+                    }
+                }
+            }
+        } else if provider.id == "anthropic" {
+            if let Some(raw_key) = Self::resolve_raw_key(&provider) {
+                let mut cmd = Command::new("curl");
+                cmd.arg("-s").arg("--max-time").arg("6")
+                   .arg("https://api.anthropic.com/v1/models")
+                   .arg("-H").arg(format!("x-api-key: {}", raw_key))
+                   .arg("-H").arg("anthropic-version: 2023-06-01");
+                if let Ok(output) = cmd.output() {
+                    let resp_str = String::from_utf8_lossy(&output.stdout);
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
+                        if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
+                            let list: Vec<String> = data.iter()
+                                .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                                .collect();
+                            if !list.is_empty() {
+                                return list;
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // OpenAI & OpenAI-compatible backends
+            let base = provider.base_url.trim_end_matches('/');
+            let url = if base.ends_with("/chat/completions") {
+                base.replace("/chat/completions", "/models")
+            } else if base.ends_with("/v1") {
+                format!("{}/models", base)
+            } else {
+                format!("{}/v1/models", base)
+            };
+
+            let mut cmd = Command::new("curl");
+            cmd.arg("-s").arg("--max-time").arg("6").arg(&url);
+            if let Some(key) = Self::resolve_raw_key(&provider) {
+                cmd.arg("-H").arg(format!("Authorization: Bearer {}", key));
+            }
+            if let Ok(output) = cmd.output() {
+                let resp_str = String::from_utf8_lossy(&output.stdout);
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
+                    if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
+                        let list: Vec<String> = data.iter()
+                            .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                            .collect();
+                        if !list.is_empty() {
+                            return list;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Return curated list if live fetch is unavailable or unauthenticated
+        provider.available_models
     }
 
     /// Test connectivity and latency against provider endpoint
@@ -936,15 +1132,33 @@ impl ProviderRegistry {
             "parts": [{ "text": prompt }]
         }));
 
+        let effort = Self::get_reasoning_effort();
+        let thinking_budget = match effort.to_lowercase().as_str() {
+            "low" => 2048,
+            "medium" => 4096,
+            "high" => 8192,
+            "max" => 16384,
+            "off" => 0,
+            _ => 4096,
+        };
+
+        let mut gen_config = serde_json::json!({
+            "temperature": temperature,
+            "maxOutputTokens": 4096
+        });
+
+        if thinking_budget > 0 && (model.contains("thinking") || model.contains("gemini-2.0")) {
+            gen_config["thinkingConfig"] = serde_json::json!({
+                "thinkingBudget": thinking_budget
+            });
+        }
+
         let payload = serde_json::json!({
             "contents": contents,
             "systemInstruction": {
                 "parts": [{ "text": system_prompt }]
             },
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": 4096
-            }
+            "generationConfig": gen_config
         });
 
         let payload_str = payload.to_string();
@@ -1038,13 +1252,30 @@ impl ProviderRegistry {
             "content": prompt
         }));
 
-        let payload = serde_json::json!({
+        let effort = Self::get_reasoning_effort();
+        let thinking_budget = match effort.to_lowercase().as_str() {
+            "low" => 2048,
+            "medium" => 4096,
+            "high" => 8192,
+            "max" => 16384,
+            "off" => 0,
+            _ => 4096,
+        };
+
+        let mut payload = serde_json::json!({
             "model": model,
-            "max_tokens": 4096,
+            "max_tokens": if thinking_budget > 0 { 8192 + thinking_budget } else { 4096 },
             "system": system_prompt,
             "messages": messages,
-            "temperature": temperature
+            "temperature": if thinking_budget > 0 { 1.0 } else { temperature }
         });
+
+        if thinking_budget > 0 && model.contains("3-7") {
+            payload["thinking"] = serde_json::json!({
+                "type": "enabled",
+                "budget_tokens": thinking_budget
+            });
+        }
 
         let payload_str = payload.to_string();
         let mut cmd = Command::new("curl");
@@ -1143,12 +1374,22 @@ impl ProviderRegistry {
             "content": prompt
         }));
 
-        let payload = serde_json::json!({
+        let effort = Self::get_reasoning_effort();
+        let mut payload = serde_json::json!({
             "model": model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": 4096
         });
+
+        if effort != "off" && (model.starts_with("o1") || model.starts_with("o3") || model.contains("reasoner")) {
+            let eff_val = match effort.to_lowercase().as_str() {
+                "low" => "low",
+                "high" | "max" => "high",
+                _ => "medium",
+            };
+            payload["reasoning_effort"] = serde_json::json!(eff_val);
+        }
 
         let payload_str = payload.to_string();
         let mut cmd = Command::new("curl");
@@ -1227,6 +1468,7 @@ impl ProviderRegistry {
             "cerebras" => Some("cerebras"),
             "sambanova" => Some("sambanova"),
             "ollama" => Some("ollama"),
+            "ollama-cloud" | "ollamacloud" => Some("ollama-cloud"),
             "lmstudio" => Some("lmstudio"),
             "vllm" => Some("vllm"),
             "bedrock" | "aws" => Some("bedrock"),
@@ -1256,6 +1498,7 @@ impl ProviderRegistry {
             "bedrock" => "https://aws.amazon.com/bedrock",
             "vertex" => "https://console.cloud.google.com/vertex-ai",
             "azure" => "https://portal.azure.com",
+            "ollama-cloud" => "https://ollama.com",
             _ => "https://simhaonline.ai",
         }
     }
