@@ -111,7 +111,7 @@ fn pad_truncate(text: &str, width: usize) -> String {
     }
 }
 
-fn strip_ansi(s: &str) -> String {
+pub fn strip_ansi(s: &str) -> String {
     let mut out = String::new();
     let mut in_escape = false;
     for c in s.chars() {
@@ -126,6 +126,24 @@ fn strip_ansi(s: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(unix)]
+pub fn has_piped_data() -> bool {
+    use std::os::unix::io::AsRawFd;
+    let fd = io::stdin().as_raw_fd();
+    let mut pfd = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    let res = unsafe { libc::poll(&mut pfd, 1, 0) };
+    res > 0 && (pfd.revents & libc::POLLIN) != 0
+}
+
+#[cfg(not(unix))]
+pub fn has_piped_data() -> bool {
+    false
 }
 
 fn normalize_category(cat: &str) -> &'static str {
@@ -228,6 +246,7 @@ impl CliHandler {
             "harness" => self.cmd_harness(&sub_args),
             "scrape" => self.cmd_scrape(&sub_args),
             "provider" | "providers" => self.cmd_provider(&sub_args),
+            "router" | "gateway" => self.cmd_router(&sub_args),
             "key" | "setkey" | "apikey" => self.cmd_key(&sub_args),
             "auth" => self.cmd_auth(&sub_args),
             "model" | "models" => self.cmd_model(&sub_args),
@@ -242,7 +261,7 @@ impl CliHandler {
                 self.interactive_repl_with_options(&options, Some(interactive::CockpitView::Swarm));
             }
             _ => {
-                let is_piped = !io::stdin().is_terminal();
+                let is_piped = !io::stdin().is_terminal() && has_piped_data();
                 // If the command is not a known subcommand, treat it as a prompt, piped task, or flag-based REPL launch
                 if options.print_mode || options.prompt.is_some() || (!cmd.is_empty() && !cmd.starts_with('-')) || is_piped {
                     let mut prompt_parts = Vec::new();
@@ -2130,6 +2149,139 @@ complete -F _ntx_completions ntx"#);
                 } else {
                     eprintln!("Unknown provider subcommand or ID '{}'. Available: list, inspect, select, add, set-key, set-url, test", provider_id);
                 }
+            }
+        }
+    }
+
+    pub fn cmd_router(&self, args: &[String]) {
+        use crate::provider::{get_router_state, AdaptiveComplexityRouter, RtkTokenOptimizer, ProviderRegistry};
+        use std::io::Read;
+
+        if args.is_empty() || args[0] == "status" || args[0] == "pool" {
+            let state = get_router_state();
+            let records = state.list_health();
+            let saved_tokens = state.get_total_tokens_saved();
+
+            println!("╭──────┬──────────────────────┬────────────┬──────────┬──────────┬─────────────┬──────────────────────────╮");
+            println!("│  #   │ PROVIDER / TARGET    │ STATE      │ SUCCESS  │ FAILURES │ AVG LATENCY │ CIRCUIT BREAKER / NOTES  │");
+            println!("├──────┼──────────────────────┼────────────┼──────────┼──────────┼─────────────┼──────────────────────────┤");
+
+            if records.is_empty() {
+                // Initialize default provider list in records
+                let providers = ProviderRegistry::list_all();
+                for (idx, p) in providers.iter().enumerate() {
+                    let num = format!(" [{:>2}] ", idx + 1);
+                    let id = format!(" {:<20} ", pad_truncate(&p.name, 20));
+                    let state_str = if p.is_configured { " \x1b[1;32m● HEALTHY\x1b[0m  " } else { " \x1b[33m○ UNSET\x1b[0m    " };
+                    let succ = format!(" {:<8} ", 0);
+                    let fail = format!(" {:<8} ", 0);
+                    let lat = format!(" {:<11} ", "--- ms");
+                    let notes = format!(" {:<24} ", pad_truncate(&p.default_model, 24));
+                    println!("│{}│{}│{}│{}│{}│{}│{}│", num, id, state_str, succ, fail, lat, notes);
+                }
+            } else {
+                for (idx, rec) in records.iter().enumerate() {
+                    let num = format!(" [{:>2}] ", idx + 1);
+                    let id = format!(" {:<20} ", pad_truncate(&rec.name, 20));
+                    let state_str = if rec.is_healthy() {
+                        " \x1b[1;32m● HEALTHY\x1b[0m  ".to_string()
+                    } else {
+                        " \x1b[1;31m✖ COOLDOWN\x1b[0m ".to_string()
+                    };
+                    let succ = format!(" {:<8} ", rec.successful_requests);
+                    let fail = format!(" {:<8} ", rec.failed_requests);
+                    let lat = if rec.avg_latency_ms > 0 {
+                        format!(" {:<11} ", format!("{} ms", rec.avg_latency_ms))
+                    } else {
+                        format!(" {:<11} ", "--- ms")
+                    };
+                    let rem = rec.cooldown_remaining_secs();
+                    let note = if rem > 0 {
+                        format!("Cooldown: {}s left", rem)
+                    } else if rec.consecutive_failures > 0 {
+                        format!("{} errs in row", rec.consecutive_failures)
+                    } else {
+                        "Auto-failover ready".to_string()
+                    };
+                    let notes_col = format!(" {:<24} ", pad_truncate(&note, 24));
+                    println!("│{}│{}│{}│{}│{}│{}│{}│", num, id, state_str, succ, fail, lat, notes_col);
+                }
+            }
+            println!("╰──────┴──────────────────────┴────────────┴──────────┴──────────┴─────────────┴──────────────────────────╯");
+
+            println!("╭───────────────────────────────────────────────────────────────────────────────────────────────────────╮");
+            let stat_line = format!("ROUTER STATS : RTK Tokens Saved: \x1b[1;32m{}\x1b[0m (via whitespace & redundant token compression)", saved_tokens);
+            let vis_len = strip_ansi(&stat_line).chars().count();
+            let pad = if vis_len < 101 { " ".repeat(101 - vis_len) } else { String::new() };
+            println!("│ {}{} │", stat_line, pad);
+            println!("├───────────────────────────────────────────────────────────────────────────────────────────────────────┤");
+            let cmd_lines = [
+                "Router CLI Commands:",
+                "  • Router Pool Status      : ntx router status",
+                "  • Adaptive Tier Classifier: ntx router classify \"<prompt>\"",
+                "  • Real-Time Token Saver   : ntx router compress \"<prompt>\" (or pipe via stdin)",
+                "  • Reset Circuit Breakers  : ntx router reset",
+            ];
+            for l in &cmd_lines {
+                let vis_len = strip_ansi(l).chars().count();
+                let pad = if vis_len < 101 { " ".repeat(101 - vis_len) } else { String::new() };
+                println!("│ {}{} │", l, pad);
+            }
+            println!("╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯");
+            return;
+        }
+
+        match args[0].as_str() {
+            "classify" => {
+                let prompt = args[1..].join(" ");
+                if prompt.is_empty() {
+                    eprintln!("Usage: ntx router classify \"<prompt text>\"");
+                    return;
+                }
+                let (tier, rationale) = AdaptiveComplexityRouter::classify(&prompt);
+                let rec = AdaptiveComplexityRouter::recommended_model(tier);
+                println!("╭─────────────────────────────────────────────────────────────────────────────╮");
+                println!("│                     ADAPTIVE COMPLEXITY CLASSIFIER                          │");
+                println!("├─────────────────────────────────────────────────────────────────────────────┤");
+                println!("│ Prompt          : {:<57} │", pad_truncate(&prompt, 57));
+                println!("│ Complexity Tier : \x1b[1;36m{:<57}\x1b[0m │", format!("{:?} ({})", tier, tier.name()));
+                println!("│ Routing Rationale: {:<56} │", pad_truncate(rationale, 56));
+                println!("│ Recommended AI  : \x1b[1;32m{:<57}\x1b[0m │", pad_truncate(rec, 57));
+                println!("╰─────────────────────────────────────────────────────────────────────────────╯");
+            }
+            "compress" => {
+                let input = if args.len() > 1 {
+                    args[1..].join(" ")
+                } else {
+                    let mut buffer = String::new();
+                    let _ = std::io::stdin().read_to_string(&mut buffer);
+                    buffer
+                };
+                if input.is_empty() {
+                    eprintln!("Usage: ntx router compress \"<text>\" or pipe text via stdin");
+                    return;
+                }
+                let (compressed, orig, comp) = RtkTokenOptimizer::compress(&input);
+                let saved = orig.saturating_sub(comp);
+                let pct = if orig > 0 { (saved as f64 / orig as f64) * 100.0 } else { 0.0 };
+                println!("╭─────────────────────────────────────────────────────────────────────────────╮");
+                println!("│                   RTK TOKEN OPTIMIZER & COMPRESSOR                          │");
+                println!("├─────────────────────────────────────────────────────────────────────────────┤");
+                println!("│ Original Est. Tokens   : {:<50} │", orig);
+                println!("│ Compressed Est. Tokens : {:<50} │", comp);
+                let saved_badge = format!("{} ({:.1}%)", saved, pct);
+                println!("│ Tokens Saved           : \x1b[1;32m{:<50}\x1b[0m │", saved_badge);
+                println!("├─────────────────────────────────────────────────────────────────────────────┤");
+                println!("│ COMPRESSED OUTPUT:                                                          │");
+                println!("╰─────────────────────────────────────────────────────────────────────────────╯");
+                println!("{}", compressed);
+            }
+            "reset" => {
+                get_router_state().reset();
+                println!("[SUCCESS] All provider circuit-breaker cooldowns and error counters have been reset to 0.");
+            }
+            _ => {
+                eprintln!("Unknown router command '{}'. Available: status, classify, compress, reset", args[0]);
             }
         }
     }

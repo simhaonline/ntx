@@ -258,11 +258,7 @@ impl InteractiveShell {
             .unwrap_or_else(|_| ".".to_string());
         let git_branch = Self::detect_git_branch();
         let session_id = format!("sess-{}", chrono::Utc::now().timestamp_millis());
-        let current_view = config
-            .last_view
-            .as_deref()
-            .and_then(CockpitView::parse)
-            .unwrap_or(CockpitView::Overview);
+        let current_view = CockpitView::Overview;
 
         Self {
             engine,
@@ -700,127 +696,137 @@ impl InteractiveShell {
     /// [1] OVERVIEW COCKPIT VIEW
     fn render_view_overview(&self) {
         let cols = terminal_cols().clamp(80, 240);
-        let inner_width = cols.saturating_sub(2);
-        self.render_nav_header(inner_width);
-        let theme = self.get_theme();
+        let total_w = cols.min(118);
         let active_p = ProviderRegistry::active();
-        let ctx_limit = active_p.context_window_for_model(&active_p.default_model);
-        let reasoning_effort = ProviderRegistry::get_reasoning_effort();
-
-        let history_tokens: usize = self.conversation_history
-            .iter()
-            .map(|(u, a)| (u.len() + a.len()) / 4)
-            .sum();
-        let ctx_pct = if ctx_limit > 0 {
-            (history_tokens as f64 / ctx_limit as f64 * 100.0).min(100.0)
+        let short_sid = if self.session_id.len() >= 8 {
+            &self.session_id[..8]
         } else {
-            0.0
+            &self.session_id
         };
 
-        let bots_count = self.engine.relational.list_bots().len();
-        let wfs_count = self.engine.relational.list_workflows().len();
-        let caps_count: usize = self.engine.relational.count_capabilities().values().sum();
+        // 1. Large 3D Block Banner (NITYAKSHA)
+        let c_top = "\x1b[38;5;226m";
+        let c_mid = "\x1b[38;5;220m";
+        let c_bot = "\x1b[38;5;214m";
+        let c_shd = "\x1b[38;5;172m";
+        let rst = "\x1b[0m";
 
-        print_box_top(
-            theme.accent,
-            Some(&format!("{bold}{accent}⚡ SYSTEM COCKPIT & LIVE ENGINE STATUS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
-            inner_width,
-            theme.reset,
+        println!();
+        println!("{}███    ██ ██ ████████ ██    ██  █████  ██   ██ ███████ ██   ██  █████ {}", c_top, rst);
+        println!("{}████   ██ ██    ██     ██  ██  ██   ██ ██  ██  ██      ██   ██ ██   ██{}", c_mid, rst);
+        println!("{}██ ██  ██ ██    ██      ████   ███████ █████   ███████ ███████ ███████{}", c_mid, rst);
+        println!("{}██  ██ ██ ██    ██       ██    ██   ██ ██  ██       ██ ██   ██ ██   ██{}", c_bot, rst);
+        println!("{}██   ████ ██    ██       ██    ██   ██ ██   ██ ███████ ██   ██ ██   ██{}", c_shd, rst);
+        println!();
+
+        // 2. Card Box Parameters
+        let c_border = "\x1b[38;5;214m";
+        let c_gold = "\x1b[38;5;220m";
+        let c_amber = "\x1b[38;5;178m";
+        let c_white = "\x1b[1;37m";
+        let c_dim = "\x1b[38;5;244m";
+        let c_olive = "\x1b[38;5;136m";
+
+        let left_w = 36usize;
+        let right_w = total_w.saturating_sub(left_w + 5);
+
+        // Header Title
+        let title = format!(" Nityaksha Meta-Harness v1.0.0 (Pure Native Rust) · stable · local {} ", short_sid);
+        let dashes_left = 18usize;
+        let dashes_right = total_w.saturating_sub(2 + dashes_left + title.chars().count());
+        println!("{c_border}╭{left_dash}{c_gold}{title}{c_border}{right_dash}╮{rst}",
+            left_dash = "─".repeat(dashes_left),
+            right_dash = "─".repeat(dashes_right),
+            c_border = c_border,
+            c_gold = c_gold,
+            title = title,
+            rst = rst
         );
 
-        // Section A: Active AI Provider & Model Gateway
-        let (line_p, line_m, line_r) = if active_p.is_configured {
-            (
-                format!("  {bold}Active AI Provider :{reset} {primary}{:<24}{reset} [Category: {:<14}] (Auth: {})",
-                    active_p.name, active_p.category, active_p.auth_summary, primary = theme.primary, bold = theme.bold, reset = theme.reset),
-                format!("  {bold}Active AI Model    :{reset} {accent}{:<24}{reset} [Max Context: {} / {} tokens]",
-                    active_p.default_model, format_num_commas(ctx_limit), format_tokens_short(ctx_limit), accent = theme.accent, bold = theme.bold, reset = theme.reset),
-                format!("  {bold}Reasoning Level    :{reset} {accent}{:<24}{reset} [Portal: {}]",
-                    reasoning_effort.to_uppercase(), ProviderRegistry::portal_url(&active_p.id), accent = theme.accent, bold = theme.bold, reset = theme.reset),
-            )
+        // Left Column: Heraldic Emblem + Model + Dir + Session
+        let emblem = [
+            "          .---. .---.          ",
+            "         :     : :     :       ",
+            "      .:' :::  : :  ::: ':.    ",
+            "  .-':::   :::  : :  :::   :::'-. ",
+            ".-'::: '::  ::: : :::  ::' ::::'-.",
+            " '--':::  ':: ::: ::: ::'  :::''-  ",
+            "        '::.  ::: :::  .::'     ",
+            "          '::. :::: .::'       ",
+            "             '::..::'          ",
+            "               ::::            ",
+            "             .::' '::.         ",
+            "            ::'     '::        ",
+            "           ::.       .::       ",
+            "            '::.   .::'        ",
+            "               ':::':          ",
+            "                ::::           ",
+            "                ::::           ",
+            "               .::.::.         ",
+            "              ::'   '::        ",
+            "              ::     ::        ",
+            "               '::.::'         ",
+            "                 :             ",
+        ];
+
+        let mut left_col: Vec<String> = emblem.iter().map(|l| format!("{}{}{}", c_amber, l, rst)).collect();
+        let ai_label = if active_p.is_configured {
+            format!("{}{} · {}{}", c_gold, active_p.default_model, active_p.name, rst)
         } else {
-            (
-                format!("  {bold}Active AI Provider :{reset} {warning}⚠️  NO AI PROVIDER CONFIGURED{reset}  (Type '/provider add' or '/key' to setup)",
-                    warning = theme.warning, bold = theme.bold, reset = theme.reset),
-                format!("  {bold}Quick Configuration:{reset} {accent}/provider add{reset} (Interactive setup wizard) or {accent}/key <id> <key>{reset}",
-                    accent = theme.accent, bold = theme.bold, reset = theme.reset),
-                format!("  {bold}Supported Backends :{reset} 36+ Native Providers (OpenRouter, Gemini, Kimi, GLM, Alibaba, Grok, etc.)",
-                    bold = theme.bold, reset = theme.reset),
-            )
+            format!("\x1b[1;33m⚠️ No Provider Configured\x1b[0m")
         };
+        left_col.push(ai_label);
+        let dir_disp = clean_path(&self.current_dir, 32);
+        left_col.push(format!("{}{}{}", c_olive, dir_disp, rst));
+        left_col.push(format!("{}Session: {}{}", c_dim, short_sid, rst));
 
-        print_box_line(theme.accent, &line_p, inner_width, theme.reset);
-        print_box_line(theme.accent, &line_m, inner_width, theme.reset);
-        print_box_line(theme.accent, &line_r, inner_width, theme.reset);
+        // Right Column: Available Tools + Available Skills
+        let right_col = vec![
+            format!("{c_gold}Available Tools{rst}"),
+            format!("{c_amber}browser-use:{rst} {c_white}browser_exec{rst}"),
+            format!("{c_amber}clarify:{rst} {c_white}clarify{rst}"),
+            format!("{c_amber}code_execution:{rst} {c_white}execute_code{rst}"),
+            format!("{c_amber}connections:{rst} {c_white}manage_connections{rst}"),
+            format!("{c_amber}delegation:{rst} {c_white}delegate_task{rst}"),
+            format!("{c_amber}file:{rst} {c_white}patch, read_file, search_files, write_file{rst}"),
+            format!("{c_amber}image_gen:{rst} {c_gold}image_generate{rst}"),
+            format!("{c_amber}memory:{rst} {c_white}memory{rst}"),
+            format!("{c_dim}(and 8 more toolsets...){rst}"),
+            String::new(),
+            format!("{c_gold}Available Skills{rst}"),
+            format!("{c_amber}autonomous-ai-agents:{rst} {c_white}agent-merge-conflict-arbiter, +10 more{rst}"),
+            format!("{c_amber}blockchain & quant:{rst} {c_white}evm, hyperliquid, solana, pine-v6{rst}"),
+            format!("{c_amber}communication:{rst} {c_white}one-three-one-rule, anti-slop{rst}"),
+            format!("{c_amber}creative:{rst} {c_white}archify, architecture-diagram, ascii-art, +29 more{rst}"),
+            format!("{c_amber}data-science:{rst} {c_white}jupyter-notebook, hybrid-rag{rst}"),
+            format!("{c_amber}devops:{rst} {c_white}actual-setup, docker-management, inference-sh-cli, +2 more{rst}"),
+            format!("{c_amber}dogfood:{rst} {c_white}adversarial-ux-test{rst}"),
+            format!("{c_amber}email & office:{rst} {c_white}agentmail, email-inbox-triage, himalaya{rst}"),
+            format!("{c_amber}finance:{rst} {c_white}3-statement-model, comps-analysis, dcf-model, +6 more{rst}"),
+            format!("{c_amber}gaming:{rst} {c_white}pokemon-player{rst}"),
+            format!("{c_amber}general:{rst} {c_white}ai-governance-grc, ai-infrastructure-hardware, +97 more{rst}"),
+        ];
 
-        // Section B: Real-Time Headroom & Budget Gauges
-        print_box_divider(
-            theme.accent,
-            Some(&format!("{bold}{accent}📊 REAL-TIME CONTEXT & BUDGET GAUGES{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
-            inner_width,
-            theme.reset,
-        );
+        let max_rows = left_col.len().max(right_col.len());
+        for r in 0..max_rows {
+            let l_raw = left_col.get(r).cloned().unwrap_or_default();
+            let r_raw = right_col.get(r).cloned().unwrap_or_default();
 
-        let gauge_w = (cols.saturating_sub(44)).clamp(16, 40);
-        let ctx_gauge = render_progress_bar(ctx_pct, gauge_w, theme.accent, theme.dim, theme.reset);
-        let line_ctx = format!("  {bold}Context Headroom   :{reset} {} {:>5.1}% ({}/{} tok)",
-            ctx_gauge, ctx_pct, format_tokens_short(history_tokens), format_tokens_short(ctx_limit), bold = theme.bold, reset = theme.reset);
+            let l_vis = visible_width(&l_raw);
+            let r_vis = visible_width(&r_raw);
 
-        let effort_budget = match reasoning_effort.to_lowercase().as_str() {
-            "low" => 2048,
-            "medium" => 4096,
-            "high" => 8192,
-            "max" => 16384,
-            _ => 0,
-        };
-        let effort_pct = if effort_budget > 0 { (effort_budget as f64 / 16384.0 * 100.0).min(100.0) } else { 0.0 };
-        let effort_gauge = render_progress_bar(effort_pct, gauge_w, theme.warning, theme.dim, theme.reset);
-        let line_eff = format!("  {bold}Thinking Budget    :{reset} {} {:>5} tokens ({})",
-            effort_gauge, effort_budget, reasoning_effort.to_uppercase(), bold = theme.bold, reset = theme.reset);
+            let l_pad = " ".repeat(left_w.saturating_sub(l_vis));
+            let r_pad = " ".repeat(right_w.saturating_sub(r_vis));
 
-        let est_cost = estimate_cost_usd(&active_p.id, &active_p.default_model, self.session_input_tokens, self.session_output_tokens);
-        let line_cost = format!("  {bold}Session Token Burn :{reset} In: {} | Out: {} | Total: {bold}{} tok{reset} (~${:.4} USD)",
-            format_num_commas(self.session_input_tokens), format_num_commas(self.session_output_tokens),
-            format_num_commas(self.session_total_tokens), est_cost, bold = theme.bold, reset = theme.reset);
+            println!("{c_border}│{rst} {l_raw}{l_pad} {r_raw}{r_pad} {c_border}│{rst}");
+        }
 
-        print_box_line(theme.accent, &line_ctx, inner_width, theme.reset);
-        print_box_line(theme.accent, &line_eff, inner_width, theme.reset);
-        print_box_line(theme.accent, &line_cost, inner_width, theme.reset);
+        let bot_dash = "─".repeat(total_w.saturating_sub(2));
+        println!("{c_border}╰{bot_dash}╯{rst}");
 
-        // Section C: Multi-Agent Swarm Health Summary
-        print_box_divider(
-            theme.accent,
-            Some(&format!("{bold}{accent}🤖 MULTI-AGENT SWARM & SECURITY SUB-SYSTEMS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
-            inner_width,
-            theme.reset,
-        );
-
-        let line_swarm = format!("  {bold}Multi-Agent Swarm  :{reset} {success}● {} Autonomous Bots Ready{reset} | {} registered skills & personas",
-            bots_count, caps_count, bold = theme.bold, success = theme.success, reset = theme.reset);
-        let line_dags = format!("  {bold}Execution DAGs     :{reset} {success}● {} Loaded Pipelines{reset} (Kahn's cycle check: 0 cycles)",
-            wfs_count, bold = theme.bold, success = theme.success, reset = theme.reset);
-        let line_sec = format!("  {bold}Security & IBAC    :{reset} {success}● Armed POSIX Sandbox{reset} | cgroups v2 quotas & memory.max enforced",
-            bold = theme.bold, success = theme.success, reset = theme.reset);
-
-        print_box_line(theme.accent, &line_swarm, inner_width, theme.reset);
-        print_box_line(theme.accent, &line_dags, inner_width, theme.reset);
-        print_box_line(theme.accent, &line_sec, inner_width, theme.reset);
-
-        // Section D: Quick Navigation & Hints
-        print_box_divider(
-            theme.accent,
-            Some(&format!("{dim}💡 QUICK NAVIGATION & HINTS{reset}", dim = theme.dim, reset = theme.reset)),
-            inner_width,
-            theme.reset,
-        );
-
-        let line_hint1 = format!("  {}Quick Navigation: Type '2' for Swarm, '3' for Memory, '4' for Cost, '5' for Missions, '6' for AI Gateway.{}", theme.dim, theme.reset);
-        let line_hint2 = format!("  {}Type your natural language prompt below to execute an autonomous swarm turn.{}", theme.dim, theme.reset);
-
-        print_box_line(theme.accent, &line_hint1, inner_width, theme.reset);
-        print_box_line(theme.accent, &line_hint2, inner_width, theme.reset);
-
-        print_box_bottom(theme.accent, inner_width, theme.reset);
+        // Bottom Navigation Bar & Hints
+        println!("  \x1b[38;5;244m💡 Quick Navigation: Type '2' for Swarm, '3' for Memory, '4' for Cost, '5' for Missions, '6' for AI Gateway, or '/router'\x1b[0m");
+        println!("  \x1b[38;5;244mType your natural language prompt below to execute an autonomous swarm turn.\x1b[0m");
     }
 
     /// [2] SWARM COCKPIT VIEW
@@ -1493,6 +1499,12 @@ impl InteractiveShell {
                             }
                         }
                     }
+                }
+            }
+            "router" | "gateway" => {
+                if let Ok(cli) = crate::cli::CliHandler::new() {
+                    let sub_args: Vec<String> = parts[1..].iter().map(|s| s.to_string()).collect();
+                    cli.cmd_router(&sub_args);
                 }
             }
             "auth" | "login" | "logout" => {

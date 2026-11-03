@@ -3,9 +3,11 @@
 //! Features native Google OAuth for Gemini, token auto-refresh, and unified multi-model dispatch.
 
 pub mod google_oauth;
+pub mod router;
 
 use crate::anti_slop::AntiSlopFilter;
 pub use google_oauth::{GoogleOAuthCredentials, GoogleOAuthEngine};
+pub use router::{AdaptiveComplexityRouter, ProviderHealthRecord, RtkTokenOptimizer, RouterTier, get_router_state};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -1211,23 +1213,14 @@ impl ProviderRegistry {
             });
         }
 
-        let truly_configured_active_id = {
-            if let Some(p) = enriched.iter().find(|p| p.id.eq_ignore_ascii_case(&config.active_provider)) {
-                let has_creds = config.keys.contains_key(&p.id)
-                    || std::env::var(&p.env_var).map(|k| !k.is_empty()).unwrap_or(false)
-                    || (p.id == "gemini" && google_creds.is_some());
-                if has_creds || (p.auth_type == "none" && (config.custom_urls.contains_key(&p.id) || config.active_provider == "ollama" || config.active_provider == "lmstudio" || config.active_provider == "vllm")) {
-                    Some(p.id.clone())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+        let selected_active_id = if !config.active_provider.is_empty() {
+            Some(config.active_provider.clone())
+        } else {
+            enriched.iter().find(|p| p.is_configured).map(|p| p.id.clone())
         };
 
         for p in &mut enriched {
-            p.is_active = truly_configured_active_id.as_ref().map(|id| p.id == *id).unwrap_or(false);
+            p.is_active = selected_active_id.as_ref().map(|id| p.id.eq_ignore_ascii_case(id)).unwrap_or(false);
         }
 
         enriched
@@ -1296,20 +1289,14 @@ impl ProviderRegistry {
         let all = Self::list_all();
         let config = Self::load_config();
 
-        // 1. If explicitly selected active provider has credentials or custom URL, return it
-        if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(&config.active_provider)) {
-            let has_creds = config.keys.contains_key(&p.id)
-                || std::env::var(&p.env_var).map(|k| !k.is_empty()).unwrap_or(false)
-                || (p.id == "gemini" && GoogleOAuthEngine::load_credentials().is_some());
-            if has_creds {
-                return p.clone();
-            }
-            if p.auth_type == "none" && (config.custom_urls.contains_key(&p.id) || config.active_provider == "ollama" || config.active_provider == "lmstudio" || config.active_provider == "vllm") {
+        // 1. If explicitly selected active provider is configured, return it
+        if !config.active_provider.is_empty() {
+            if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(&config.active_provider)) {
                 return p.clone();
             }
         }
 
-        // 2. If any other provider has saved keys in config, return it
+        // 2. If any provider has saved keys in config, return it
         for (prov_id, key) in &config.keys {
             if !key.is_empty() {
                 if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(prov_id)) {
@@ -1336,8 +1323,8 @@ impl ProviderRegistry {
             }
         }
 
-        // 5. No provider configured: return unconfigured sentinel
-        Self::unconfigured_sentinel()
+        // 5. Default to the first configured provider, or unconfigured sentinel
+        all.into_iter().find(|p| p.is_configured).unwrap_or_else(Self::unconfigured_sentinel)
     }
 
     /// Register or update a custom user provider
@@ -1936,23 +1923,18 @@ impl ProviderRegistry {
         None
     }
 
-    /// Unified Multi-Model Dispatch with detailed token and context telemetry
-    pub fn dispatch_prompt_detailed(
+    /// Executes a prompt against a specific provider definition with latency and error telemetry
+    pub fn dispatch_to_provider(
+        provider: &ProviderDefinition,
         prompt: &str,
-        system_prompt: Option<&str>,
+        sys: &str,
         temperature: f32,
         history: &[(String, String)],
     ) -> Result<PromptExecutionResult, String> {
-        let active = Self::active();
-        let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
-
-        if active.id == "unconfigured" || (!active.is_configured && active.auth_type != "none") {
-            return Err("No AI provider configured. Run '/provider add' (or 'ntx provider add <id> <key>') to configure an AI provider.".to_string());
-        }
-
-        if active.id == "gemini" || active.id == "aistudio" {
-            let raw_key = Self::resolve_raw_key(&active);
-            let oauth_token = if raw_key.is_none() && active.id == "gemini" {
+        let start = Instant::now();
+        let res = if provider.id == "gemini" || provider.id == "aistudio" {
+            let raw_key = Self::resolve_raw_key(provider);
+            let oauth_token = if raw_key.is_none() && provider.id == "gemini" {
                 GoogleOAuthEngine::get_valid_access_token().ok()
             } else {
                 None
@@ -1960,91 +1942,138 @@ impl ProviderRegistry {
             if oauth_token.is_none() && raw_key.is_none() {
                 return Err(format!(
                     "{} requires authentication. Run 'ntx provider add {} <api_key>' (Get a free key at {}) or 'ntx auth login google'.",
-                    active.name, active.id, Self::portal_url(&active.id)
+                    provider.name, provider.id, Self::portal_url(&provider.id)
                 ));
             }
-            return Self::call_gemini(
+            Self::call_gemini(
                 prompt,
                 sys,
-                &active.default_model,
+                &provider.default_model,
                 temperature,
                 oauth_token.as_deref(),
                 raw_key.as_deref(),
                 history,
-            );
-        }
-
-        if active.api_format == "anthropic" || active.id == "anthropic" {
-            let raw_key = Self::resolve_raw_key(&active).ok_or_else(|| {
+            )
+        } else if provider.api_format == "anthropic" || provider.id == "anthropic" {
+            let raw_key = Self::resolve_raw_key(provider).ok_or_else(|| {
                 format!(
                     "{} requires an API key. Run '/provider add' or set ${} from {}.",
-                    active.name, active.env_var, Self::portal_url(&active.id)
+                    provider.name, provider.env_var, Self::portal_url(&provider.id)
                 )
             })?;
-            return Self::call_anthropic(
-                &active,
+            Self::call_anthropic(
+                provider,
                 prompt,
                 sys,
-                &active.default_model,
+                &provider.default_model,
                 temperature,
                 &raw_key,
                 history,
-            );
-        }
-
-        // OpenAI-compatible providers (OpenAI, Nous, DeepSeek, Groq, OpenRouter, Kimi, GLM, Alibaba, Tencent, Fal, Kilocode, Grok, ByteDance, Qwen Cloud, NVIDIA NIM, Hugging Face, Codebuddy, Manus, Cloudflare, etc.)
-        let raw_key = if active.auth_type != "none" {
-            let key = Self::resolve_raw_key(&active).ok_or_else(|| {
-                format!(
-                    "{} requires an API key. Run '/provider add' or set ${} from {}.",
-                    active.name, active.env_var, Self::portal_url(&active.id)
-                )
-            })?;
-            Some(key)
+            )
         } else {
-            None
+            let raw_key = if provider.auth_type != "none" {
+                let key = Self::resolve_raw_key(provider).ok_or_else(|| {
+                    format!(
+                        "{} requires an API key. Run '/provider add' or set ${} from {}.",
+                        provider.name, provider.env_var, Self::portal_url(&provider.id)
+                    )
+                })?;
+                Some(key)
+            } else {
+                None
+            };
+            Self::call_openai_compatible(
+                provider,
+                prompt,
+                sys,
+                &provider.default_model,
+                temperature,
+                raw_key.as_deref(),
+                history,
+            )
         };
 
-        let openai_res = Self::call_openai_compatible(
-            &active,
-            prompt,
-            sys,
-            &active.default_model,
-            temperature,
-            raw_key.as_deref(),
-            history,
-        );
+        match &res {
+            Ok(success) => {
+                get_router_state().mark_success(
+                    &provider.id,
+                    &provider.name,
+                    start.elapsed().as_millis(),
+                    success.input_tokens,
+                    success.output_tokens,
+                );
+            }
+            Err(e) => {
+                get_router_state().mark_failure(&provider.id, &provider.name, e);
+            }
+        }
 
-        match openai_res {
+        res
+    }
+
+    /// Unified Multi-Model Dispatch with RTK token compression, circuit breakers, and resilient failover cascade
+    pub fn dispatch_prompt_detailed(
+        prompt: &str,
+        system_prompt: Option<&str>,
+        temperature: f32,
+        history: &[(String, String)],
+    ) -> Result<PromptExecutionResult, String> {
+        let (compressed_prompt, _orig_tokens, _comp_tokens) = RtkTokenOptimizer::compress(prompt);
+        let eff_prompt = compressed_prompt.as_str();
+
+        let active = Self::active();
+        let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
+
+        if active.id == "unconfigured" || (!active.is_configured && active.auth_type != "none") {
+            return Err("No AI provider configured. Run '/provider add' (or 'ntx provider add <id> <key>') to configure an AI provider.".to_string());
+        }
+
+        // 1. Try active provider if healthy or if no other configured provider exists
+        let mut target_provider = active.clone();
+        let is_target_healthy = get_router_state().is_healthy(&active.id);
+
+        if !is_target_healthy {
+            let all = Self::list_all();
+            if let Some(alt) = all.iter().find(|p| p.id != active.id && p.is_configured && get_router_state().is_healthy(&p.id)) {
+                eprintln!("\n\x1b[33m[RESILIENT FAILOVER] Active provider '{}' is in circuit-breaker cooldown. Rerouting to healthy '{}' ({})\x1b[0m", active.name, alt.name, alt.default_model);
+                target_provider = alt.clone();
+            }
+        }
+
+        let first_res = Self::dispatch_to_provider(&target_provider, eff_prompt, sys, temperature, history);
+
+        match first_res {
             Ok(res) => Ok(res),
             Err(e) => {
                 let e_lower = e.to_lowercase();
-                if e_lower.contains("credit_balance_exhausted")
+                let is_retryable = e_lower.contains("credit_balance_exhausted")
                     || e_lower.contains("no credits remaining")
                     || e_lower.contains("insufficient_quota")
-                {
-                    if let Some(gp) = Self::get("gemini") {
-                        if gp.is_configured {
-                            eprintln!("\n\x1b[33m[RESILIENT FAILOVER] {} credit balance is exhausted ($0.00). Automatically routing request to configured Google Gemini...\x1b[0m", active.name);
-                            let g_key = Self::resolve_raw_key(&gp);
-                            let g_token = if g_key.is_none() { GoogleOAuthEngine::get_valid_access_token().ok() } else { None };
-                            if let Ok(res) = Self::call_gemini(
-                                prompt,
-                                sys,
-                                &gp.default_model,
-                                temperature,
-                                g_token.as_deref(),
-                                g_key.as_deref(),
-                                history,
-                            ) {
-                                return Ok(res);
-                            }
+                    || e_lower.contains("high demand")
+                    || e_lower.contains("rate limit")
+                    || e_lower.contains("429")
+                    || e_lower.contains("503")
+                    || e_lower.contains("connection error")
+                    || e_lower.contains("timed out")
+                    || e_lower.contains("spikes in demand");
+
+                if is_retryable {
+                    let all = Self::list_all();
+                    for alt in all.iter().filter(|p| p.id != target_provider.id && p.is_configured && get_router_state().is_healthy(&p.id)) {
+                        eprintln!("\n\x1b[33m[RESILIENT FAILOVER] Provider '{}' failed ({}) - Auto-failing over to healthy provider '{}' ({})...\x1b[0m",
+                            target_provider.name, e, alt.name, alt.default_model);
+                        if let Ok(res) = Self::dispatch_to_provider(alt, eff_prompt, sys, temperature, history) {
+                            return Ok(res);
                         }
                     }
+                }
+
+                if e_lower.contains("credit_balance_exhausted") || e_lower.contains("no credits remaining") {
                     return Err(format!(
-                        "OpenAI Quota Exhausted: Your OpenAI API key is authenticated and valid, but your organization's prepaid credit balance is exhausted ($0.00).\n  • Add billing credits: https://platform.openai.com/settings/organization/billing/\n  • Or switch to Google Gemini (free quota active): run 'ntx provider set gemini'"
+                        "OpenAI Quota Exhausted: Your OpenAI API key is authenticated, but your account has no credits remaining ($0.00).\n  • Add billing credits: https://platform.openai.com/settings/organization/billing/\n  • Or switch to Google Gemini: run 'ntx provider set gemini' (or 'ntx key gemini <api_key>')"
                     ));
                 }
+
                 Err(e)
             }
         }

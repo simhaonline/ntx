@@ -645,6 +645,189 @@ fn handle_connection(
         }
     }
 
+    // --- Drop-in OpenAI API Router & Gateway (/v1/chat/completions, /v1/models, /v1/health, /api/router/stats) ---
+    if method == "GET" && (uri == "/v1/health" || uri == "/health" || uri == "/api/health") {
+        let payload = serde_json::json!({
+            "status": "healthy",
+            "server": "Nityaksha Pure Rust AI Gateway",
+            "version": "1.0.0",
+            "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "GET" && (uri == "/api/router/stats" || uri == "/v1/router/stats") {
+        use crate::provider::get_router_state;
+        let state = get_router_state();
+        let records = state.list_health();
+        let saved_tokens = state.get_total_tokens_saved();
+        let rec_json: Vec<serde_json::Value> = records.iter().map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "name": r.name,
+                "is_healthy": r.is_healthy(),
+                "cooldown_remaining_secs": r.cooldown_remaining_secs(),
+                "successful_requests": r.successful_requests,
+                "failed_requests": r.failed_requests,
+                "total_requests": r.total_requests,
+                "avg_latency_ms": r.avg_latency_ms,
+                "last_error": r.last_error,
+            })
+        }).collect();
+        let payload = serde_json::json!({
+            "total_tokens_saved": saved_tokens,
+            "providers": rec_json,
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "GET" && (uri == "/v1/models" || uri == "/api/models") {
+        let providers = ProviderRegistry::list_all();
+        let mut model_entries = Vec::new();
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(1700000000);
+        for p in &providers {
+            for m in &p.available_models {
+                model_entries.push(serde_json::json!({
+                    "id": m,
+                    "object": "model",
+                    "created": now,
+                    "owned_by": p.id,
+                    "permission": [],
+                    "root": m,
+                    "parent": null
+                }));
+            }
+        }
+        let payload = serde_json::json!({
+            "object": "list",
+            "data": model_entries
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && (uri == "/v1/chat/completions" || uri == "/api/chat/completions") {
+        let req_val: serde_json::Value = match serde_json::from_str(body) {
+            Ok(v) => v,
+            Err(e) => {
+                let err_payload = serde_json::json!({
+                    "error": {
+                        "message": format!("Invalid JSON request payload: {}", e),
+                        "type": "invalid_request_error",
+                        "param": null,
+                        "code": "bad_request"
+                    }
+                });
+                send_json(&mut stream, 400, &err_payload)?;
+                return Ok(());
+            }
+        };
+
+        let temp = req_val["temperature"].as_f64().map(|f| f as f32).unwrap_or(0.7);
+        let mut sys_prompt = String::new();
+        let mut user_prompt = String::new();
+        let mut history: Vec<(String, String)> = Vec::new();
+
+        if let Some(messages) = req_val["messages"].as_array() {
+            for msg in messages {
+                let role = msg["role"].as_str().unwrap_or("");
+                let content = if let Some(s) = msg["content"].as_str() {
+                    s.to_string()
+                } else if let Some(arr) = msg["content"].as_array() {
+                    let mut text_parts = Vec::new();
+                    for part in arr {
+                        if part["type"].as_str() == Some("text") {
+                            if let Some(t) = part["text"].as_str() {
+                                text_parts.push(t);
+                            }
+                        }
+                    }
+                    text_parts.join("\n")
+                } else {
+                    String::new()
+                };
+
+                match role {
+                    "system" => {
+                        if !sys_prompt.is_empty() {
+                            sys_prompt.push('\n');
+                        }
+                        sys_prompt.push_str(&content);
+                    }
+                    "user" => {
+                        if !user_prompt.is_empty() {
+                            history.push(("user".to_string(), user_prompt.clone()));
+                        }
+                        user_prompt = content;
+                    }
+                    "assistant" => {
+                        history.push(("assistant".to_string(), content));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if user_prompt.is_empty() {
+            let err_payload = serde_json::json!({
+                "error": {
+                    "message": "No user message found in 'messages' array",
+                    "type": "invalid_request_error",
+                    "param": "messages",
+                    "code": "missing_required_field"
+                }
+            });
+            send_json(&mut stream, 400, &err_payload)?;
+            return Ok(());
+        }
+
+        let sys_opt = if !sys_prompt.is_empty() { Some(sys_prompt.as_str()) } else { None };
+
+        match ProviderRegistry::dispatch_prompt_detailed(&user_prompt, sys_opt, temp, &history) {
+            Ok(res) => {
+                let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(1700000000);
+                let unique_id = format!("chatcmpl-ntx-{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+                let resp_payload = serde_json::json!({
+                    "id": unique_id,
+                    "object": "chat.completion",
+                    "created": now,
+                    "model": res.model,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": res.text
+                            },
+                            "finish_reason": "stop"
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": res.input_tokens,
+                        "completion_tokens": res.output_tokens,
+                        "total_tokens": res.total_tokens
+                    }
+                });
+                send_json(&mut stream, 200, &resp_payload)?;
+                return Ok(());
+            }
+            Err(e) => {
+                let err_payload = serde_json::json!({
+                    "error": {
+                        "message": e,
+                        "type": "api_error",
+                        "param": null,
+                        "code": "gateway_execution_error"
+                    }
+                });
+                send_json(&mut stream, 502, &err_payload)?;
+                return Ok(());
+            }
+        }
+    }
+
     // --- Google OAuth & Auth Status API ---
     if method == "GET" && uri == "/api/auth/status" {
         let google_creds = GoogleOAuthEngine::load_credentials();
