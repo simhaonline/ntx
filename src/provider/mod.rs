@@ -42,19 +42,19 @@ fn default_context_window() -> usize {
 impl ProviderDefinition {
     pub fn context_window_for_model(&self, model: &str) -> usize {
         let m = model.to_lowercase();
-        if m.contains("1.5-pro") {
+        if m.contains("2.5-pro") || m.contains("1.5-pro") {
             2_097_152
-        } else if m.contains("gemini-2.0") || m.contains("1.5-flash") {
+        } else if m.contains("2.5-flash") || m.contains("gemini-2.0") || m.contains("1.5-flash") {
             1_048_576
         } else if m.contains("claude-3-7") || m.contains("claude-3-5") || m.contains("claude-3-opus") {
             200_000
-        } else if m.contains("o1") || m.contains("o3-mini") || m.contains("sonar-pro") {
+        } else if m.contains("o1") || m.contains("o3-mini") || m.contains("sonar-pro") || m.contains("sonar-reasoning") {
             200_000
         } else if m.contains("codestral") {
             256_000
         } else if m.contains("grok-2") {
             131_072
-        } else if m.contains("gpt-4o") || m.contains("llama-3.3") || m.contains("hermes-3") {
+        } else if m.contains("gpt-4.5") || m.contains("gpt-4o") || m.contains("llama-3.3") || m.contains("llama-3.1") || m.contains("hermes-3") {
             128_000
         } else if m.contains("deepseek") {
             64_000
@@ -66,6 +66,7 @@ impl ProviderDefinition {
             self.max_context_window
         }
     }
+
     pub fn is_reasoning_capable(&self, model: &str) -> bool {
         let m = model.to_lowercase();
         m.contains("r1")
@@ -74,6 +75,7 @@ impl ProviderDefinition {
             || m.contains("thinking")
             || m.contains("reason")
             || m.contains("claude-3-7")
+            || m.contains("gemini-2.5")
             || m.contains("gemini-2.0")
     }
 }
@@ -171,10 +173,14 @@ impl ProviderRegistry {
                 name: "Google Gemini".to_string(),
                 category: "Commercial".to_string(),
                 base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
-                default_model: "gemini-2.0-flash".to_string(),
+                default_model: "gemini-2.5-flash".to_string(),
                 available_models: vec![
+                    "gemini-2.5-flash".to_string(),
+                    "gemini-2.5-pro".to_string(),
                     "gemini-2.0-flash".to_string(),
                     "gemini-2.0-flash-thinking-exp".to_string(),
+                    "gemini-2.0-pro-exp-02-05".to_string(),
+                    "gemini-2.0-flash-lite".to_string(),
                     "gemini-1.5-pro".to_string(),
                     "gemini-1.5-flash".to_string(),
                     "gemini-1.5-flash-8b".to_string(),
@@ -221,9 +227,12 @@ impl ProviderRegistry {
                 default_model: "gpt-4o".to_string(),
                 available_models: vec![
                     "gpt-4o".to_string(),
+                    "gpt-4.5-preview".to_string(),
                     "gpt-4o-mini".to_string(),
                     "o1".to_string(),
                     "o3-mini".to_string(),
+                    "o1-preview".to_string(),
+                    "o1-mini".to_string(),
                     "chatgpt-4o-latest".to_string(),
                 ],
                 api_format: "openai".to_string(),
@@ -289,9 +298,10 @@ impl ProviderRegistry {
                 default_model: "llama-3.3-70b-versatile".to_string(),
                 available_models: vec![
                     "llama-3.3-70b-versatile".to_string(),
-                    "llama-3.1-8b-instant".to_string(),
-                    "mixtral-8x7b-32768".to_string(),
                     "deepseek-r1-distill-llama-70b".to_string(),
+                    "llama-3.1-8b-instant".to_string(),
+                    "qwen-2.5-coder-32b".to_string(),
+                    "mixtral-8x7b-32768".to_string(),
                 ],
                 api_format: "openai".to_string(),
                 auth_type: "api_key".to_string(),
@@ -313,9 +323,13 @@ impl ProviderRegistry {
                 available_models: vec![
                     "auto".to_string(),
                     "anthropic/claude-3.7-sonnet".to_string(),
+                    "deepseek/deepseek-r1".to_string(),
+                    "deepseek/deepseek-chat".to_string(),
+                    "openai/gpt-4.5-preview".to_string(),
+                    "google/gemini-2.5-pro".to_string(),
+                    "google/gemini-2.5-flash".to_string(),
                     "openai/gpt-4o".to_string(),
                     "meta-llama/llama-3.3-70b-instruct".to_string(),
-                    "deepseek/deepseek-r1".to_string(),
                 ],
                 api_format: "openai".to_string(),
                 auth_type: "api_key".to_string(),
@@ -785,6 +799,170 @@ impl ProviderRegistry {
         Self::save_config(&config)
     }
 
+    /// Dynamically fetch live model list from provider API with given key and url overrides
+    pub fn fetch_remote_models_with_key(
+        provider_id: &str,
+        override_key: Option<&str>,
+        override_url: Option<&str>,
+    ) -> Result<Vec<String>, String> {
+        let provider = match Self::get(provider_id) {
+            Some(p) => p,
+            None => return Err(format!("Unknown provider '{}'", provider_id)),
+        };
+
+        let active_key = override_key
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .or_else(|| Self::resolve_raw_key(&provider));
+
+        let active_base = override_url
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .or_else(|| provider.custom_base_url.clone())
+            .unwrap_or_else(|| provider.base_url.clone());
+
+        if provider.id == "gemini" {
+            let oauth_token = if active_key.is_none() {
+                GoogleOAuthEngine::get_valid_access_token().ok()
+            } else {
+                None
+            };
+            let url = if let Some(ref key) = active_key {
+                format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", key)
+            } else if oauth_token.is_some() {
+                "https://generativelanguage.googleapis.com/v1beta/models".to_string()
+            } else {
+                return Err("Google Gemini requires an API key or Google OAuth to query live models.".to_string());
+            };
+
+            let mut cmd = Command::new("curl");
+            cmd.arg("-s").arg("--max-time").arg("8").arg("-X").arg("GET").arg(&url);
+            if let Some(ref token) = oauth_token {
+                if active_key.is_none() {
+                    cmd.arg("-H").arg(format!("Authorization: Bearer {}", token));
+                }
+            }
+            let output = cmd.output().map_err(|e| format!("Failed to curl Gemini API: {}", e))?;
+            let resp_str = String::from_utf8_lossy(&output.stdout);
+            let val: serde_json::Value = serde_json::from_str(&resp_str)
+                .map_err(|e| format!("Invalid JSON response: {}. Body: {}", e, resp_str))?;
+
+            if let Some(err_msg) = val.pointer("/error/message").and_then(|v| v.as_str()) {
+                return Err(format!("Gemini API Error: {}", err_msg));
+            }
+
+            if let Some(models) = val.pointer("/models").and_then(|v| v.as_array()) {
+                let mut list = Vec::new();
+                for m in models {
+                    if let Some(methods) = m.get("supportedGenerationMethods").and_then(|v| v.as_array()) {
+                        let has_gen = methods.iter().any(|method| method.as_str() == Some("generateContent"));
+                        if has_gen {
+                            if let Some(name) = m.get("name").and_then(|v| v.as_str()) {
+                                let clean = name.strip_prefix("models/").unwrap_or(name);
+                                list.push(clean.to_string());
+                            }
+                        }
+                    }
+                }
+                if !list.is_empty() {
+                    list.sort_by(|a, b| {
+                        let score = |s: &str| {
+                            if s.contains("2.5") { 3 }
+                            else if s.contains("2.0") { 2 }
+                            else if s.contains("1.5") { 1 }
+                            else { 0 }
+                        };
+                        score(b).cmp(&score(a))
+                    });
+                    return Ok(list);
+                }
+            }
+            return Err("No generative models found in Gemini API response.".to_string());
+        }
+
+        if provider.id == "ollama" {
+            let base = active_base.trim_end_matches('/');
+            let url = format!("{}/api/tags", base);
+            let mut cmd = Command::new("curl");
+            cmd.arg("-s").arg("--max-time").arg("4").arg(&url);
+            let output = cmd.output().map_err(|e| format!("Failed to reach Ollama: {}", e))?;
+            let resp_str = String::from_utf8_lossy(&output.stdout);
+            let val: serde_json::Value = serde_json::from_str(&resp_str)
+                .map_err(|e| format!("Invalid JSON from Ollama: {}", e))?;
+            if let Some(models) = val.get("models").and_then(|v| v.as_array()) {
+                let list: Vec<String> = models.iter()
+                    .filter_map(|m| m.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                    .collect();
+                if !list.is_empty() {
+                    return Ok(list);
+                }
+            }
+            return Err("No local models found in Ollama repository. Run 'ollama pull llama3.3'.".to_string());
+        }
+
+        if provider.id == "anthropic" {
+            let key = active_key.ok_or_else(|| "Anthropic Claude requires an API key to fetch live models.".to_string())?;
+            let mut cmd = Command::new("curl");
+            cmd.arg("-s").arg("--max-time").arg("8")
+               .arg("https://api.anthropic.com/v1/models")
+               .arg("-H").arg(format!("x-api-key: {}", key))
+               .arg("-H").arg("anthropic-version: 2023-06-01");
+            let output = cmd.output().map_err(|e| format!("Failed to reach Anthropic: {}", e))?;
+            let resp_str = String::from_utf8_lossy(&output.stdout);
+            let val: serde_json::Value = serde_json::from_str(&resp_str)
+                .map_err(|e| format!("Invalid JSON from Anthropic: {}", e))?;
+            if let Some(err) = val.pointer("/error/message").and_then(|v| v.as_str()) {
+                return Err(format!("Anthropic API Error: {}", err));
+            }
+            if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
+                let list: Vec<String> = data.iter()
+                    .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                    .collect();
+                if !list.is_empty() {
+                    return Ok(list);
+                }
+            }
+            return Err("No models returned by Anthropic API.".to_string());
+        }
+
+        // OpenAI, OpenRouter, Groq, DeepSeek, Together, Mistral, Ollama Cloud, etc.
+        let key = active_key.ok_or_else(|| format!("{} requires an API key to query live models.", provider.name))?;
+        let base = active_base.trim_end_matches('/');
+        let url = if base.ends_with("/chat/completions") {
+            base.replace("/chat/completions", "/models")
+        } else if base.ends_with("/v1") {
+            format!("{}/models", base)
+        } else {
+            format!("{}/v1/models", base)
+        };
+
+        let mut cmd = Command::new("curl");
+        cmd.arg("-s").arg("--max-time").arg("8").arg(&url)
+           .arg("-H").arg(format!("Authorization: Bearer {}", key));
+
+        let output = cmd.output().map_err(|e| format!("Failed to reach {}: {}", provider.name, e))?;
+        let resp_str = String::from_utf8_lossy(&output.stdout);
+        let val: serde_json::Value = serde_json::from_str(&resp_str)
+            .map_err(|e| format!("Invalid JSON from {}: {}. Response: {}", provider.name, e, resp_str))?;
+
+        if let Some(err) = val.pointer("/error/message").and_then(|v| v.as_str()) {
+            return Err(format!("{} API Error: {}", provider.name, err));
+        }
+
+        if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
+            let mut list: Vec<String> = data.iter()
+                .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                .filter(|id| !id.contains("embedding") && !id.contains("tts") && !id.contains("dall-e") && !id.contains("whisper"))
+                .collect();
+            if !list.is_empty() {
+                list.sort();
+                return Ok(list);
+            }
+        }
+
+        Err(format!("No generative models found in response from {}", provider.name))
+    }
+
     /// Dynamically fetch live model list from provider API with fallback to curated models
     pub fn fetch_remote_models(provider_id: &str) -> Vec<String> {
         let provider = match Self::get(provider_id) {
@@ -792,117 +970,9 @@ impl ProviderRegistry {
             None => return Vec::new(),
         };
 
-        if provider.id == "gemini" {
-            let raw_key = Self::resolve_raw_key(&provider);
-            let oauth_token = if raw_key.is_none() {
-                GoogleOAuthEngine::get_valid_access_token().ok()
-            } else {
-                None
-            };
-            let url = if let Some(ref key) = raw_key {
-                format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", key)
-            } else if oauth_token.is_some() {
-                "https://generativelanguage.googleapis.com/v1beta/models".to_string()
-            } else {
-                return provider.available_models;
-            };
-
-            let mut cmd = Command::new("curl");
-            cmd.arg("-s").arg("--max-time").arg("6").arg("-X").arg("GET").arg(&url);
-            if let Some(ref token) = oauth_token {
-                if raw_key.is_none() {
-                    cmd.arg("-H").arg(format!("Authorization: Bearer {}", token));
-                }
-            }
-            if let Ok(output) = cmd.output() {
-                let resp_str = String::from_utf8_lossy(&output.stdout);
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
-                    if let Some(models) = val.pointer("/models").and_then(|v| v.as_array()) {
-                        let mut list = Vec::new();
-                        for m in models {
-                            if let Some(methods) = m.get("supportedGenerationMethods").and_then(|v| v.as_array()) {
-                                let has_gen = methods.iter().any(|method| method.as_str() == Some("generateContent"));
-                                if has_gen {
-                                    if let Some(name) = m.get("name").and_then(|v| v.as_str()) {
-                                        let clean = name.strip_prefix("models/").unwrap_or(name);
-                                        list.push(clean.to_string());
-                                    }
-                                }
-                            }
-                        }
-                        if !list.is_empty() {
-                            return list;
-                        }
-                    }
-                }
-            }
-        } else if provider.id == "ollama" {
-            let base = provider.base_url.trim_end_matches('/');
-            let url = format!("{}/api/tags", base);
-            let mut cmd = Command::new("curl");
-            cmd.arg("-s").arg("--max-time").arg("4").arg(&url);
-            if let Ok(output) = cmd.output() {
-                let resp_str = String::from_utf8_lossy(&output.stdout);
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
-                    if let Some(models) = val.get("models").and_then(|v| v.as_array()) {
-                        let list: Vec<String> = models.iter()
-                            .filter_map(|m| m.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()))
-                            .collect();
-                        if !list.is_empty() {
-                            return list;
-                        }
-                    }
-                }
-            }
-        } else if provider.id == "anthropic" {
-            if let Some(raw_key) = Self::resolve_raw_key(&provider) {
-                let mut cmd = Command::new("curl");
-                cmd.arg("-s").arg("--max-time").arg("6")
-                   .arg("https://api.anthropic.com/v1/models")
-                   .arg("-H").arg(format!("x-api-key: {}", raw_key))
-                   .arg("-H").arg("anthropic-version: 2023-06-01");
-                if let Ok(output) = cmd.output() {
-                    let resp_str = String::from_utf8_lossy(&output.stdout);
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
-                        if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
-                            let list: Vec<String> = data.iter()
-                                .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
-                                .collect();
-                            if !list.is_empty() {
-                                return list;
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // OpenAI & OpenAI-compatible backends
-            let base = provider.base_url.trim_end_matches('/');
-            let url = if base.ends_with("/chat/completions") {
-                base.replace("/chat/completions", "/models")
-            } else if base.ends_with("/v1") {
-                format!("{}/models", base)
-            } else {
-                format!("{}/v1/models", base)
-            };
-
-            let mut cmd = Command::new("curl");
-            cmd.arg("-s").arg("--max-time").arg("6").arg(&url);
-            if let Some(key) = Self::resolve_raw_key(&provider) {
-                cmd.arg("-H").arg(format!("Authorization: Bearer {}", key));
-            }
-            if let Ok(output) = cmd.output() {
-                let resp_str = String::from_utf8_lossy(&output.stdout);
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&resp_str) {
-                    if let Some(data) = val.get("data").and_then(|v| v.as_array()) {
-                        let list: Vec<String> = data.iter()
-                            .filter_map(|m| m.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
-                            .collect();
-                        if !list.is_empty() {
-                            return list;
-                        }
-                    }
-                }
+        if let Ok(models) = Self::fetch_remote_models_with_key(provider_id, None, None) {
+            if !models.is_empty() {
+                return models;
             }
         }
 
@@ -1503,11 +1573,16 @@ impl ProviderRegistry {
             "fireworks" => "https://fireworks.ai/api-keys",
             "cerebras" => "https://cloud.cerebras.ai",
             "sambanova" => "https://cloud.sambanova.ai/apis",
+            "novita" => "https://novita.ai/settings/key-management",
+            "hyperbolic" => "https://app.hyperbolic.xyz/settings",
+            "nebius" => "https://token.nebius.ai/",
+            "deepinfra" => "https://deepinfra.com/dash/api_keys",
             "bedrock" => "https://aws.amazon.com/bedrock",
             "vertex" => "https://console.cloud.google.com/vertex-ai",
             "azure" => "https://portal.azure.com",
             "ollama-cloud" => "https://ollama.com",
-            _ => "https://simhaonline.ai",
+            "ollama" => "http://localhost:11434",
+            _ => "https://aistudio.google.com/app/apikey",
         }
     }
 

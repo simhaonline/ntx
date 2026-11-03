@@ -112,6 +112,9 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
     
     .hitl-banner { background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 1.25rem; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
     .hitl-banner h4 { color: #B45309; font-size: 0.95rem; font-weight: 700; }
+
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(9, 25, 46, 0.75); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .modal-content { background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 12px; width: 90%; max-width: 580px; padding: 2rem; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); }
     
     @keyframes pulse {
       0% { opacity: 0.7; }
@@ -297,7 +300,7 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
           <div>
             <div class="card-title" style="margin-bottom: 0.25rem;">🌐 Multi-Provider AI Gateway & App Store</div>
-            <p style="color: var(--text-muted); font-size: 0.88rem;">21 preconfigured providers across frontier labs, open-source clusters, and specialized LPUs.</p>
+            <p style="color: var(--text-muted); font-size: 0.88rem;">22 preconfigured providers across frontier labs, open-source clusters, and specialized LPUs.</p>
           </div>
           <div style="display: flex; gap: 0.5rem;">
             <input type="text" id="provider-search" placeholder="Search providers or models..." onkeyup="filterProviders()" style="width: 240px;">
@@ -306,6 +309,55 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
 
         <div id="providers-container" class="bot-grid">
           <!-- Dynamically Loaded via loadProviders() -->
+        </div>
+      </div>
+
+      <!-- Advanced Provider Configuration Modal -->
+      <div id="provider-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div>
+              <h3 id="modal-provider-title" style="font-size: 1.25rem; font-weight: 800; color: var(--text-heading);">Configure Provider</h3>
+              <span id="modal-provider-id" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent);"></span>
+            </div>
+            <button class="btn-secondary" onclick="closeProviderModal()" style="border: none; font-size: 1.2rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.35rem;">API Key:</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="password" id="modal-api-key" placeholder="Enter API Key..." style="flex: 1; font-family: var(--font-mono); font-size: 0.85rem;">
+              <button class="btn-secondary" onclick="toggleModalKeyVisibility()" title="Toggle Visibility">👁️</button>
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.35rem;">
+              Official Console: <a id="modal-portal-link" href="#" target="_blank" style="color: var(--color-brand-accent); font-weight: 600; text-decoration: underline;">Open Provider Console ↗</a>
+            </div>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading);">Model Selection:</label>
+              <button class="btn-secondary" onclick="fetchLiveModelsForModal()" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; cursor: pointer;">🔄 Fetch Live Models</button>
+            </div>
+            <select id="modal-model-select" style="width: 100%; font-family: var(--font-mono); font-size: 0.85rem;"></select>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.35rem;">Reasoning & Thinking Effort:</label>
+            <select id="modal-effort-select" style="width: 100%; font-size: 0.85rem;">
+              <option value="low">Low (Fast Thinking - 2,048 tokens budget)</option>
+              <option value="medium" selected>Medium (Balanced Reasoning - 4,096 tokens budget)</option>
+              <option value="high">High (Deep Step-by-Step Thinking - 8,192 tokens budget)</option>
+              <option value="max">Max (Exhaustive Reasoning - 16,384 tokens budget)</option>
+              <option value="off">Off (Standard Direct Output - 0 tokens)</option>
+            </select>
+          </div>
+          <div style="margin-bottom: 1.5rem;">
+            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.35rem;">Custom Base URL (Optional / Enterprise / Local Proxy):</label>
+            <input type="text" id="modal-base-url" placeholder="e.g. http://localhost:11434 or https://custom-proxy.internal/v1" style="width: 100%; font-family: var(--font-mono); font-size: 0.85rem;">
+          </div>
+          <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+            <button class="btn-secondary" onclick="closeProviderModal()">Cancel</button>
+            <button class="btn-secondary" onclick="testModalProvider()">Ping Test</button>
+            <button class="btn-primary" onclick="saveProviderModal()">Save & Set Active</button>
+          </div>
         </div>
       </div>
     </div>
@@ -449,6 +501,33 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
         .catch(err => console.error("Error loading providers:", err));
     }
 
+    const PORTAL_URLS = {
+      gemini: "https://aistudio.google.com/app/apikey",
+      anthropic: "https://console.anthropic.com/settings/keys",
+      openai: "https://platform.openai.com/api-keys",
+      deepseek: "https://platform.deepseek.com/api_keys",
+      groq: "https://console.groq.com/keys",
+      openrouter: "https://openrouter.ai/keys",
+      together: "https://api.together.ai/settings/api-keys",
+      perplexity: "https://www.perplexity.ai/settings/api",
+      xai: "https://console.x.ai/",
+      sambanova: "https://cloud.sambanova.ai/apis",
+      mistral: "https://console.mistral.ai/api-keys",
+      cohere: "https://dashboard.cohere.com/api-keys",
+      fireworks: "https://fireworks.ai/api-keys",
+      cerebras: "https://cloud.cerebras.ai/",
+      novita: "https://novita.ai/settings/key-management",
+      hyperbolic: "https://app.hyperbolic.xyz/settings",
+      nebius: "https://token.nebius.ai/",
+      deepinfra: "https://deepinfra.com/dash/api_keys",
+      bedrock: "https://aws.amazon.com/bedrock/",
+      vertex: "https://console.cloud.google.com/vertex-ai",
+      "ollama-cloud": "https://ollama.com",
+      ollama: "http://localhost:11434"
+    };
+
+    let modalActiveProviderId = null;
+
     function renderProviders(providers) {
       const c = document.getElementById('providers-container');
       if (!c) return;
@@ -459,9 +538,12 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
           ? '<span class="badge badge-green">ACTIVE DEFAULT</span>'
           : p.is_configured
             ? '<span class="badge badge-blue">READY</span>'
-            : '<span class="badge">UNCONFIGURED</span>';
+            : p.auth_type === 'none'
+              ? '<span class="badge badge-purple">LOCAL</span>'
+              : '<span class="badge badge-amber">KEY REQUIRED</span>';
 
         const categoryBadge = `<span class="badge" style="font-size: 0.7rem;">${escapeHtml(p.category)}</span>`;
+        const portalUrl = PORTAL_URLS[p.id] || "https://aistudio.google.com/app/apikey";
 
         const card = document.createElement('div');
         card.className = 'bot-card' + (isActive ? ' active-provider' : '');
@@ -470,16 +552,22 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
           card.style.boxShadow = '0 4px 16px rgba(192, 90, 40, 0.15)';
         }
 
-        const modelsList = (p.available_models || []).slice(0, 3).map(m =>
-          `<span class="badge" style="font-size: 0.65rem; background: var(--bg-canvas);">${escapeHtml(m)}</span>`
-        ).join(' ');
+        const modelOptions = (p.available_models || []).map(m => {
+          const selected = m === p.default_model ? 'selected' : '';
+          return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
+        }).join('');
+
+        const keyPlaceholder = p.api_key ? `•••••••• (${p.api_key})` : `Paste API Key (${p.env_var})...`;
 
         card.innerHTML = `
           <div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.65rem;">
               <div>
                 <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text-heading);">${escapeHtml(p.name)}</h3>
-                <span style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--color-brand-accent);">${escapeHtml(p.id)}</span>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.15rem;">
+                  <span style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--color-brand-accent);">${escapeHtml(p.id)}</span>
+                  <a href="${portalUrl}" target="_blank" style="font-size: 0.72rem; color: var(--color-brand-accent); text-decoration: underline; font-weight: 600;">Get API Key ↗</a>
+                </div>
               </div>
               <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
                 ${statusBadge}
@@ -487,89 +575,239 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
               </div>
             </div>
 
-            <p style="font-size: 0.85rem; color: var(--text-body); margin-bottom: 0.85rem; line-height: 1.4;">${escapeHtml(p.description)}</p>
+            <p style="font-size: 0.84rem; color: var(--text-body); margin-bottom: 0.75rem; line-height: 1.4;">${escapeHtml(p.description)}</p>
 
-            <div style="background: var(--bg-canvas); padding: 0.65rem; border-radius: 6px; border: 1px solid var(--border-subtle); margin-bottom: 0.85rem; font-size: 0.78rem;">
-              <div><strong>Default Model:</strong> <span style="color: var(--color-brand-accent); font-family: var(--font-mono);">${escapeHtml(p.default_model)}</span></div>
-              <div style="margin-top: 0.2rem;"><strong>Auth:</strong> ${escapeHtml(p.auth_summary)}</div>
+            <div style="background: var(--bg-canvas); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-subtle); margin-bottom: 0.85rem; font-size: 0.78rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span><strong>Auth:</strong> ${escapeHtml(p.auth_summary)}</span>
+                <span style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.72rem;">max ${p.max_context_window ? (p.max_context_window / 1000).toFixed(0) + 'k' : '128k'} ctx</span>
+              </div>
             </div>
 
-            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 1rem;">
-              ${modelsList}
+            <!-- Inline API Key Input -->
+            <div style="margin-bottom: 0.85rem;">
+              <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.3rem;">API Key Credentials:</label>
+              <div style="display: flex; gap: 0.4rem;">
+                <input type="password" id="key-input-${p.id}" placeholder="${keyPlaceholder}" style="flex: 1; font-family: var(--font-mono); font-size: 0.8rem; padding: 0.45rem 0.65rem;">
+                <button class="btn-secondary" onclick="toggleKeyVisibility('${p.id}')" title="Toggle Show/Hide" style="padding: 0.45rem 0.65rem; font-size: 0.8rem;">👁️</button>
+                <button class="btn-primary" onclick="quickSaveKey('${p.id}')" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; white-space: nowrap;">Save & Set Active</button>
+              </div>
+            </div>
+
+            <!-- Model Selection & Live Query -->
+            <div style="margin-bottom: 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-heading);">Model Selection:</label>
+                <button class="btn-secondary" onclick="fetchLiveModelsForCard('${p.id}', this)" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; cursor: pointer;">🔄 Fetch Live Models</button>
+              </div>
+              <select id="model-select-${p.id}" onchange="selectModelForProvider('${p.id}', this.value)" style="width: 100%; font-family: var(--font-mono); font-size: 0.8rem; padding: 0.45rem 0.65rem;">
+                ${modelOptions}
+              </select>
             </div>
           </div>
 
-          <div style="display: flex; gap: 0.5rem; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 0.85rem;">
+          <div style="display: flex; gap: 0.5rem; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; margin-top: 0.5rem;">
             ${isActive 
-              ? `<button class="btn-primary" style="flex: 1; opacity: 0.8; cursor: default;">✓ Current Active</button>`
-              : `<button class="btn-primary" style="flex: 1;" onclick="selectProvider('${p.id}')">Set Active</button>`
+              ? `<button class="btn-primary" style="flex: 1; opacity: 0.9; cursor: default; font-size: 0.82rem;">✓ Current Active</button>`
+              : `<button class="btn-primary" style="flex: 1; font-size: 0.82rem;" onclick="selectProvider('${p.id}')">Set Active</button>`
             }
-            <button class="btn-secondary" onclick="testProvider('${p.id}', this)">Ping</button>
-            <button class="btn-secondary" onclick="configPrompt('${p.id}')">Config</button>
+            <button class="btn-secondary" onclick="testProvider('${p.id}', this)" style="font-size: 0.82rem; padding: 0.45rem 0.75rem;">Ping</button>
+            <button class="btn-secondary" onclick="openProviderModal('${p.id}')" style="font-size: 0.82rem; padding: 0.45rem 0.75rem;">⚙️ Config</button>
           </div>
         `;
         c.appendChild(card);
       });
     }
 
-    function filterProviders() {
-      const q = (document.getElementById('provider-search').value || '').toLowerCase();
-      const filtered = activeProviders.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        p.id.toLowerCase().includes(q) || 
-        p.category.toLowerCase().includes(q) ||
-        p.default_model.toLowerCase().includes(q)
-      );
-      renderProviders(filtered);
+    function toggleKeyVisibility(id) {
+      const input = document.getElementById(`key-input-${id}`);
+      if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+      }
     }
 
-    function selectProvider(id) {
-      fetch('/api/providers/select', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
-      })
-      .then(r => r.json())
-      .then(() => loadProviders())
-      .catch(err => alert("Error selecting provider: " + err));
+    function toggleModalKeyVisibility() {
+      const input = document.getElementById('modal-api-key');
+      if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+      }
     }
 
-    function testProvider(id, btn) {
-      const origText = btn.textContent;
-      btn.textContent = '...';
-      fetch('/api/providers/test', {
+    function quickSaveKey(id) {
+      const p = activeProviders.find(x => x.id === id);
+      const input = document.getElementById(`key-input-${id}`);
+      const keyVal = input ? input.value.trim() : '';
+
+      if (!keyVal) {
+        alert(`Please type or paste an API Key for ${p ? p.name : id} before saving.`);
+        return;
+      }
+
+      fetch('/api/providers/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id })
+        body: JSON.stringify({ id: id, api_key: keyVal, set_active: true })
       })
       .then(r => r.json())
       .then(res => {
-        btn.textContent = origText;
-        if (res.status === 'ok') {
-          alert(`[TEST PASSED]\n${res.message}`);
+        alert(`✓ API key saved successfully for ${p ? p.name : id} and set as active default!`);
+        loadProviders();
+        // Trigger live model query with the newly saved key
+        const btn = document.querySelector(`#model-select-${id}`)?.previousElementSibling?.querySelector('button');
+        if (btn) {
+          fetchLiveModelsForCard(id, btn);
+        }
+      })
+      .catch(err => alert("Error saving API key: " + err));
+    }
+
+    function fetchLiveModelsForCard(id, btn) {
+      const p = activeProviders.find(x => x.id === id);
+      const origText = btn ? btn.textContent : '🔄 Fetch Live Models';
+      if (btn) btn.textContent = '⏳ Querying...';
+
+      const keyInput = document.getElementById(`key-input-${id}`);
+      const keyVal = keyInput ? keyInput.value.trim() : '';
+
+      fetch('/api/providers/fetch-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, api_key: keyVal || undefined })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (btn) btn.textContent = origText;
+        if (res.status === 'ok' && res.models && res.models.length > 0) {
+          if (p) p.available_models = res.models;
+          const select = document.getElementById(`model-select-${id}`);
+          if (select) {
+            select.innerHTML = res.models.map(m => {
+              const selected = (p && m === p.default_model) ? 'selected' : '';
+              return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
+            }).join('');
+          }
+          alert(`✓ Successfully retrieved ${res.count} live models from ${p ? p.name : id} API!`);
         } else {
-          alert(`[TEST FAILED]\n${res.message}`);
+          alert(`⚠️ Notice from ${p ? p.name : id} API:\n${res.message || 'No models returned'}\n\nDisplaying fallback curated models.`);
         }
       })
       .catch(err => {
-        btn.textContent = origText;
-        alert("Ping error: " + err);
+        if (btn) btn.textContent = origText;
+        alert("Error querying remote models: " + err);
       });
     }
 
-    function configPrompt(id) {
+    function selectModelForProvider(id, model) {
+      fetch('/api/providers/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, model: model })
+      })
+      .then(r => r.json())
+      .then(() => loadProviders())
+      .catch(err => alert("Error setting model: " + err));
+    }
+
+    function openProviderModal(id) {
       const p = activeProviders.find(x => x.id === id);
-      const key = prompt(`Enter API Key for ${p ? p.name : id} (or leave empty to keep current):`);
-      if (key !== null) {
-        fetch('/api/providers/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: id, api_key: key })
-        })
-        .then(r => r.json())
-        .then(() => loadProviders())
-        .catch(err => alert("Error saving config: " + err));
+      if (!p) return;
+      modalActiveProviderId = id;
+
+      document.getElementById('modal-provider-title').textContent = `Configure ${p.name}`;
+      document.getElementById('modal-provider-id').textContent = p.id;
+      document.getElementById('modal-api-key').value = '';
+      document.getElementById('modal-api-key').placeholder = p.api_key ? `•••••••• (${p.api_key})` : `Paste API Key (${p.env_var})...`;
+      document.getElementById('modal-base-url').value = p.custom_base_url || '';
+      document.getElementById('modal-base-url').placeholder = p.base_url;
+
+      const portalUrl = PORTAL_URLS[p.id] || "https://aistudio.google.com/app/apikey";
+      const portalLink = document.getElementById('modal-portal-link');
+      if (portalLink) {
+        portalLink.href = portalUrl;
+        portalLink.textContent = `Get ${p.name} Key from Official Console ↗`;
       }
+
+      const modelSelect = document.getElementById('modal-model-select');
+      if (modelSelect) {
+        modelSelect.innerHTML = (p.available_models || []).map(m => {
+          const selected = m === p.default_model ? 'selected' : '';
+          return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
+        }).join('');
+      }
+
+      document.getElementById('provider-modal').style.display = 'flex';
+    }
+
+    function closeProviderModal() {
+      document.getElementById('provider-modal').style.display = 'none';
+      modalActiveProviderId = null;
+    }
+
+    function fetchLiveModelsForModal() {
+      if (!modalActiveProviderId) return;
+      const id = modalActiveProviderId;
+      const keyVal = document.getElementById('modal-api-key').value.trim();
+      const urlVal = document.getElementById('modal-base-url').value.trim();
+
+      fetch('/api/providers/fetch-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, api_key: keyVal || undefined, base_url: urlVal || undefined })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'ok' && res.models && res.models.length > 0) {
+          const p = activeProviders.find(x => x.id === id);
+          if (p) p.available_models = res.models;
+          const select = document.getElementById('modal-model-select');
+          if (select) {
+            select.innerHTML = res.models.map(m => {
+              const selected = (p && m === p.default_model) ? 'selected' : '';
+              return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
+            }).join('');
+          }
+          alert(`✓ Successfully retrieved ${res.count} live models!`);
+        } else {
+          alert(`⚠️ Live model query note:\n${res.message || 'No models returned'}`);
+        }
+      })
+      .catch(err => alert("Error querying live models: " + err));
+    }
+
+    function testModalProvider() {
+      if (!modalActiveProviderId) return;
+      testProvider(modalActiveProviderId, { textContent: 'Ping' });
+    }
+
+    function saveProviderModal() {
+      if (!modalActiveProviderId) return;
+      const id = modalActiveProviderId;
+      const key = document.getElementById('modal-api-key').value.trim();
+      const model = document.getElementById('modal-model-select').value;
+      const effort = document.getElementById('modal-effort-select').value;
+      const url = document.getElementById('modal-base-url').value.trim();
+
+      const payload = {
+        id: id,
+        set_active: true
+      };
+      if (key) payload.api_key = key;
+      if (model) payload.model = model;
+      if (effort) payload.reasoning_effort = effort;
+      if (url) payload.base_url = url;
+
+      fetch('/api/providers/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(r => r.json())
+      .then(() => {
+        alert("✓ Configuration saved and provider set as active default!");
+        closeProviderModal();
+        loadProviders();
+      })
+      .catch(err => alert("Error saving provider config: " + err));
     }
 
     function startGoogleOAuth() {

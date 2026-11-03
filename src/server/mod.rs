@@ -573,6 +573,9 @@ fn handle_connection(
         let provider_id = req_val["id"].as_str().or_else(|| req_val["provider"].as_str()).unwrap_or("");
         let key_opt = req_val["api_key"].as_str();
         let url_opt = req_val["base_url"].as_str();
+        let model_opt = req_val["model"].as_str();
+        let effort_opt = req_val["reasoning_effort"].as_str();
+        let set_active = req_val["set_active"].as_bool().unwrap_or(false);
 
         if let Some(key) = key_opt {
             let _ = ProviderRegistry::set_key(provider_id, key);
@@ -580,11 +583,49 @@ fn handle_connection(
         if let Some(url) = url_opt {
             let _ = ProviderRegistry::set_base_url(provider_id, url);
         }
+        if let Some(model) = model_opt {
+            let _ = ProviderRegistry::set_model(provider_id, model);
+        }
+        if let Some(effort) = effort_opt {
+            let _ = ProviderRegistry::set_reasoning_effort(effort);
+        }
+        if set_active {
+            let _ = ProviderRegistry::set_active(provider_id);
+        }
 
         let updated = ProviderRegistry::get(provider_id);
         let payload = serde_json::json!({ "status": "success", "provider": updated });
         send_json(&mut stream, 200, &payload)?;
         return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/providers/fetch-models" {
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let provider_id = req_val["id"].as_str().or_else(|| req_val["provider"].as_str()).unwrap_or("");
+        let key_opt = req_val["api_key"].as_str();
+        let url_opt = req_val["base_url"].as_str();
+
+        match ProviderRegistry::fetch_remote_models_with_key(provider_id, key_opt, url_opt) {
+            Ok(models) => {
+                let payload = serde_json::json!({
+                    "status": "ok",
+                    "models": models,
+                    "count": models.len()
+                });
+                send_json(&mut stream, 200, &payload)?;
+                return Ok(());
+            }
+            Err(e) => {
+                let fallback = ProviderRegistry::get(provider_id).map(|p| p.available_models).unwrap_or_default();
+                let payload = serde_json::json!({
+                    "status": "error",
+                    "message": e,
+                    "fallback_models": fallback
+                });
+                send_json(&mut stream, 200, &payload)?;
+                return Ok(());
+            }
+        }
     }
 
     if method == "POST" && uri == "/api/providers/test" {
