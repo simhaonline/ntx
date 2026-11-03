@@ -600,8 +600,8 @@ impl CliHandler {
     }
 
     pub fn cmd_version(&self) {
-        println!("ntx (NITYAKSHA - An AI Concierge Platform) v1.0.0 (Pure Rust Native)");
-        println!("Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.");
+        println!("ntx (NITYAKSHA - An AI Concierge Platform) v1.0.0");
+        println!("Engineered for high-velocity, deterministic AI concierge execution.");
         println!("Author: Simha <simhaonline.in@gmail.com>");
         println!("Storage: Native Agent Memory Stack (WAL, Dense SIMD, BM25, CAS, MVCC)");
     }
@@ -641,7 +641,7 @@ impl CliHandler {
 
         // 5. Dispatch Prompt to Active AI Provider
         let active_p = ProviderRegistry::active();
-        let sys_prompt = "Objective Technical Execution Mode. Pure Rust Native.";
+        let sys_prompt = "Objective Technical Execution Mode.";
 
         let (cleaned_response, in_tok, out_tok, tot_tok, ctx_limit, dur_ms) = match ProviderRegistry::dispatch_prompt_detailed(&input_prompt, Some(sys_prompt), 0.7, &[]) {
             Ok(result) => (result.text, result.input_tokens, result.output_tokens, result.total_tokens, result.context_limit, result.duration_ms),
@@ -1765,7 +1765,7 @@ complete -F _ntx_completions ntx"#);
         let action = if args.is_empty() { "status" } else { args[0].as_str() };
         match action {
             "status" => {
-                println!("Nityaksha Autonomous AI Harness Architecture (Pure Rust Native):");
+                println!("Nityaksha Autonomous AI Harness Architecture:");
                 println!("--------------------------------------------------------------------------------");
                 println!("  [ACTIVE] Outer Runtime Budgets & Physical Loop Counter");
                 println!("  [ACTIVE] Thrashing & File Oscillation Detector");
@@ -2471,8 +2471,8 @@ complete -F _ntx_completions ntx"#);
     }
 
     pub fn cmd_help(&self) {
-        println!("NITYAKSHA - An AI Concierge Platform (v1.0.0 Pure Rust Native)");
-        println!("Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.\n");
+        println!("NITYAKSHA - An AI Concierge Platform v1.0.0");
+        println!("Engineered for high-velocity, deterministic AI concierge execution.\n");
         println!("Usage: ntx [OPTIONS] [COMMAND] [PROMPT...]\n");
         println!("Global Options:");
         println!("  -p, --print [PROMPT]            Run non-interactively and print response");

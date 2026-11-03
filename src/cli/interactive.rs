@@ -646,7 +646,7 @@ impl InteractiveShell {
         println!();
         print_box_top(theme.accent, None, inner_width, theme.reset);
         let line1 = format!(
-            " {bold}{primary}◈ NITYAKSHA AGENT META-HARNESS & SWARM COCKPIT{reset} {dim}(v1.0.0 Pure Native Rust){reset}",
+            " {bold}{primary}◈ NITYAKSHA AGENT META-HARNESS & SWARM COCKPIT{reset} {dim}(v1.0.0){reset}",
             bold = theme.bold, primary = theme.primary, dim = theme.dim, reset = theme.reset
         );
         print_box_line(theme.accent, &line1, inner_width, theme.reset);
@@ -716,7 +716,6 @@ impl InteractiveShell {
         let c_silver = "\x1b[38;2;148;163;184m";     // #94A3B8 Silver / Muted
         let c_dim = "\x1b[38;2;100;116;139m";       // #64748B Slate Dim
         let c_emerald = "\x1b[38;2;16;185;129m";    // #10B981 Active Pulse
-        let c_rust = "\x1b[38;2;192;90;40m";        // #C05A28 Rust Orange Tag
         let rst = "\x1b[0m";
 
         let dir_disp = clean_path(&self.current_dir, 32);
@@ -724,7 +723,7 @@ impl InteractiveShell {
 
         // 1. Sleek Typographic Header Lockup (Antigravity Style - Zero Retro ASCII)
         println!();
-        println!(" {c_glyph_cyan}◈{rst} {c_white}NITYAKSHA CONCIERGE PLATFORM{rst} {c_dim}v1.0.0{rst} {c_rust}[Pure Rust Native]{rst}");
+        println!(" {c_glyph_cyan}◈{rst} {c_white}NITYAKSHA CONCIERGE PLATFORM{rst} {c_dim}v1.0.0{rst}");
         println!("   {c_silver}Active AI:{rst} {c_emerald}● {c_white}{}{rst} {c_dim}({}){rst} · {c_white}39 Providers Connected{rst}", active_p.name, active_p.default_model);
         println!("   {c_silver}Routing  :{rst} {c_white}Zero-Cost Auto Router [Index 0]{rst} {c_dim}· Cascading Failover Active{rst}");
         println!("   {c_silver}Sandbox  :{rst} {c_glyph_cyan}Sovereign POSIX Jail{rst} {c_dim}· SQLite WAL Episodic Memory{rst}");
@@ -1917,7 +1916,7 @@ impl InteractiveShell {
         println!();
         print_box_top(
             theme.accent,
-            Some(&format!("{bold}{accent}🩺 NITYAKSHA DIAGNOSTIC & SECURITY AUDIT (v1.0.0 Pure Rust){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            Some(&format!("{bold}{accent}🩺 NITYAKSHA DIAGNOSTIC & SECURITY AUDIT (v1.0.0){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
             inner_width,
             theme.reset,
         );
@@ -2014,10 +2013,10 @@ impl InteractiveShell {
             if let Some(bot) = self.engine.relational.get_bot(bot_id) {
                 bot.system_prompt_template
             } else {
-                "Objective Technical Execution Mode. Pure Rust Native.".to_string()
+                "Objective Technical Execution Mode.".to_string()
             }
         } else {
-            "Objective Technical Execution Mode. Pure Rust Native.".to_string()
+            "Objective Technical Execution Mode.".to_string()
         };
 
         match ProviderRegistry::dispatch_prompt_detailed(

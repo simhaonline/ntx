@@ -29,7 +29,7 @@ impl HttpServer {
     pub fn start(&self) -> std::io::Result<()> {
         let addr = format!("0.0.0.0:{}", self.port);
         let listener = TcpListener::bind(&addr)?;
-        println!("Nityaksha Pure Rust WebUI & REST API running on http://46.62.188.249:{} (and http://{})", self.port, addr);
+        println!("Nityaksha WebUI & REST API running on http://46.62.188.249:{} (and http://{})", self.port, addr);
 
         for stream in listener.incoming() {
             if let Ok(stream) = stream {
@@ -654,7 +654,7 @@ fn handle_connection(
     if method == "GET" && (uri == "/v1/health" || uri == "/health" || uri == "/api/health") {
         let payload = serde_json::json!({
             "status": "healthy",
-            "server": "Nityaksha Pure Rust AI Gateway",
+            "server": "Nityaksha AI Gateway",
             "version": "1.0.0",
             "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
         });
