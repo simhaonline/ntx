@@ -2,54 +2,90 @@
 //! Pure Native Rust Control Plane with Universal AI Gateway, Multi-Model Router, and Live Playground.
 
 pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NITYAKSHA — Enterprise AI Gateway & Control Plane</title>
   <link rel="icon" type="image/png" href="/NITYAKSHA_LOGO.png">
+  <script>
+    (function() {
+      try {
+        const saved = localStorage.getItem('ntx_theme');
+        if (saved === 'dark' || saved === 'light') {
+          document.documentElement.setAttribute('data-theme', saved);
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <style>
-    :root {
-      --bg-canvas: #0B1120;
-      --bg-sidebar: #0E1626;
-      --bg-surface: #111C2E;
-      --bg-surface-elevated: #16243C;
-      --bg-card-hover: #1C2D4A;
-      --border-subtle: #1E293B;
+    /* ==========================================================================
+       NITYAKSHA DESIGN SYSTEM TOKENS
+       Default Light Mode & Toggleable Dark Mode (API Park Architecture)
+       ========================================================================== */
+    :root, html[data-theme="light"] {
+      /* Light Mode Palette (Default) */
+      --bg-canvas: #F4F6F9;              /* Clean Off-White Canvas */
+      --bg-sidebar: #FFFFFF;             /* Pure White Sidebar */
+      --bg-surface: #FFFFFF;             /* White Surface Panels */
+      --bg-surface-elevated: #F8FAFC;    /* Elevated Soft Slate */
+      --bg-card-hover: #F1F5F9;
+      --border-subtle: #E2E8F0;          /* Crisp Slate Border */
+      --border-strong: #CBD5E1;
       --border-accent: rgba(192, 90, 40, 0.4);
-      --border-focus: #EA580C;
+      --border-focus: #C05A28;
 
-      --color-brand: #EA580C;
-      --color-brand-glow: rgba(234, 88, 12, 0.35);
-      --color-emerald: #10B981;
-      --color-cyan: #0EA5E9;
-      --color-amber: #F59E0B;
-      --color-violet: #8B5CF6;
-      --color-rose: #F43F5E;
+      --color-brand: #C05A28;            /* Rust Orange */
+      --color-brand-glow: rgba(192, 90, 40, 0.25);
+      --color-emerald: #059669;          /* High contrast emerald on white */
+      --color-cyan: #0284C7;
+      --color-amber: #D97706;
+      --color-violet: #7C3AED;
+      --color-rose: #E11D48;
 
-      --text-heading: #F8FAFC;
-      --text-body: #CBD5E1;
-      --text-muted: #94A3B8;
-      --text-dim: #64748B;
+      --text-heading: #0D2340;           /* Deep Navy (Crisp & High Contrast) */
+      --text-body: #2E4F6F;              /* Slate Steel Body */
+      --text-muted: #64748B;             /* Cool Slate Muted */
+      --text-dim: #94A3B8;
+
+      --card-shadow: 0 1px 3px rgba(13, 35, 64, 0.05), 0 1px 2px rgba(13, 35, 64, 0.03);
+      --card-shadow-hover: 0 6px 16px rgba(13, 35, 64, 0.08);
 
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, Menlo, Monaco, monospace;
     }
 
-    html[data-theme="light"] {
-      --bg-canvas: #F8FAFC;
-      --bg-sidebar: #FFFFFF;
-      --bg-surface: #FFFFFF;
-      --bg-surface-elevated: #F1F5F9;
-      --bg-card-hover: #E2E8F0;
-      --border-subtle: #E2E8F0;
-      --border-accent: rgba(234, 88, 12, 0.4);
+    html[data-theme="dark"] {
+      /* Dark Mode Palette (Toggleable) */
+      --bg-canvas: #09192E;              /* Deep Navy Dark Canvas */
+      --bg-sidebar: #0D2340;             /* Navy Sidebar */
+      --bg-surface: #0D2340;             /* Navy Panel Surface */
+      --bg-surface-elevated: #132D4E;    /* Elevated Navy */
+      --bg-card-hover: #163252;
+      --border-subtle: #1E3A5F;          /* Slate Steel Dark Border */
+      --border-strong: #2E4F6F;
+      --border-accent: rgba(192, 90, 40, 0.6);
       --border-focus: #EA580C;
 
-      --text-heading: #0F172A;
-      --text-body: #334155;
-      --text-muted: #64748B;
-      --text-dim: #94A3B8;
+      --color-brand: #EA580C;            /* Vibrant Rust Orange */
+      --color-brand-glow: rgba(234, 88, 12, 0.35);
+      --color-emerald: #10B981;          /* Glowing Emerald on Dark */
+      --color-cyan: #0EA5E9;
+      --color-amber: #F59E0B;
+      --color-violet: #8B5CF6;
+      --color-rose: #F43F5E;
+
+      --text-heading: #FFFFFF;           /* Pure White */
+      --text-body: #CBD5E1;              /* Soft Light Body */
+      --text-muted: #94A3B8;             /* Cool Slate */
+      --text-dim: #64748B;
+
+      --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --card-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.45);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-sans); }
@@ -189,7 +225,7 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       gap: 0.5rem;
       padding: 0.4rem 0.6rem;
       border-radius: 6px;
-      background: var(--bg-surface);
+      background: var(--bg-surface-elevated);
       border: 1px solid var(--border-subtle);
     }
     .footer-actions {
@@ -199,15 +235,40 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       color: var(--text-dim);
     }
     .theme-btn {
-      background: none;
+      background: var(--bg-surface-elevated);
       border: 1px solid var(--border-subtle);
       border-radius: 6px;
-      padding: 0.3rem 0.6rem;
+      padding: 0.35rem 0.65rem;
       color: var(--text-heading);
       cursor: pointer;
       font-size: 0.8rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s;
     }
-    .theme-btn:hover { background: var(--bg-surface-elevated); }
+    .theme-btn:hover { background: var(--bg-card-hover); border-color: var(--border-accent); }
+    .theme-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-heading);
+      cursor: pointer;
+      box-shadow: var(--card-shadow);
+      transition: all 0.15s ease;
+    }
+    .theme-toggle-btn:hover {
+      background: var(--bg-surface-elevated);
+      border-color: var(--border-accent);
+      transform: translateY(-1px);
+    }
 
     /* --- Main Content Area --- */
     #main {
@@ -252,6 +313,7 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       border-radius: 8px;
       padding: 0.3rem 0.75rem;
       font-size: 0.82rem;
+      box-shadow: var(--card-shadow);
     }
     .top-select-box label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; }
     .top-select-box select {
@@ -262,14 +324,18 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       outline: none;
       cursor: pointer;
     }
+    option {
+      background-color: var(--bg-surface);
+      color: var(--text-heading);
+    }
     .token-saved-pill {
       display: flex;
       align-items: center;
       gap: 0.4rem;
       padding: 0.35rem 0.75rem;
       border-radius: 9999px;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.25);
+      background: rgba(5, 150, 105, 0.08);
+      border: 1px solid rgba(5, 150, 105, 0.25);
       color: var(--color-emerald);
       font-size: 0.78rem;
       font-family: var(--font-mono);
@@ -297,6 +363,8 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       border-radius: 12px;
       padding: 1.25rem 1.5rem;
       margin-bottom: 1.25rem;
+      box-shadow: var(--card-shadow);
+      transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
     }
     .card-title {
       font-size: 1rem;
@@ -323,9 +391,14 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       display: flex;
       flex-direction: column;
       gap: 0.4rem;
+      box-shadow: var(--card-shadow);
       transition: all 0.2s;
     }
-    .kpi-card:hover { border-color: var(--border-accent); transform: translateY(-1px); }
+    .kpi-card:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-1px);
+      box-shadow: var(--card-shadow-hover);
+    }
     .kpi-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between; }
     .kpi-val { font-size: 1.75rem; font-weight: 800; color: var(--text-heading); font-family: var(--font-mono); line-height: 1.2; }
     .kpi-sub { font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; }
@@ -337,6 +410,7 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       border: 1px solid var(--border-subtle);
       border-radius: 10px;
       background: var(--bg-surface);
+      box-shadow: var(--card-shadow);
     }
     table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
     th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-subtle); }
@@ -552,7 +626,10 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
         </div>
       </div>
       <div class="footer-actions">
-        <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
+        <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle Light / Dark mode">
+          <span id="sidebar-theme-icon">🌙</span>
+          <span id="sidebar-theme-label">Dark</span>
+        </button>
         <a href="https://github.com/simhaonline/ntx" target="_blank" style="color:var(--text-dim); text-decoration:none; font-weight:600;">GitHub ↗</a>
       </div>
     </div>
@@ -568,6 +645,10 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
         <span class="breadcrumb-title" id="breadcrumb-title">Overview & Analytics</span>
       </div>
       <div class="top-tools">
+        <button class="theme-toggle-btn" onclick="toggleTheme()" id="top-theme-btn" title="Toggle Light / Dark mode">
+          <span id="top-theme-icon">🌙</span>
+          <span id="top-theme-label">Dark Mode</span>
+        </button>
         <div class="token-saved-pill">
           <span>⚡ RTK Saved:</span>
           <span id="top-tokens-saved">0</span>
@@ -1112,13 +1193,33 @@ print(response.choices[0].message.content)</pre>
       document.getElementById('breadcrumb-title').textContent = titles[viewId] || 'Control Plane';
     }
 
-    // --- Theme Toggle ---
+    // --- Unified Theme Engine (Light & Dark with LocalStorage Persistence) ---
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      try {
+        localStorage.setItem('ntx_theme', theme);
+      } catch (e) {}
+
+      const isLight = theme === 'light';
+      const nextIcon = isLight ? '🌙' : '☀️';
+      const nextModeText = isLight ? 'Dark Mode' : 'Light Mode';
+      const nextShortText = isLight ? 'Dark' : 'Light';
+
+      const topIcon = document.getElementById('top-theme-icon');
+      const topLabel = document.getElementById('top-theme-label');
+      if (topIcon) topIcon.textContent = nextIcon;
+      if (topLabel) topLabel.textContent = nextModeText;
+
+      const sideIcon = document.getElementById('sidebar-theme-icon');
+      const sideLabel = document.getElementById('sidebar-theme-label');
+      if (sideIcon) sideIcon.textContent = nextIcon;
+      if (sideLabel) sideLabel.textContent = nextShortText;
+    }
+
     function toggleTheme() {
-      const html = document.documentElement;
-      const current = html.getAttribute('data-theme');
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
       const next = current === 'dark' ? 'light' : 'dark';
-      html.setAttribute('data-theme', next);
-      document.getElementById('theme-btn').textContent = next === 'dark' ? '☀️ Light' : '🌙 Dark';
+      applyTheme(next);
     }
 
     // --- Fetch Providers Matrix ---
@@ -1569,6 +1670,10 @@ print(response.choices[0].message.content)</pre>
 
     // --- Initialize ---
     window.addEventListener('DOMContentLoaded', () => {
+      // Initialize theme state (Default Light Mode / LocalStorage)
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(currentTheme);
+
       const origin = window.location.origin || 'http://46.62.188.249:8080';
       const host = window.location.host || '46.62.188.249:8080';
 
