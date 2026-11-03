@@ -202,17 +202,17 @@ impl ProviderRegistry {
                 name: "Google Gemini".to_string(),
                 category: "Commercial".to_string(),
                 base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
-                default_model: "gemini-2.5-flash".to_string(),
+                default_model: "gemini-3.6-flash".to_string(),
                 available_models: vec![
-                    "gemini-2.5-flash".to_string(),
-                    "gemini-2.5-pro".to_string(),
-                    "gemini-2.0-flash".to_string(),
-                    "gemini-2.0-flash-thinking-exp".to_string(),
-                    "gemini-2.0-pro-exp-02-05".to_string(),
-                    "gemini-2.0-flash-lite".to_string(),
-                    "gemini-1.5-pro".to_string(),
-                    "gemini-1.5-flash".to_string(),
-                    "gemini-1.5-flash-8b".to_string(),
+                    "gemini-3.6-flash".to_string(),
+                    "gemini-3-flash-preview".to_string(),
+                    "gemini-2.5-flash-lite".to_string(),
+                    "gemini-flash-lite-latest".to_string(),
+                    "gemini-4-argon".to_string(),
+                    "gemini-3.8-flash".to_string(),
+                    "gemini-3.7-flash".to_string(),
+                    "gemini-3.5-flash".to_string(),
+                    "gemini-3.1-pro-preview".to_string(),
                 ],
                 api_format: "gemini".to_string(),
                 auth_type: "oauth_google".to_string(),
@@ -722,15 +722,17 @@ impl ProviderRegistry {
                 name: "Google AI Studio".to_string(),
                 category: "Commercial".to_string(),
                 base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
-                default_model: "gemini-2.5-flash".to_string(),
+                default_model: "gemini-3.6-flash".to_string(),
                 available_models: vec![
-                    "gemini-2.5-flash".to_string(),
-                    "gemini-2.5-pro".to_string(),
-                    "gemini-2.0-flash".to_string(),
-                    "gemini-2.0-flash-thinking-exp".to_string(),
-                    "gemini-2.0-pro-exp-02-05".to_string(),
-                    "gemini-1.5-pro".to_string(),
-                    "gemini-1.5-flash".to_string(),
+                    "gemini-3.6-flash".to_string(),
+                    "gemini-3-flash-preview".to_string(),
+                    "gemini-2.5-flash-lite".to_string(),
+                    "gemini-flash-lite-latest".to_string(),
+                    "gemini-4-argon".to_string(),
+                    "gemini-3.8-flash".to_string(),
+                    "gemini-3.7-flash".to_string(),
+                    "gemini-3.5-flash".to_string(),
+                    "gemini-3.1-pro-preview".to_string(),
                 ],
                 api_format: "gemini".to_string(),
                 auth_type: "api_key".to_string(),
@@ -1910,7 +1912,7 @@ impl ProviderRegistry {
             None
         };
 
-        Self::call_openai_compatible(
+        let openai_res = Self::call_openai_compatible(
             &active,
             prompt,
             sys,
@@ -1918,7 +1920,41 @@ impl ProviderRegistry {
             temperature,
             raw_key.as_deref(),
             history,
-        )
+        );
+
+        match openai_res {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                let e_lower = e.to_lowercase();
+                if e_lower.contains("credit_balance_exhausted")
+                    || e_lower.contains("no credits remaining")
+                    || e_lower.contains("insufficient_quota")
+                {
+                    if let Some(gp) = Self::get("gemini") {
+                        if gp.is_configured {
+                            eprintln!("\n\x1b[33m[RESILIENT FAILOVER] {} credit balance is exhausted ($0.00). Automatically routing request to configured Google Gemini...\x1b[0m", active.name);
+                            let g_key = Self::resolve_raw_key(&gp);
+                            let g_token = if g_key.is_none() { GoogleOAuthEngine::get_valid_access_token().ok() } else { None };
+                            if let Ok(res) = Self::call_gemini(
+                                prompt,
+                                sys,
+                                &gp.default_model,
+                                temperature,
+                                g_token.as_deref(),
+                                g_key.as_deref(),
+                                history,
+                            ) {
+                                return Ok(res);
+                            }
+                        }
+                    }
+                    return Err(format!(
+                        "OpenAI Quota Exhausted: Your OpenAI API key is authenticated and valid, but your organization's prepaid credit balance is exhausted ($0.00).\n  • Add billing credits: https://platform.openai.com/settings/organization/billing/\n  • Or switch to Google Gemini (free quota active): run 'ntx provider set gemini'"
+                    ));
+                }
+                Err(e)
+            }
+        }
     }
 
     /// Backwards-compatible prompt dispatch
@@ -1932,6 +1968,48 @@ impl ProviderRegistry {
     }
 
     fn call_gemini(
+        prompt: &str,
+        system_prompt: &str,
+        model: &str,
+        temperature: f32,
+        auth_token: Option<&str>,
+        api_key: Option<&str>,
+        history: &[(String, String)],
+    ) -> Result<PromptExecutionResult, String> {
+        match Self::call_gemini_single(prompt, system_prompt, model, temperature, auth_token, api_key, history) {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                let e_lower = e.to_lowercase();
+                let is_transient = e_lower.contains("high demand")
+                    || e_lower.contains("503")
+                    || e_lower.contains("no longer available")
+                    || e_lower.contains("404")
+                    || e_lower.contains("quota exceeded")
+                    || e_lower.contains("limit exceeded");
+
+                if is_transient {
+                    let fallbacks = ["gemini-3.6-flash", "gemini-3-flash-preview", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"];
+                    for fb in fallbacks {
+                        if fb == model {
+                            continue;
+                        }
+                        eprintln!(
+                            "\n\x1b[33m[RESILIENT FAILOVER] Model '{}' reported: {}. Rerouting to verified fallback model '{}'...\x1b[0m",
+                            model, e, fb
+                        );
+                        if let Ok(mut res) = Self::call_gemini_single(prompt, system_prompt, fb, temperature, auth_token, api_key, history) {
+                            let _ = Self::set_model("gemini", fb);
+                            res.model = fb.to_string();
+                            return Ok(res);
+                        }
+                    }
+                }
+                Err(e)
+            }
+        }
+    }
+
+    fn call_gemini_single(
         prompt: &str,
         system_prompt: &str,
         model: &str,
