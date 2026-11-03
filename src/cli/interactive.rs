@@ -488,8 +488,6 @@ impl InteractiveShell {
             };
 
             let cols = terminal_cols().clamp(72, 118);
-            let sep = "─".repeat(cols);
-            let c_rule = "\x1b[38;2;30;50;75m";
             let c_cyan = "\x1b[38;2;56;189;248m";
             let c_dim = "\x1b[38;2;100;116;139m";
             let rst = "\x1b[0m";
@@ -507,7 +505,7 @@ impl InteractiveShell {
             let status_line = format!("{c_dim}{}{}{c_cyan}{}{rst}", status_left, " ".repeat(gap), model_desc);
 
             let prompt_prefix = format!(
-                "\n{c_rule}{sep}{rst}\n{status_line}\n{c_cyan}> {rst}"
+                "\n{status_line}\n{c_cyan}> {rst}"
             );
 
             let line = if let Some(ref mut ed) = rl {
@@ -713,7 +711,6 @@ impl InteractiveShell {
         };
 
         let c_glyph_cyan = "\x1b[38;2;56;189;248m";  // #38BDF8 Electric Cyan
-        let c_glyph_blue = "\x1b[38;2;14;165;233m";  // #0EA5E9 Azure Velocity
         let c_rule = "\x1b[38;2;30;50;75m";         // #1E324B Subtle Rule
         let c_white = "\x1b[1;37m";                  // Pure White Bold
         let c_silver = "\x1b[38;2;148;163;184m";     // #94A3B8 Silver / Muted
@@ -725,13 +722,13 @@ impl InteractiveShell {
         let dir_disp = clean_path(&self.current_dir, 32);
         let git_disp = self.git_branch.as_deref().unwrap_or("main");
 
-        // 1. Antigravity-Style Geometric Micro-Glyph & Platform Metadata
+        // 1. Sleek Typographic Header Lockup (Antigravity Style - Zero Retro ASCII)
         println!();
-        println!("  {c_glyph_cyan}▄▀▀▄{rst}        {c_white}Nityaksha Concierge Platform 1.0.0{rst} {c_rust}[Pure Rust Native]{rst}");
-        println!(" {c_glyph_cyan}▀▀▀▀▀▀{rst}       {c_silver}Active AI:{rst} {c_emerald}● {c_white}{}{rst} {c_dim}({}){rst}", active_p.name, active_p.default_model);
-        println!(" {c_glyph_blue}▀▀▀▀▀▀▀▀{rst}      {c_silver}Gateway  :{rst} {c_white}39 Providers Connected{rst} {c_dim}· Zero-Cost Auto Router [Index 0]{rst}");
-        println!("    {c_glyph_blue}▄▀▀  ▀▀▄{rst}   {c_silver}Sandbox  :{rst} {c_glyph_cyan}Sovereign POSIX Jail{rst} {c_dim}· SQLite WAL Episodic Memory{rst}");
-        println!("   {c_glyph_blue}▄▀▀    ▀▀▄{rst}  {c_dim}{dir} ({git}) · {sid}{rst}", dir = dir_disp, git = git_disp, sid = short_sid);
+        println!(" {c_glyph_cyan}◈{rst} {c_white}NITYAKSHA CONCIERGE PLATFORM{rst} {c_dim}v1.0.0{rst} {c_rust}[Pure Rust Native]{rst}");
+        println!("   {c_silver}Active AI:{rst} {c_emerald}● {c_white}{}{rst} {c_dim}({}){rst} · {c_white}39 Providers Connected{rst}", active_p.name, active_p.default_model);
+        println!("   {c_silver}Routing  :{rst} {c_white}Zero-Cost Auto Router [Index 0]{rst} {c_dim}· Cascading Failover Active{rst}");
+        println!("   {c_silver}Sandbox  :{rst} {c_glyph_cyan}Sovereign POSIX Jail{rst} {c_dim}· SQLite WAL Episodic Memory{rst}");
+        println!("   {c_silver}Workspace:{rst} {c_dim}{dir} ({git}) · {sid}{rst}", dir = dir_disp, git = git_disp, sid = short_sid);
 
         let sep = "─".repeat(cols);
         println!("\n{c_rule}{sep}{rst}");
