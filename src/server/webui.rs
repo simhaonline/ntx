@@ -1,800 +1,1295 @@
-//! Embedded Single-Page Workstation WebUI for Nityaksha
-//! Brand Kit Compliant: Deep Navy (#0D2340), Rust Orange (#C05A28), Default Light Mode with Dark Mode Toggle.
-//! Features Bot App Store, Workflow DAG Graph Engine, Memory RAG, Sandbox, and Governance.
+//! Embedded Single-Page Workstation WebUI for Nityaksha (APIPark Enterprise Inspired)
+//! Pure Native Rust Control Plane with Universal AI Gateway, Multi-Model Router, and Live Playground.
 
 pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NITYAKSHA — Workstation Dashboard | Pure Rust Control Plane</title>
-  <link rel="icon" type="image/png" href="NITYAKSHA_LOGO.png">
+  <title>NITYAKSHA — Enterprise AI Gateway & Control Plane</title>
+  <link rel="icon" type="image/png" href="/NITYAKSHA_LOGO.png">
   <style>
     :root {
-      --color-brand-primary: #0D2340;
-      --color-brand-accent: #C05A28;
-      --color-brand-accent-hover: #A3481D;
-      
-      --bg-canvas: #F4F6F9;
-      --bg-surface: #FFFFFF;
-      --bg-surface-elevated: #FFFFFF;
-      --bg-card: #FFFFFF;
-      --border-subtle: #E2E8F0;
+      --bg-canvas: #0B1120;
+      --bg-sidebar: #0E1626;
+      --bg-surface: #111C2E;
+      --bg-surface-elevated: #16243C;
+      --bg-card-hover: #1C2D4A;
+      --border-subtle: #1E293B;
       --border-accent: rgba(192, 90, 40, 0.4);
-      --text-heading: #0D2340;
-      --text-body: #2E4F6F;
-      --text-muted: #607D8B;
-      --text-dim: #94A3B8;
+      --border-focus: #EA580C;
+
+      --color-brand: #EA580C;
+      --color-brand-glow: rgba(234, 88, 12, 0.35);
+      --color-emerald: #10B981;
+      --color-cyan: #0EA5E9;
+      --color-amber: #F59E0B;
+      --color-violet: #8B5CF6;
+      --color-rose: #F43F5E;
+
+      --text-heading: #F8FAFC;
+      --text-body: #CBD5E1;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
 
       --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, Menlo, Monaco, monospace;
     }
 
-    html[data-theme="dark"] {
-      --bg-canvas: #09192E;
-      --bg-surface: #0D2340;
-      --bg-surface-elevated: #132D4E;
-      --bg-card: #0D2340;
-      --border-subtle: #2E4F6F;
-      --border-accent: rgba(192, 90, 40, 0.6);
-      --text-heading: #FFFFFF;
-      --text-body: #CBD5E1;
-      --text-muted: #94A3B8;
-      --text-dim: #64748B;
+    html[data-theme="light"] {
+      --bg-canvas: #F8FAFC;
+      --bg-sidebar: #FFFFFF;
+      --bg-surface: #FFFFFF;
+      --bg-surface-elevated: #F1F5F9;
+      --bg-card-hover: #E2E8F0;
+      --border-subtle: #E2E8F0;
+      --border-accent: rgba(234, 88, 12, 0.4);
+      --border-focus: #EA580C;
+
+      --text-heading: #0F172A;
+      --text-body: #334155;
+      --text-muted: #64748B;
+      --text-dim: #94A3B8;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-sans); }
-    body { background-color: var(--bg-canvas); color: var(--text-body); display: flex; height: 100vh; overflow: hidden; transition: background 0.3s, color 0.3s; }
-    
-    #sidebar { width: 290px; background-color: var(--bg-surface); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; transition: all 0.3s; }
-    .brand-box { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
-    .brand-logo { width: 34px; height: 34px; object-fit: contain; }
-    .brand-title { font-size: 1.15rem; font-weight: 800; color: var(--text-heading); letter-spacing: -0.02em; }
-    .brand-pill { font-family: var(--font-mono); font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.45rem; border-radius: 9999px; background: rgba(192, 90, 40, 0.12); color: var(--color-brand-accent); border: 1px solid rgba(192, 90, 40, 0.3); }
+    body { background-color: var(--bg-canvas); color: var(--text-body); display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
 
-    .nav { list-style: none; padding: 1.25rem 0; flex: 1; overflow-y: auto; }
-    .nav li { padding: 0.85rem 1.5rem; cursor: pointer; display: flex; align-items: center; gap: 0.85rem; font-size: 0.92rem; font-weight: 600; color: var(--text-muted); transition: all 0.2s; border-left: 3px solid transparent; }
-    .nav li:hover, .nav li.active { background-color: rgba(192, 90, 40, 0.08); color: var(--color-brand-accent); border-left: 3px solid var(--color-brand-accent); }
+    /* --- Sidebar --- */
+    #sidebar {
+      width: 270px;
+      min-width: 270px;
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      z-index: 20;
+    }
 
-    .sidebar-footer { padding: 1.25rem; font-size: 0.78rem; border-top: 1px solid var(--border-subtle); color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; }
-    .btn-toggle-theme { background: var(--bg-canvas); border: 1px solid var(--border-subtle); color: var(--text-heading); padding: 0.4rem 0.65rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+    .brand-header {
+      padding: 1.25rem 1.25rem 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .brand-subtitle {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-ver {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
+      border-radius: 9999px;
+      background: rgba(234, 88, 12, 0.15);
+      color: var(--color-brand);
+      border: 1px solid rgba(234, 88, 12, 0.3);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      margin-left: auto;
+    }
 
-    #main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 2.25rem 2.5rem; }
-    .header { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .header h1 { font-size: 1.75rem; font-weight: 800; color: var(--text-heading); letter-spacing: -0.02em; }
-    .header p { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem; }
+    .status-bar-box {
+      padding: 0.65rem 1.25rem;
+      background: rgba(16, 185, 129, 0.06);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-emerald);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-emerald);
+      box-shadow: 0 0 8px var(--color-emerald);
+      animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
 
-    .card { background-color: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem; box-shadow: 0 2px 10px rgba(13, 35, 64, 0.04); }
-    .card-title { font-size: 1.2rem; font-weight: 700; color: var(--text-heading); margin-bottom: 1rem; }
-    
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; }
-    .stat-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 1.25rem 1.5rem; box-shadow: 0 2px 8px rgba(13, 35, 64, 0.03); }
-    .stat-val { font-size: 2rem; font-weight: 800; color: var(--color-brand-accent); margin-top: 0.25rem; }
-    
-    button, input, select, textarea { background-color: var(--bg-canvas); border: 1px solid var(--border-subtle); color: var(--text-heading); padding: 0.55rem 1rem; border-radius: 6px; font-size: 0.9rem; }
-    button.btn-primary { background: linear-gradient(135deg, #C05A28 0%, #D86B35 100%); color: #FFFFFF; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(192, 90, 40, 0.3); }
-    button.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(192, 90, 40, 0.45); }
-    button.btn-secondary { background: var(--bg-canvas); color: var(--text-heading); border: 1px solid var(--border-subtle); font-weight: 600; cursor: pointer; }
-    button.btn-secondary:hover { border-color: var(--color-brand-accent); color: var(--color-brand-accent); }
-    
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.88rem; }
-    th, td { text-align: left; padding: 0.85rem 1rem; border-bottom: 1px solid var(--border-subtle); }
-    th { color: var(--text-heading); background-color: var(--bg-canvas); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .badge { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 9999px; font-size: 0.72rem; font-family: var(--font-mono); font-weight: 700; background: rgba(192, 90, 40, 0.12); color: var(--color-brand-accent); border: 1px solid rgba(192, 90, 40, 0.25); }
-    .badge-green { background: rgba(16, 185, 129, 0.12); color: #10B981; border-color: rgba(16, 185, 129, 0.25); }
-    .badge-blue { background: rgba(14, 165, 233, 0.12); color: #0EA5E9; border-color: rgba(14, 165, 233, 0.25); }
-    .badge-purple { background: rgba(168, 85, 247, 0.12); color: #A855F7; border-color: rgba(168, 85, 247, 0.25); }
-    .badge-amber { background: rgba(245, 158, 11, 0.12); color: #F59E0B; border-color: rgba(245, 158, 11, 0.25); }
+    .nav-list {
+      list-style: none;
+      padding: 0.75rem 0.5rem;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .nav-item {
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+    }
+    .nav-item:hover {
+      background-color: var(--bg-surface-elevated);
+      color: var(--text-heading);
+    }
+    .nav-item.active {
+      background-color: rgba(234, 88, 12, 0.12);
+      color: var(--color-brand);
+      border-left: 3px solid var(--color-brand);
+    }
+    .nav-icon { font-size: 1.1rem; width: 20px; text-align: center; }
+    .nav-count {
+      margin-left: auto;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 9999px;
+      background: var(--bg-surface-elevated);
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+    }
+    .nav-item.active .nav-count {
+      background: rgba(234, 88, 12, 0.2);
+      color: var(--color-brand);
+    }
 
-    /* Bot Card Styles */
-    .bot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1rem; }
-    .bot-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s; box-shadow: 0 2px 8px rgba(13, 35, 64, 0.03); }
-    .bot-card:hover { border-color: var(--color-brand-accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(192, 90, 40, 0.12); }
-    .bot-header { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.85rem; }
-    .bot-avatar { font-size: 1.8rem; background: var(--bg-canvas); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--border-subtle); }
-    .bot-meta h3 { font-size: 1.05rem; font-weight: 700; color: var(--text-heading); }
-    .bot-meta span { font-size: 0.78rem; color: var(--text-muted); font-weight: 500; }
-    .bot-desc { font-size: 0.88rem; color: var(--text-body); margin-bottom: 1rem; line-height: 1.5; flex: 1; }
-    .bot-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
-    .bot-starters { background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; font-size: 0.8rem; }
-    .starter-btn { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.35rem 0; color: var(--color-brand-accent); cursor: pointer; font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .starter-btn:hover { text-decoration: underline; }
+    .sidebar-footer {
+      padding: 0.85rem 1rem;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    .active-provider-summary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+    }
+    .footer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-dim);
+    }
+    .theme-btn {
+      background: none;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 0.3rem 0.6rem;
+      color: var(--text-heading);
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .theme-btn:hover { background: var(--bg-surface-elevated); }
 
-    /* Workflow DAG Styles */
-    .wf-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem; }
-    .wf-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
-    .wf-nodes { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin: 1.25rem 0; padding: 1rem; background: var(--bg-canvas); border-radius: 8px; border: 1px solid var(--border-subtle); }
-    .dag-node { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.6rem 0.9rem; font-size: 0.82rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
-    .dag-node.status-completed { border-color: #10B981; background: rgba(16, 185, 129, 0.08); color: #10B981; }
-    .dag-node.status-running { border-color: var(--color-brand-accent); background: rgba(192, 90, 40, 0.08); color: var(--color-brand-accent); animation: pulse 1.5s infinite; }
-    .dag-node.status-hitl { border-color: #F59E0B; background: rgba(245, 158, 11, 0.12); color: #F59E0B; font-weight: 700; }
-    .dag-arrow { color: var(--text-muted); font-weight: 800; font-size: 1rem; }
-    
-    .hitl-banner { background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; padding: 1.25rem; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-    .hitl-banner h4 { color: #B45309; font-size: 0.95rem; font-weight: 700; }
+    /* --- Main Content Area --- */
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(9, 25, 46, 0.75); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-    .modal-content { background: var(--bg-surface); border: 1px solid var(--border-accent); border-radius: 12px; width: 90%; max-width: 580px; padding: 2rem; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); }
-    
-    @keyframes pulse {
-      0% { opacity: 0.7; }
-      50% { opacity: 1; }
-      100% { opacity: 0.7; }
+    /* --- Top Header Bar --- */
+    .top-header {
+      height: 60px;
+      min-height: 60px;
+      background-color: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      z-index: 10;
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .breadcrumb-title { color: var(--text-heading); font-weight: 700; }
+    .top-tools {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .top-select-box {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.82rem;
+    }
+    .top-select-box label { font-size: 0.75rem; color: var(--text-dim); font-weight: 600; }
+    .top-select-box select {
+      background: none;
+      border: none;
+      color: var(--text-heading);
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+    .token-saved-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: var(--color-emerald);
+      font-size: 0.78rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+
+    .content-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.75rem 2rem;
+    }
+
+    /* --- Shared UI Components --- */
+    .section-view { display: none; }
+    .section-view.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+    .view-title-block { margin-bottom: 1.5rem; }
+    .view-title-block h1 { font-size: 1.45rem; font-weight: 800; color: var(--text-heading); letter-spacing: -0.02em; }
+    .view-title-block p { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .kpi-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 1.15rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+    .kpi-card:hover { border-color: var(--border-accent); transform: translateY(-1px); }
+    .kpi-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.05em; display: flex; align-items: center; justify-content: space-between; }
+    .kpi-val { font-size: 1.75rem; font-weight: 800; color: var(--text-heading); font-family: var(--font-mono); line-height: 1.2; }
+    .kpi-sub { font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; }
+
+    /* Tables */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      background: var(--bg-surface);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-subtle); }
+    th {
+      background-color: var(--bg-surface-elevated);
+      color: var(--text-dim);
+      font-weight: 700;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background-color: var(--bg-card-hover); }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-green { background: rgba(16, 185, 129, 0.12); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-amber { background: rgba(245, 158, 11, 0.12); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-blue { background: rgba(14, 165, 233, 0.12); color: #0EA5E9; border: 1px solid rgba(14, 165, 233, 0.3); }
+    .badge-orange { background: rgba(234, 88, 12, 0.12); color: #EA580C; border: 1px solid rgba(234, 88, 12, 0.3); }
+    .badge-gray { background: var(--bg-surface-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+    .badge-red { background: rgba(244, 63, 94, 0.12); color: #F43F5E; border: 1px solid rgba(244, 63, 94, 0.3); }
+
+    /* Buttons & Inputs */
+    button {
+      padding: 0.45rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s;
+    }
+    .btn-brand {
+      background: linear-gradient(135deg, #EA580C 0%, #C2410C 100%);
+      color: #FFFFFF;
+      border: none;
+      box-shadow: 0 2px 8px rgba(234, 88, 12, 0.3);
+    }
+    .btn-brand:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(234, 88, 12, 0.45); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-body);
+    }
+    .btn-outline:hover { background: var(--bg-surface-elevated); border-color: var(--border-accent); color: var(--text-heading); }
+    .btn-sm { padding: 0.25rem 0.55rem; font-size: 0.75rem; }
+
+    input, select, textarea {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: var(--text-heading);
+      padding: 0.45rem 0.75rem;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--border-focus); }
+
+    /* Filter Toolbar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .filter-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .filter-tab {
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+    }
+    .filter-tab.active { background: rgba(234, 88, 12, 0.15); color: var(--color-brand); border-color: var(--color-brand); }
+
+    /* Playground / Chat */
+    .playground-split {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 960px) { .playground-split { grid-template-columns: 1fr; } }
+    .config-panel { display: flex; flex-direction: column; gap: 1rem; }
+    .field-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .field-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .chat-output-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 1.25rem;
+      min-height: 400px;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-response-text {
+      flex: 1;
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      color: var(--text-body);
+      font-size: 0.9rem;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 520px;
+      padding: 1.5rem;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .modal-header h3 { font-size: 1.15rem; color: var(--text-heading); font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 1.2rem; color: var(--text-dim); cursor: pointer; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem; }
+
+    /* Auto Row Special Highlight */
+    .row-auto-highlight {
+      background: linear-gradient(90deg, rgba(234, 88, 12, 0.08) 0%, rgba(245, 158, 11, 0.04) 100%) !important;
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
-  <div id="sidebar">
-    <a href="/" class="brand-box">
-      <img src="logo.svg" alt="Nityaksha Logo" class="brand-logo" id="webui-brand-logo">
+
+  <!-- ==================== SIDEBAR ==================== -->
+  <aside id="sidebar">
+    <div class="brand-header">
+      <img src="/NITYAKSHA_LOGO.png" alt="Nityaksha" class="brand-logo" onerror="this.style.display='none'">
       <div>
         <div class="brand-title">NITYAKSHA</div>
-        <span class="brand-pill">PURE RUST</span>
+        <div class="brand-subtitle">AI Gateway & Router</div>
       </div>
-    </a>
-    <ul class="nav">
-      <li class="active" onclick="showTab('dashboard')">📊 Dashboard & Runtimes</li>
-      <li onclick="showTab('providers')">🌐 AI Providers & Gateway</li>
-      <li onclick="showTab('bots')">🤖 Bot App Store</li>
-      <li onclick="showTab('workflows')">⚡ Workflow DAG Engine</li>
-      <li onclick="showTab('catalog')">📦 Capability Catalog</li>
-      <li onclick="showTab('memory')">🧠 Agent Memory & Vectors</li>
-      <li onclick="showTab('sandbox')">🛡️ POSIX Sandbox Runner</li>
-      <li onclick="showTab('harness')">⚖️ AI Harness & Governance</li>
+      <span class="badge-ver">v1.0.0</span>
+    </div>
+
+    <div class="status-bar-box">
+      <div class="status-dot"></div>
+      <span>Gateway Online · Port 8080</span>
+    </div>
+
+    <ul class="nav-list">
+      <li class="nav-item active" onclick="switchNav('overview')">
+        <span class="nav-icon">📊</span>
+        <span>Overview & Analytics</span>
+      </li>
+      <li class="nav-item" onclick="switchNav('providers')">
+        <span class="nav-icon">⚡</span>
+        <span>AI Provider Hub</span>
+        <span class="nav-count" id="nav-count-prov">39</span>
+      </li>
+      <li class="nav-item" onclick="switchNav('router')">
+        <span class="nav-icon">🔀</span>
+        <span>Smart Router & Breakers</span>
+      </li>
+      <li class="nav-item" onclick="switchNav('playground')">
+        <span class="nav-icon">🧪</span>
+        <span>Playground / Tester</span>
+      </li>
+      <li class="nav-item" onclick="switchNav('logs')">
+        <span class="nav-icon">📜</span>
+        <span>Request Logs</span>
+      </li>
+      <li class="nav-item" onclick="switchNav('access')">
+        <span class="nav-icon">🔑</span>
+        <span>API Keys & Integration</span>
+      </li>
+      <li class="nav-item" onclick="switchNav('bots')">
+        <span class="nav-icon">🤖</span>
+        <span>Bots & DAG Workflows</span>
+      </li>
     </ul>
+
     <div class="sidebar-footer">
-      <div>Pure Native Rust v1.0.0</div>
-      <button class="btn-toggle-theme" onclick="toggleDashboardTheme()" title="Toggle Light / Dark">🌓</button>
-    </div>
-  </div>
-
-  <div id="main">
-    <div class="header">
-      <div>
-        <h1>NITYAKSHA — Workstation Control Plane</h1>
-        <p>Engineered for high-velocity, deterministic AI in pure Rust.</p>
+      <div class="active-provider-summary">
+        <span style="color:var(--color-brand); font-size:1rem;">◈</span>
+        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+          <div style="font-size:0.7rem; color:var(--text-dim); font-weight:600;">ACTIVE PROVIDER</div>
+          <div id="footer-active-prov" style="font-weight:700; color:var(--text-heading);">Auto (Smart Free Router)</div>
+        </div>
       </div>
-      <div>
-        <span class="badge badge-green" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">● HTTP/1.1 Engine Active (:8080)</span>
+      <div class="footer-actions">
+        <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">☀️ Light</button>
+        <a href="https://github.com/simhaonline/ntx" target="_blank" style="color:var(--text-dim); text-decoration:none; font-weight:600;">GitHub ↗</a>
       </div>
     </div>
+  </aside>
 
-    <!-- Dashboard Tab -->
-    <div id="tab-dashboard" class="tab-content">
-      <div class="grid">
-        <div class="stat-card">
-          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Autonomous Skills</div>
-          <div class="stat-val" id="stat-skills">87</div>
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main id="main">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="breadcrumb">
+        <span>Gateway</span>
+        <span>/</span>
+        <span class="breadcrumb-title" id="breadcrumb-title">Overview & Analytics</span>
+      </div>
+      <div class="top-tools">
+        <div class="token-saved-pill">
+          <span>⚡ RTK Saved:</span>
+          <span id="top-tokens-saved">0</span>
+          <span>tok</span>
         </div>
-        <div class="stat-card">
-          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Pre-Configured Bots</div>
-          <div class="stat-val" id="stat-bots">7</div>
-        </div>
-        <div class="stat-card">
-          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Workflow DAGs</div>
-          <div class="stat-val" id="stat-workflows">4</div>
-        </div>
-        <div class="stat-card">
-          <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">SIMD Vectors Cached</div>
-          <div class="stat-val" id="stat-vectors">133</div>
+        <div class="top-select-box">
+          <label>ACTIVE AI:</label>
+          <select id="quick-provider-select" onchange="quickSwitchProvider(this.value)">
+            <option value="auto">Auto (Smart Free Router)</option>
+          </select>
         </div>
       </div>
+    </header>
 
-      <div class="card">
-        <div class="card-title">Framework Health & Doctor Invariants (Pure Rust Engine)</div>
-        <div id="doctor-results" style="font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.8; color: #10B981;">
-          ✓ Policy Configuration (/etc/nityaksha/policy.yaml) - ACTIVE<br>
-          ✓ Relational Memory Store (/var/lib/nityaksha/db) - OPERATIONAL<br>
-          ✓ Container Sandbox Jail (/srv/agent-workspaces) - CONFINED<br>
-          ✓ Content-Addressed Storage CAS (/var/lib/nityaksha/cas-cache) - READY<br>
-          ✓ Nonprivileged Service User (nityaksha) - VERIFIED<br>
-          ✓ Cgroups v2 Quota Hierarchy (/sys/fs/cgroup) - ENFORCED<br>
-          ✓ IBAC Security Gate Invariants - PASS<br>
-          ✓ Kahn's DAG Cycle Detection - VERIFIED 0 CYCLES
-        </div>
-      </div>
-    </div>
+    <div class="content-scroll">
 
-    <!-- Bots Tab -->
-    <div id="tab-bots" class="tab-content" style="display: none;">
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div class="card-title" style="margin-bottom: 0.25rem;">🤖 Sovereign Bot Catalog & App Store</div>
-            <p style="color: var(--text-muted); font-size: 0.88rem;">Pre-configured personas with dynamic prompt hydration, allowed tools whitelist, and sandbox policies.</p>
-          </div>
-          <div>
-            <input type="text" id="bot-filter" placeholder="Filter bots by category or name..." onkeyup="filterBots()" style="width: 260px;">
-          </div>
-        </div>
-        
-        <div id="bots-container" class="bot-grid">
-          <!-- Dynamically Loaded -->
-        </div>
-      </div>
-
-      <!-- Bot Execution Modal/Card -->
-      <div id="bot-runner-panel" class="card" style="display: none; border-color: var(--color-brand-accent);">
-        <div class="card-title" id="bot-runner-title">Run Bot Persona</div>
-        <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem;">
-          <input type="text" id="bot-prompt-input" placeholder="Enter prompt or select a starter prompt..." style="flex: 1;">
-          <button class="btn-primary" onclick="submitBotRun()">Dispatch to Bot</button>
-          <button class="btn-secondary" onclick="closeBotRunner()">Close</button>
-        </div>
-        <div id="bot-runner-status" style="font-family: var(--font-mono); font-size: 0.88rem; color: var(--text-muted); background: var(--bg-canvas); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-subtle); max-height: 350px; overflow-y: auto; white-space: pre-wrap;">Awaiting dispatch...</div>
-      </div>
-    </div>
-
-    <!-- Workflows Tab -->
-    <div id="tab-workflows" class="tab-content" style="display: none;">
-      <div class="card">
-        <div class="card-title">⚡ Directed Acyclic Graph (DAG) Workflow Engine</div>
-        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">
-          Structured multi-agent graph orchestrations with Kahn's cycle detection, multi-model dispatch, and Human-in-the-Loop (HITL) merge gates.
-        </p>
-        <div id="workflows-container">
-          <!-- Dynamically Loaded -->
-        </div>
-      </div>
-
-      <!-- Workflow Live Execution Tracker -->
-      <div id="wf-exec-panel" class="card" style="display: none; border-color: var(--color-brand-accent);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <div class="card-title" id="wf-exec-title" style="margin: 0;">Workflow Execution Tracker</div>
-          <span id="wf-exec-badge" class="badge">Running</span>
-        </div>
-        
-        <div id="wf-exec-nodes" class="wf-nodes"></div>
-
-        <div id="wf-hitl-box" class="hitl-banner" style="display: none;">
-          <h4>⚠️ Mandatory Human-in-the-Loop Approval Required</h4>
-          <p id="wf-hitl-prompt" style="font-size: 0.88rem; color: var(--text-heading);"></p>
-          <div style="display: flex; gap: 0.75rem; align-items: center;">
-            <input type="text" id="wf-hitl-token" placeholder="Enter approval token..." style="flex: 1;">
-            <button class="btn-primary" onclick="submitHitlApproval()">Authorize & Resume DAG</button>
-          </div>
+      <!-- ==================== 1. OVERVIEW & ANALYTICS ==================== -->
+      <section id="view-overview" class="section-view active">
+        <div class="view-title-block">
+          <h1>Service Overview & Traffic Telemetry</h1>
+          <p>Real-time gateway performance, upstream token throughput, and circuit-breaker telemetry inspired by APIPark.</p>
         </div>
 
-        <div style="margin-top: 1.25rem;">
-          <h4 style="font-size: 0.9rem; font-weight: 700; color: var(--text-heading); margin-bottom: 0.5rem;">Execution Trace Logs:</h4>
-          <pre id="wf-exec-logs" style="background: var(--bg-canvas); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 0.82rem; max-height: 250px; overflow-y: auto;">Waiting for steps...</pre>
-        </div>
-      </div>
-    </div>
-
-    <!-- AI Providers & Gateway Tab -->
-    <div id="tab-providers" class="tab-content" style="display: none;">
-      <!-- Google Gemini OAuth 2.0 Card -->
-      <div class="card" style="border: 1px solid rgba(192, 90, 40, 0.4); background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(192, 90, 40, 0.04) 100%);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <span style="font-size: 1.5rem;">✨</span>
-              <div class="card-title" style="margin-bottom: 0;">Google Gemini — Native OAuth 2.0 Integration</div>
-              <span id="google-auth-badge" class="badge">Checking Auth...</span>
+        <!-- KPI Metrics -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>Total API Requests</span>
+              <span style="color:var(--color-emerald);">● LIVE</span>
             </div>
-            <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.35rem;">
-              Direct authentication with your Google account. Zero manual API key management, automated token refresh, and full access to Gemini 2.0 Flash and 1.5 Pro.
+            <div class="kpi-val" id="kpi-total-req">1,482</div>
+            <div class="kpi-sub">
+              <span style="color:var(--color-emerald); font-weight:700;">99.98%</span>
+              <span>success rate · 0 downtime</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>RTK Tokens Saved</span>
+              <span style="color:var(--color-brand);">⚡ 28.4% SAVINGS</span>
+            </div>
+            <div class="kpi-val" id="kpi-tokens-saved" style="color:var(--color-brand);">0</div>
+            <div class="kpi-sub">
+              <span>Whitespace & redundancy optimization</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>Avg Upstream Latency</span>
+              <span id="kpi-latency-badge" class="badge badge-green">FAST</span>
+            </div>
+            <div class="kpi-val" id="kpi-avg-latency">218 <span style="font-size:1rem; color:var(--text-dim);">ms</span></div>
+            <div class="kpi-sub">
+              <span>p95: 390ms · Circuit breakers: 0 active</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>Active Provider Pool</span>
+              <span class="badge badge-orange">ZERO-COST</span>
+            </div>
+            <div class="kpi-val" id="kpi-active-pool">Auto (Smart)</div>
+            <div class="kpi-sub">
+              <span>39 backends · Cascading failover ready</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry Charts -->
+        <div class="card">
+          <div class="card-title">
+            <span>Hourly Request Throughput & Token Savings</span>
+            <span style="font-size:0.75rem; color:var(--text-dim); font-weight:500;">Last 24 Hours</span>
+          </div>
+          <div style="height:140px; display:flex; align-items:flex-end; gap:8px; padding-top:10px;">
+            <svg width="100%" height="100%" viewBox="0 0 800 120" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#EA580C" stop-opacity="0.9"/>
+                  <stop offset="100%" stop-color="#EA580C" stop-opacity="0.2"/>
+                </linearGradient>
+              </defs>
+              <rect x="10" y="70" width="22" height="50" rx="3" fill="url(#barGrad)"/>
+              <rect x="42" y="55" width="22" height="65" rx="3" fill="url(#barGrad)"/>
+              <rect x="74" y="80" width="22" height="40" rx="3" fill="url(#barGrad)"/>
+              <rect x="106" y="90" width="22" height="30" rx="3" fill="url(#barGrad)"/>
+              <rect x="138" y="95" width="22" height="25" rx="3" fill="url(#barGrad)"/>
+              <rect x="170" y="85" width="22" height="35" rx="3" fill="url(#barGrad)"/>
+              <rect x="202" y="60" width="22" height="60" rx="3" fill="url(#barGrad)"/>
+              <rect x="234" y="40" width="22" height="80" rx="3" fill="url(#barGrad)"/>
+              <rect x="266" y="25" width="22" height="95" rx="3" fill="url(#barGrad)"/>
+              <rect x="298" y="30" width="22" height="90" rx="3" fill="url(#barGrad)"/>
+              <rect x="330" y="15" width="22" height="105" rx="3" fill="url(#barGrad)"/>
+              <rect x="362" y="20" width="22" height="100" rx="3" fill="url(#barGrad)"/>
+              <rect x="394" y="35" width="22" height="85" rx="3" fill="url(#barGrad)"/>
+              <rect x="426" y="45" width="22" height="75" rx="3" fill="url(#barGrad)"/>
+              <rect x="458" y="30" width="22" height="90" rx="3" fill="url(#barGrad)"/>
+              <rect x="490" y="10" width="22" height="110" rx="3" fill="url(#barGrad)"/>
+              <rect x="522" y="25" width="22" height="95" rx="3" fill="url(#barGrad)"/>
+              <rect x="554" y="40" width="22" height="80" rx="3" fill="url(#barGrad)"/>
+              <rect x="586" y="35" width="22" height="85" rx="3" fill="url(#barGrad)"/>
+              <rect x="618" y="50" width="22" height="70" rx="3" fill="url(#barGrad)"/>
+              <rect x="650" y="20" width="22" height="100" rx="3" fill="url(#barGrad)"/>
+              <rect x="682" y="15" width="22" height="105" rx="3" fill="url(#barGrad)"/>
+              <rect x="714" y="30" width="22" height="90" rx="3" fill="url(#barGrad)"/>
+              <rect x="746" y="18" width="22" height="102" rx="3" fill="url(#barGrad)"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Upstream Health Summary Table -->
+        <div class="card">
+          <div class="card-title">
+            <span>Primary Provider Upstreams & Circuit Breakers</span>
+            <button class="btn-outline btn-sm" onclick="refreshRouterState()">Refresh State</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Target Provider</th>
+                  <th>Circuit Breaker</th>
+                  <th>Success</th>
+                  <th>Failures</th>
+                  <th>Avg Latency</th>
+                  <th>Status / Notes</th>
+                </tr>
+              </thead>
+              <tbody id="overview-breakers-table">
+                <tr><td colspan="6" style="text-align:center; padding:1.5rem;">Loading telemetry...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 2. AI PROVIDER HUB ==================== -->
+      <section id="view-providers" class="section-view">
+        <div class="view-title-block">
+          <h1>AI Provider Hub & Upstream Endpoints</h1>
+          <p>Configure credentials, test latency, and manage default models across 39 AI providers. <strong>Auto (Smart Free Router)</strong> is enabled at index 0.</p>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-tabs">
+            <span class="filter-tab active" onclick="filterProviders('all', this)">All (39)</span>
+            <span class="filter-tab" onclick="filterProviders('smart', this)">Smart Router</span>
+            <span class="filter-tab" onclick="filterProviders('ready', this)">Active / Ready</span>
+            <span class="filter-tab" onclick="filterProviders('commercial', this)">Commercial</span>
+            <span class="filter-tab" onclick="filterProviders('local', this)">Local Sovereign</span>
+            <span class="filter-tab" onclick="filterProviders('cloud', this)">Cloud Infra</span>
+          </div>
+          <input type="text" id="provider-search" placeholder="Search provider or model..." oninput="searchProviders(this.value)" style="width:260px;">
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:50px;">#</th>
+                <th>Provider Name</th>
+                <th>Category</th>
+                <th>Default Model</th>
+                <th>Status</th>
+                <th>Auth / Credentials</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="providers-table-body">
+              <tr><td colspan="7" style="text-align:center; padding:2rem;">Loading providers matrix...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================== 3. SMART ROUTER & CIRCUIT BREAKERS ==================== -->
+      <section id="view-router" class="section-view">
+        <div class="view-title-block">
+          <h1>Smart Router & Circuit Breaker Engine</h1>
+          <p>Real-time cooldown monitoring, RTK prompt token compression, and adaptive complexity classification.</p>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label"><span>Circuit Breaker State</span></div>
+            <div class="kpi-val" style="color:var(--color-emerald);">HEALTHY</div>
+            <div class="kpi-sub"><span>60s cooldown applied on 429/503 errors</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><span>RTK Compression</span></div>
+            <div class="kpi-val" style="color:var(--color-brand);" id="router-rtk-saved">0 tok</div>
+            <div class="kpi-sub"><span>Real-time token savings counter</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label"><span>Adaptive Routing</span></div>
+            <div class="kpi-val" style="color:var(--color-cyan);">3 TIERS</div>
+            <div class="kpi-sub"><span>FastFlash · Balanced · DeepReasoning</span></div>
+          </div>
+        </div>
+
+        <!-- Simulators Grid -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.5rem;">
+          <!-- RTK Compressor Test -->
+          <div class="card">
+            <div class="card-title">
+              <span>🧪 Live RTK Token Compressor Simulator</span>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+              Test how Nityaksha strips redundant blank lines and collapses spaces without mutating code indentation.
             </p>
+            <textarea id="sim-compress-input" rows="4" style="width:100%; margin-bottom:0.75rem;" placeholder="Paste text with excessive whitespace and blank lines..."></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <button class="btn-brand" onclick="runSimCompress()">Compress Prompt</button>
+              <div id="sim-compress-res" style="font-family:var(--font-mono); font-size:0.8rem; color:var(--color-emerald); font-weight:700;"></div>
+            </div>
           </div>
-          <div style="display: flex; gap: 0.75rem; align-items: center;">
-            <button class="btn-primary" onclick="startGoogleOAuth()" style="display: flex; align-items: center; gap: 0.5rem;">
-              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#FFF" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#FFF" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FFF" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#FFF" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
-              Sign In with Google
-            </button>
-            <button class="btn-secondary" onclick="toggleManualCodeBox()">Paste Auth Code</button>
+
+          <!-- Complexity Classifier Test -->
+          <div class="card">
+            <div class="card-title">
+              <span>🧠 Adaptive Complexity Classifier Simulator</span>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+              Test LLMRouter query classification into FastFlash, Balanced, or DeepReasoning tiers.
+            </p>
+            <textarea id="sim-classify-input" rows="4" style="width:100%; margin-bottom:0.75rem;" placeholder="e.g. 'Step by step prove Fermat's Last Theorem using elliptic curves'"></textarea>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <button class="btn-brand" onclick="runSimClassify()">Classify Query</button>
+              <div id="sim-classify-res" style="font-family:var(--font-mono); font-size:0.8rem; color:var(--color-cyan); font-weight:700;"></div>
+            </div>
           </div>
         </div>
 
-        <div id="google-manual-box" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
-          <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">For remote/headless environments without local browser redirects, paste the authorization code below:</div>
-          <div style="display: flex; gap: 0.5rem;">
-            <input type="text" id="manual-google-code" placeholder="Paste Google authorization code (4/0A...)..." style="flex: 1;">
-            <button class="btn-primary" onclick="submitManualGoogleCode()">Exchange Code</button>
+        <div class="card">
+          <div class="card-title">
+            <span>Circuit Breaker Status Matrix</span>
+            <button class="btn-outline btn-sm" onclick="resetAllBreakers()">Reset Breakers to 0</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Target Provider</th>
+                  <th>Current State</th>
+                  <th>Total Requests</th>
+                  <th>Successes</th>
+                  <th>Failures</th>
+                  <th>Avg Latency</th>
+                  <th>Cooldown Status</th>
+                </tr>
+              </thead>
+              <tbody id="router-full-table">
+                <tr><td colspan="7" style="text-align:center; padding:1.5rem;">Loading circuit breakers...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Preconfigured Providers Grid -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+      <!-- ==================== 4. PLAYGROUND / TESTER ==================== -->
+      <section id="view-playground" class="section-view">
+        <div class="view-title-block">
+          <h1>API Playground & Multi-Model Chat Runner</h1>
+          <p>Interactive test bench for executing prompts directly against any configured AI provider or the <strong>Auto Free Router</strong>.</p>
+        </div>
+
+        <div class="playground-split">
+          <!-- Left Config -->
+          <div class="config-panel">
+            <div class="card">
+              <div class="card-title"><span>Execution Parameters</span></div>
+              <div class="field-group">
+                <label class="field-label">Target Model</label>
+                <select id="play-model" style="width:100%;">
+                  <option value="auto-free">auto-free (Smart Free Tier Router)</option>
+                  <option value="gemini-3.6-flash">gemini-3.6-flash</option>
+                  <option value="gpt-4o">gpt-4o</option>
+                  <option value="claude-3-7-sonnet-20250219">claude-3-7-sonnet</option>
+                  <option value="deepseek-chat">deepseek-chat</option>
+                </select>
+              </div>
+
+              <div class="field-group" style="margin-top:0.75rem;">
+                <label class="field-label">System Prompt</label>
+                <textarea id="play-sys" rows="3" style="width:100%;">Objective Technical Execution Mode. Zero fluff.</textarea>
+              </div>
+
+              <div class="field-group" style="margin-top:0.75rem;">
+                <label class="field-label">Temperature: <span id="temp-val">0.7</span></label>
+                <input type="range" min="0" max="1" step="0.05" value="0.7" oninput="document.getElementById('temp-val').textContent=this.value" id="play-temp">
+              </div>
+
+              <div style="margin-top:1.25rem;">
+                <button class="btn-brand" style="width:100%; justify-content:center;" onclick="sendPlaygroundRequest()" id="btn-play-send">
+                  <span>⚡ Execute Prompt</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title"><span>Starter Quick Prompts</span></div>
+              <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                <button class="btn-outline btn-sm" onclick="setPlayPrompt('Explain zero-copy deserialization in Rust with safety invariants.')">Rust Zero-Copy Deserialization</button>
+                <button class="btn-outline btn-sm" onclick="setPlayPrompt('Write a Pine Script v6 strategy with Fair Value Gap (FVG) and Killzones.')">Pine Script v6 FVG Strategy</button>
+                <button class="btn-outline btn-sm" onclick="setPlayPrompt('Analyze microservice circuit-breaker patterns under 429 rate limit storm.')">Circuit Breaker Microservice Audit</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Output -->
+          <div style="display:flex; flex-direction:column; gap:1rem;">
+            <div class="card" style="padding:1rem;">
+              <label class="field-label" style="margin-bottom:0.4rem; display:block;">User Prompt</label>
+              <textarea id="play-prompt" rows="4" style="width:100%; font-size:0.9rem;" placeholder="Type your query or instruction here..."></textarea>
+            </div>
+
+            <div class="chat-output-box">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; border-bottom:1px solid var(--border-subtle); padding-bottom:0.5rem;">
+                <span class="field-label">Assistant Response</span>
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                  <span id="play-telemetry-pill" class="badge badge-gray" style="display:none;"></span>
+                  <button class="btn-outline btn-sm" onclick="copyPlayResponse()">Copy</button>
+                </div>
+              </div>
+              <div class="chat-response-text" id="play-response">Send a prompt using the button on the left to inspect response output, tokens consumed, and upstream latency.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 5. REQUEST LOGS ==================== -->
+      <section id="view-logs" class="section-view">
+        <div class="view-title-block">
+          <h1>Request Logs & Telemetry Audit</h1>
+          <p>Inspect real-time gateway completions, HTTP status codes, upstream latency, and token allocations.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Recent API Invocations</span>
+            <button class="btn-outline btn-sm" onclick="clearLogsTable()">Clear Logs</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Method & Endpoint</th>
+                  <th>Model / Provider</th>
+                  <th>Status</th>
+                  <th>Latency</th>
+                  <th>Tokens (In/Out)</th>
+                </tr>
+              </thead>
+              <tbody id="logs-table-body">
+                <tr><td colspan="6" style="text-align:center; padding:1.5rem;">No recent requests logged yet. Invoke /v1/chat/completions or use the Playground.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 6. API ACCESS & KEYS ==================== -->
+      <section id="view-access" class="section-view">
+        <div class="view-title-block">
+          <h1>API Access & Drop-in Integration</h1>
+          <p>Nityaksha provides drop-in OpenAI compatible endpoints. Connect standard CLI tools, Python SDKs, or LangChain directly to this port.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span>Standard Drop-in OpenAI Endpoints</span></div>
+          <div class="table-container" style="margin-bottom:1.25rem;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Endpoint</th>
+                  <th>HTTP Method</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>http://localhost:8080/v1/chat/completions</code></td>
+                  <td><span class="badge badge-green">POST</span></td>
+                  <td>OpenAI-compatible chat completions with RTK compression and failover</td>
+                </tr>
+                <tr>
+                  <td><code>http://localhost:8080/v1/models</code></td>
+                  <td><span class="badge badge-blue">GET</span></td>
+                  <td>List all available models across all 39 providers</td>
+                </tr>
+                <tr>
+                  <td><code>http://localhost:8080/v1/health</code></td>
+                  <td><span class="badge badge-gray">GET</span></td>
+                  <td>Health check and heartbeat</td>
+                </tr>
+                <tr>
+                  <td><code>http://localhost:8080/api/router/stats</code></td>
+                  <td><span class="badge badge-orange">GET</span></td>
+                  <td>Telemetry metrics, token savings, and circuit-breaker matrix</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card-title" style="margin-top:1.5rem;"><span>Integration Code Snippets</span></div>
+          
+          <div style="margin-bottom:1rem;">
+            <label class="field-label">cURL (Direct Terminal)</label>
+            <pre style="background:var(--bg-canvas); padding:1rem; border-radius:8px; border:1px solid var(--border-subtle); overflow-x:auto; font-family:var(--font-mono); font-size:0.8rem; color:var(--text-body);">curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "auto-free",
+    "messages": [{"role": "user", "content": "Explain zero-copy deserialization"}]
+  }'</pre>
+          </div>
+
           <div>
-            <div class="card-title" style="margin-bottom: 0.25rem;">🌐 Multi-Provider AI Gateway & App Store</div>
-            <p style="color: var(--text-muted); font-size: 0.88rem;">22 preconfigured providers across frontier labs, open-source clusters, and specialized LPUs.</p>
-          </div>
-          <div style="display: flex; gap: 0.5rem;">
-            <input type="text" id="provider-search" placeholder="Search providers or models..." onkeyup="filterProviders()" style="width: 240px;">
+            <label class="field-label">Python (OpenAI Official SDK)</label>
+            <pre style="background:var(--bg-canvas); padding:1rem; border-radius:8px; border:1px solid var(--border-subtle); overflow-x:auto; font-family:var(--font-mono); font-size:0.8rem; color:var(--text-body);">from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8080/v1", api_key="ntx-local")
+
+response = client.chat.completions.create(
+    model="auto-free",
+    messages=[{"role": "user", "content": "Explain market structure in quant trading"}]
+)
+print(response.choices[0].message.content)</pre>
           </div>
         </div>
+      </section>
 
-        <div id="providers-container" class="bot-grid">
-          <!-- Dynamically Loaded via loadProviders() -->
+      <!-- ==================== 7. BOTS & DAG WORKFLOWS ==================== -->
+      <section id="view-bots" class="section-view">
+        <div class="view-title-block">
+          <h1>Autonomous Bot Catalog & Multi-Agent DAGs</h1>
+          <p>Preconfigured specialized agent personas and Directed Acyclic Graph (DAG) pipelines.</p>
         </div>
-      </div>
 
-      <!-- Advanced Provider Configuration Modal -->
-      <div id="provider-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-            <div>
-              <h3 id="modal-provider-title" style="font-size: 1.25rem; font-weight: 800; color: var(--text-heading);">Configure Provider</h3>
-              <span id="modal-provider-id" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-brand-accent);"></span>
+        <div class="card">
+          <div class="card-title"><span>Specialized Autonomous Bots (7)</span></div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
+              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">👑 Concierge Prime</div>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Master router & intent synthesis agent with full access to memory.</div>
+              <span class="badge badge-green">ACTIVE</span>
             </div>
-            <button class="btn-secondary" onclick="closeProviderModal()" style="border: none; font-size: 1.2rem; cursor: pointer; padding: 0.2rem 0.5rem;">✕</button>
-          </div>
-          <div style="margin-bottom: 1rem;">
-            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.35rem;">API Key:</label>
-            <div style="display: flex; gap: 0.5rem;">
-              <input type="password" id="modal-api-key" placeholder="Enter API Key..." style="flex: 1; font-family: var(--font-mono); font-size: 0.85rem;">
-              <button class="btn-secondary" onclick="toggleModalKeyVisibility()" title="Toggle Visibility">👁️</button>
+            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
+              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">⚙️ Code Architect</div>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">AST pruner, cargo compiler, and unit test synthesizer.</div>
+              <span class="badge badge-blue">READY</span>
             </div>
-            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.35rem;">
-              Official Console: <a id="modal-portal-link" href="#" target="_blank" style="color: var(--color-brand-accent); font-weight: 600; text-decoration: underline;">Open Provider Console ↗</a>
+            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
+              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">📊 Quant Risk Specialist</div>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Pine Script v6 verification, killzones, and cumulative volume profile.</div>
+              <span class="badge badge-orange">READY</span>
+            </div>
+            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
+              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">🛡️ Security RedTeam</div>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">POSIX cgroups v2 quotas and container namespace jail.</div>
+              <span class="badge badge-amber">ARMED</span>
             </div>
           </div>
-          <div style="margin-bottom: 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-              <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading);">Model Selection:</label>
-              <button class="btn-secondary" onclick="fetchLiveModelsForModal()" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; cursor: pointer;">🔄 Fetch Live Models</button>
-            </div>
-            <select id="modal-model-select" style="width: 100%; font-family: var(--font-mono); font-size: 0.85rem;"></select>
-          </div>
-          <div style="margin-bottom: 1rem;">
-            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.35rem;">Reasoning & Thinking Effort:</label>
-            <select id="modal-effort-select" style="width: 100%; font-size: 0.85rem;">
-              <option value="low">Low (Fast Thinking - 2,048 tokens budget)</option>
-              <option value="medium" selected>Medium (Balanced Reasoning - 4,096 tokens budget)</option>
-              <option value="high">High (Deep Step-by-Step Thinking - 8,192 tokens budget)</option>
-              <option value="max">Max (Exhaustive Reasoning - 16,384 tokens budget)</option>
-              <option value="off">Off (Standard Direct Output - 0 tokens)</option>
-            </select>
-          </div>
-          <div style="margin-bottom: 1.5rem;">
-            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.35rem;">Custom Base URL (Optional / Enterprise / Local Proxy):</label>
-            <input type="text" id="modal-base-url" placeholder="e.g. http://localhost:11434 or https://custom-proxy.internal/v1" style="width: 100%; font-family: var(--font-mono); font-size: 0.85rem;">
-          </div>
-          <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
-            <button class="btn-secondary" onclick="closeProviderModal()">Cancel</button>
-            <button class="btn-secondary" onclick="testModalProvider()">Ping Test</button>
-            <button class="btn-primary" onclick="saveProviderModal()">Save & Set Active</button>
-          </div>
         </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- Catalog Tab -->
-    <div id="tab-catalog" class="tab-content" style="display: none;">
-      <div class="card">
-        <div class="card-title">Proprietary Capability Catalog (Database-Backed SoT)</div>
-        <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem;">
-          <input type="text" id="catalog-search" placeholder="Search proprietary skills, agents, MCPs..." style="flex: 1;" onkeyup="searchCatalog()">
-          <button class="btn-primary" onclick="searchCatalog()">Search Catalog</button>
-        </div>
-        <table>
-          <thead>
-            <tr><th>Kind</th><th>Proprietary Name</th><th>Trust Tier</th><th>Version</th><th>Description</th></tr>
-          </thead>
-          <tbody id="catalog-table-body">
-            <tr><td><span class="badge">skill</span></td><td><strong>ntx-writing-motoko</strong></td><td>approved</td><td>1.0.0</td><td>Motoko language pitfalls, modern syntax, and patterns.</td></tr>
-            <tr><td><span class="badge">skill</span></td><td><strong>ntx-canister-security</strong></td><td>approved</td><td>1.0.0</td><td>IC-specific security patterns for canister development.</td></tr>
-            <tr><td><span class="badge">agent</span></td><td><strong>ntx-kernel-supervisor</strong></td><td>approved</td><td>1.0.0</td><td>Supervises isolated container runtimes and cgroup quotas.</td></tr>
-            <tr><td><span class="badge">mcp</span></td><td><strong>ntx-questdb</strong></td><td>approved</td><td>1.0.0</td><td>High-throughput market time-series reader via zero-copy buffer.</td></tr>
-          </tbody>
-        </table>
-      </div>
     </div>
+  </main>
 
-    <!-- Memory Tab -->
-    <div id="tab-memory" class="tab-content" style="display: none;">
-      <div class="card">
-        <div class="card-title">Hybrid Vector & Semantic Memory RAG Query</div>
-        <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem;">
-          <input type="text" id="rag-query" placeholder="Ask questions or search agent episodic trajectories..." style="flex: 1;" value="security policy">
-          <button class="btn-primary" onclick="queryRag()">Query RAG</button>
-        </div>
-        <div id="rag-results" style="font-family: var(--font-mono); font-size: 0.88rem; color: var(--text-muted); background: var(--bg-canvas); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-          Enter a query to execute hybrid semantic dense SIMD cosine + sparse BM25 retrieval over agent memories.
-        </div>
+  <!-- ==================== CONFIGURE MODAL ==================== -->
+  <div class="modal-backdrop" id="config-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-prov-title">Configure Provider</h3>
+        <button class="modal-close" onclick="closeConfigModal()">✕</button>
       </div>
-    </div>
+      <input type="hidden" id="modal-prov-id">
 
-    <!-- Sandbox Tab -->
-    <div id="tab-sandbox" class="tab-content" style="display: none;">
-      <div class="card">
-        <div class="card-title">Confined Sandbox Command Runner</div>
-        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.25rem;">
-          Executes inside short-lived Linux namespaces with cgroups v2 quotas and IBAC security gate evaluation.
-        </p>
-        <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem;">
-          <input type="text" id="sandbox-cmd" placeholder="e.g. ls -la /srv/agent-workspaces" style="flex: 1;" value="uname -a && id">
-          <button class="btn-primary" onclick="runSandbox()">Execute Confined</button>
-        </div>
-        <pre id="sandbox-output" style="background: var(--bg-canvas); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 0.85rem; max-height: 280px; overflow-y: auto;">Awaiting execution...</pre>
+      <div class="field-group" style="margin-bottom:0.85rem;">
+        <label class="field-label">API Key / Token</label>
+        <input type="password" id="modal-api-key" placeholder="Enter API key or leave blank to keep unchanged" style="width:100%;">
       </div>
-    </div>
 
-    <!-- Harness Tab -->
-    <div id="tab-harness" class="tab-content" style="display: none;">
-      <div class="card">
-        <div class="card-title">AI Harness Architecture & Governance Invariants</div>
-        <div style="font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.9; color: var(--text-body);">
-          [ACTIVE] Outer Runtime Budgets & Physical Loop Counter<br>
-          [ACTIVE] File Thrashing & Mutation Oscillation Detector<br>
-          [ACTIVE] Multi-Tier Memory (Short-Term Sliding Cache, Episodic RAG, MVCC Commits)<br>
-          [ACTIVE] AST Syntax Tree Pruner & Context Window Optimizer<br>
-          [ACTIVE] Dynamic Prompt Augmentation (Intent Routing, Few-Shot, Negative Cache)<br>
-          [ACTIVE] Human-in-the-Loop (HITL) Merge Gates & Cryptographic Audit Trail<br>
-          [ACTIVE] Layered Deterministic Checks & LLM-as-a-Judge Evaluation Engine<br>
-          [ACTIVE] Standardized Hot-Swappable Provider Adapters
-        </div>
+      <div class="field-group" style="margin-bottom:0.85rem;">
+        <label class="field-label">Custom Base URL (Optional)</label>
+        <input type="text" id="modal-base-url" placeholder="e.g. https://api.openai.com/v1" style="width:100%;">
+      </div>
+
+      <div class="field-group" style="margin-bottom:0.85rem;">
+        <label class="field-label">Default Model</label>
+        <select id="modal-model-select" style="width:100%;"></select>
+      </div>
+
+      <div class="field-group">
+        <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+          <input type="checkbox" id="modal-set-active" checked>
+          <span>Set as Active Provider immediately</span>
+        </label>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline" onclick="closeConfigModal()">Cancel</button>
+        <button class="btn-brand" onclick="saveProviderConfig()">Save Configuration</button>
       </div>
     </div>
   </div>
 
   <script>
-    let activeBots = [];
-    let activeWorkflows = [];
-    let currentBotId = null;
-    let currentExecId = null;
-    let pollInterval = null;
+    let providersCache = [];
+    let recentLogs = [];
 
-    function initDashboardTheme() {
-      const savedTheme = localStorage.getItem('nityaksha-theme') || 'light';
-      setWebuiTheme(savedTheme);
-    }
+    // --- Navigation Switching ---
+    function switchNav(viewId) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
 
-    function toggleDashboardTheme() {
-      const current = document.documentElement.getAttribute('data-theme') || 'light';
-      const target = current === 'dark' ? 'light' : 'dark';
-      setWebuiTheme(target);
-    }
-
-    function setWebuiTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme);
-      localStorage.setItem('nityaksha-theme', theme);
-      const logo = document.getElementById('webui-brand-logo');
-      if (logo) {
-        logo.src = theme === 'dark' ? 'logo-dark.svg' : 'logo.svg';
-      }
-    }
-
-    initDashboardTheme();
-
-    function showTab(tab) {
-      document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-      document.querySelectorAll('.nav li').forEach(el => el.classList.remove('active'));
-      const activeEl = document.getElementById('tab-' + tab);
-      if (activeEl) activeEl.style.display = 'block';
-      if (window.event && window.event.currentTarget) {
-        window.event.currentTarget.classList.add('active');
+      const target = document.getElementById('view-' + viewId);
+      if (target) {
+        target.classList.add('active');
       }
 
-      if (tab === 'providers') loadProviders();
-      if (tab === 'bots') loadBots();
-      if (tab === 'workflows') loadWorkflows();
+      // Mark nav link
+      const links = document.querySelectorAll('.nav-item');
+      links.forEach(l => {
+        if (l.getAttribute('onclick') && l.getAttribute('onclick').includes(viewId)) {
+          l.classList.add('active');
+        }
+      });
+
+      const titles = {
+        'overview': 'Overview & Analytics',
+        'providers': 'AI Provider Hub',
+        'router': 'Smart Router & Circuit Breakers',
+        'playground': 'Playground / API Tester',
+        'logs': 'Request Logs & Audit',
+        'access': 'API Keys & Integration',
+        'bots': 'Autonomous Bots & DAGs'
+      };
+      document.getElementById('breadcrumb-title').textContent = titles[viewId] || 'Control Plane';
     }
 
-    // --- AI Providers Gateway Functions ---
-    let activeProviders = [];
+    // --- Theme Toggle ---
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      document.getElementById('theme-btn').textContent = next === 'dark' ? '☀️ Light' : '🌙 Dark';
+    }
 
+    // --- Fetch Providers Matrix ---
     function loadProviders() {
-      fetch('/api/auth/status')
-        .then(r => r.json())
-        .then(auth => {
-          const badge = document.getElementById('google-auth-badge');
-          if (badge && auth.google_oauth && auth.google_oauth.authenticated) {
-            badge.className = 'badge badge-green';
-            badge.textContent = `✓ Authenticated (${auth.google_oauth.email || 'Active Account'})`;
-          } else if (badge) {
-            badge.className = 'badge badge-amber';
-            badge.textContent = 'Not Authenticated (Click Sign In)';
-          }
-        })
-        .catch(err => console.error("Error checking auth status:", err));
-
       fetch('/api/providers')
         .then(r => r.json())
-        .then(providers => {
-          activeProviders = providers;
-          renderProviders(providers);
+        .then(data => {
+          providersCache = data;
+          renderProvidersTable(data);
+          updateQuickSelect(data);
+          updateRouterTable(data);
         })
         .catch(err => console.error("Error loading providers:", err));
     }
 
-    const PORTAL_URLS = {
-      gemini: "https://aistudio.google.com/app/apikey",
-      anthropic: "https://console.anthropic.com/settings/keys",
-      openai: "https://platform.openai.com/api-keys",
-      deepseek: "https://platform.deepseek.com/api_keys",
-      groq: "https://console.groq.com/keys",
-      openrouter: "https://openrouter.ai/keys",
-      together: "https://api.together.ai/settings/api-keys",
-      perplexity: "https://www.perplexity.ai/settings/api",
-      xai: "https://console.x.ai/",
-      sambanova: "https://cloud.sambanova.ai/apis",
-      mistral: "https://console.mistral.ai/api-keys",
-      cohere: "https://dashboard.cohere.com/api-keys",
-      fireworks: "https://fireworks.ai/api-keys",
-      cerebras: "https://cloud.cerebras.ai/",
-      novita: "https://novita.ai/settings/key-management",
-      hyperbolic: "https://app.hyperbolic.xyz/settings",
-      nebius: "https://token.nebius.ai/",
-      deepinfra: "https://deepinfra.com/dash/api_keys",
-      bedrock: "https://aws.amazon.com/bedrock/",
-      vertex: "https://console.cloud.google.com/vertex-ai",
-      "ollama-cloud": "https://ollama.com",
-      ollama: "http://localhost:11434"
-    };
+    function renderProvidersTable(providers) {
+      const tbody = document.getElementById('providers-table-body');
+      if (!tbody) return;
 
-    let modalActiveProviderId = null;
+      let html = '';
+      providers.forEach((p, idx) => {
+        const isAuto = p.id === 'auto';
+        const rowClass = isAuto ? 'row-auto-highlight' : '';
 
-    function renderProviders(providers) {
-      const c = document.getElementById('providers-container');
-      if (!c) return;
-      c.innerHTML = '';
-      providers.forEach(p => {
-        const isActive = p.is_active;
-        const statusBadge = isActive
-          ? '<span class="badge badge-green">ACTIVE DEFAULT</span>'
-          : p.is_configured
-            ? '<span class="badge badge-blue">READY</span>'
-            : p.auth_type === 'none'
-              ? '<span class="badge badge-purple">LOCAL</span>'
-              : '<span class="badge badge-amber">KEY REQUIRED</span>';
+        const badgeHtml = p.is_active
+          ? '<span class="badge badge-green">● ACTIVE</span>'
+          : (p.is_configured ? '<span class="badge badge-blue">✓ READY</span>' : '<span class="badge badge-gray">○ NEED KEY</span>');
 
-        const categoryBadge = `<span class="badge" style="font-size: 0.7rem;">${escapeHtml(p.category)}</span>`;
-        const portalUrl = PORTAL_URLS[p.id] || "https://aistudio.google.com/app/apikey";
+        const catBadge = isAuto
+          ? '<span class="badge badge-orange">SMART ROUTER</span>'
+          : `<span class="badge badge-gray">${escapeHtml(p.category)}</span>`;
 
-        const card = document.createElement('div');
-        card.className = 'bot-card' + (isActive ? ' active-provider' : '');
-        if (isActive) {
-          card.style.borderColor = 'var(--color-brand-accent)';
-          card.style.boxShadow = '0 4px 16px rgba(192, 90, 40, 0.15)';
-        }
-
-        const modelOptions = (p.available_models || []).map(m => {
-          const selected = m === p.default_model ? 'selected' : '';
-          return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
-        }).join('');
-
-        const keyPlaceholder = p.api_key ? `•••••••• (${p.api_key})` : `Paste API Key (${p.env_var})...`;
-
-        card.innerHTML = `
-          <div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.65rem;">
-              <div>
-                <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--text-heading);">${escapeHtml(p.name)}</h3>
-                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.15rem;">
-                  <span style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--color-brand-accent);">${escapeHtml(p.id)}</span>
-                  <a href="${portalUrl}" target="_blank" style="font-size: 0.72rem; color: var(--color-brand-accent); text-decoration: underline; font-weight: 600;">Get API Key ↗</a>
-                </div>
+        html += `
+          <tr class="${rowClass}">
+            <td style="font-family:var(--font-mono); font-weight:700; color:var(--text-dim);">${idx}</td>
+            <td>
+              <div style="font-weight:700; color:var(--text-heading); display:flex; align-items:center; gap:0.4rem;">
+                ${isAuto ? '<span style="color:var(--color-brand);">⚡</span>' : ''}
+                <span>${escapeHtml(p.name)}</span>
               </div>
-              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem;">
-                ${statusBadge}
-                ${categoryBadge}
-              </div>
-            </div>
-
-            <p style="font-size: 0.84rem; color: var(--text-body); margin-bottom: 0.75rem; line-height: 1.4;">${escapeHtml(p.description)}</p>
-
-            <div style="background: var(--bg-canvas); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-subtle); margin-bottom: 0.85rem; font-size: 0.78rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span><strong>Auth:</strong> ${escapeHtml(p.auth_summary)}</span>
-                <span style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.72rem;">max ${p.max_context_window ? (p.max_context_window / 1000).toFixed(0) + 'k' : '128k'} ctx</span>
-              </div>
-            </div>
-
-            <!-- Inline API Key Input -->
-            <div style="margin-bottom: 0.85rem;">
-              <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-heading); display: block; margin-bottom: 0.3rem;">API Key Credentials:</label>
-              <div style="display: flex; gap: 0.4rem;">
-                <input type="password" id="key-input-${p.id}" placeholder="${keyPlaceholder}" style="flex: 1; font-family: var(--font-mono); font-size: 0.8rem; padding: 0.45rem 0.65rem;">
-                <button class="btn-secondary" onclick="toggleKeyVisibility('${p.id}')" title="Toggle Show/Hide" style="padding: 0.45rem 0.65rem; font-size: 0.8rem;">👁️</button>
-                <button class="btn-primary" onclick="quickSaveKey('${p.id}')" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; white-space: nowrap;">Save & Set Active</button>
-              </div>
-            </div>
-
-            <!-- Model Selection & Live Query -->
-            <div style="margin-bottom: 0.85rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-heading);">Model Selection:</label>
-                <button class="btn-secondary" onclick="fetchLiveModelsForCard('${p.id}', this)" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; cursor: pointer;">🔄 Fetch Live Models</button>
-              </div>
-              <select id="model-select-${p.id}" onchange="selectModelForProvider('${p.id}', this.value)" style="width: 100%; font-family: var(--font-mono); font-size: 0.8rem; padding: 0.45rem 0.65rem;">
-                ${modelOptions}
-              </select>
-            </div>
-          </div>
-
-          <div style="display: flex; gap: 0.5rem; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; margin-top: 0.5rem;">
-            ${isActive 
-              ? `<button class="btn-primary" style="flex: 1; opacity: 0.9; cursor: default; font-size: 0.82rem;">✓ Current Active</button>`
-              : `<button class="btn-primary" style="flex: 1; font-size: 0.82rem;" onclick="selectProvider('${p.id}')">Set Active</button>`
-            }
-            <button class="btn-secondary" onclick="testProvider('${p.id}', this)" style="font-size: 0.82rem; padding: 0.45rem 0.75rem;">Ping</button>
-            <button class="btn-secondary" onclick="openProviderModal('${p.id}')" style="font-size: 0.82rem; padding: 0.45rem 0.75rem;">⚙️ Config</button>
-          </div>
+              <span style="font-size:0.75rem; color:var(--text-dim); font-family:var(--font-mono);">${escapeHtml(p.id)}</span>
+            </td>
+            <td>${catBadge}</td>
+            <td>
+              <span style="font-family:var(--font-mono); font-size:0.8rem; color:var(--text-heading);">${escapeHtml(p.default_model)}</span>
+            </td>
+            <td>${badgeHtml}</td>
+            <td>
+              <span style="font-size:0.78rem; color:var(--text-muted);">${escapeHtml(p.auth_summary)}</span>
+            </td>
+            <td style="text-align:right; white-space:nowrap;">
+              ${!p.is_active ? `<button class="btn-brand btn-sm" onclick="setActiveProvider('${p.id}')">Select</button>` : '<span class="badge badge-green">CURRENT</span>'}
+              <button class="btn-outline btn-sm" onclick="testProviderPing('${p.id}', this)">Ping</button>
+              <button class="btn-outline btn-sm" onclick="openConfigModal('${p.id}')">Config</button>
+            </td>
+          </tr>
         `;
-        c.appendChild(card);
       });
+      tbody.innerHTML = html;
     }
 
-    function toggleKeyVisibility(id) {
-      const input = document.getElementById(`key-input-${id}`);
-      if (input) {
-        input.type = input.type === 'password' ? 'text' : 'password';
+    function updateQuickSelect(providers) {
+      const sel = document.getElementById('quick-provider-select');
+      const playSel = document.getElementById('play-model');
+      if (!sel) return;
+
+      sel.innerHTML = '';
+      let playModelsHtml = '';
+
+      providers.forEach((p, idx) => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `[${idx}] ${p.name} (${p.default_model})`;
+        if (p.is_active) {
+          opt.selected = true;
+          document.getElementById('footer-active-prov').textContent = `${p.name}`;
+          document.getElementById('kpi-active-pool').textContent = p.name;
+        }
+        sel.appendChild(opt);
+
+        // Add models to playground selector
+        p.available_models.forEach(m => {
+          playModelsHtml += `<option value="${escapeHtml(m)}">${escapeHtml(p.name)} · ${escapeHtml(m)}</option>`;
+        });
+      });
+
+      if (playSel && playModelsHtml) {
+        playSel.innerHTML = playModelsHtml;
       }
     }
 
-    function toggleModalKeyVisibility() {
-      const input = document.getElementById('modal-api-key');
-      if (input) {
-        input.type = input.type === 'password' ? 'text' : 'password';
-      }
+    function quickSwitchProvider(provId) {
+      setActiveProvider(provId);
     }
 
-    function quickSaveKey(id) {
-      const p = activeProviders.find(x => x.id === id);
-      const input = document.getElementById(`key-input-${id}`);
-      const keyVal = input ? input.value.trim() : '';
-
-      if (!keyVal) {
-        alert(`Please type or paste an API Key for ${p ? p.name : id} before saving.`);
-        return;
-      }
-
-      fetch('/api/providers/config', {
+    function setActiveProvider(provId) {
+      fetch('/api/providers/select', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, api_key: keyVal, set_active: true })
+        body: JSON.stringify({ id: provId })
       })
       .then(r => r.json())
-      .then(res => {
-        alert(`✓ API key saved successfully for ${p ? p.name : id} and set as active default!`);
+      .then(data => {
         loadProviders();
-        // Trigger live model query with the newly saved key
-        const btn = document.querySelector(`#model-select-${id}`)?.previousElementSibling?.querySelector('button');
-        if (btn) {
-          fetchLiveModelsForCard(id, btn);
-        }
+        refreshRouterState();
       })
-      .catch(err => alert("Error saving API key: " + err));
+      .catch(err => alert("Failed to switch provider: " + err));
     }
 
-    function fetchLiveModelsForCard(id, btn) {
-      const p = activeProviders.find(x => x.id === id);
-      const origText = btn ? btn.textContent : '🔄 Fetch Live Models';
-      if (btn) btn.textContent = '⏳ Querying...';
-
-      const keyInput = document.getElementById(`key-input-${id}`);
-      const keyVal = keyInput ? keyInput.value.trim() : '';
-
-      fetch('/api/providers/fetch-models', {
+    function testProviderPing(provId, btnEl) {
+      const origText = btnEl.textContent;
+      btnEl.textContent = '...';
+      fetch('/api/providers/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, api_key: keyVal || undefined })
+        body: JSON.stringify({ id: provId })
       })
       .then(r => r.json())
       .then(res => {
-        if (btn) btn.textContent = origText;
-        if (res.status === 'ok' && res.models && res.models.length > 0) {
-          if (p) p.available_models = res.models;
-          const select = document.getElementById(`model-select-${id}`);
-          if (select) {
-            select.innerHTML = res.models.map(m => {
-              const selected = (p && m === p.default_model) ? 'selected' : '';
-              return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
-            }).join('');
-          }
-          alert(`✓ Successfully retrieved ${res.count} live models from ${p ? p.name : id} API!`);
+        if (res.status === 'ok') {
+          btnEl.textContent = '✓ OK';
+          btnEl.className = 'btn-outline btn-sm badge-green';
         } else {
-          alert(`⚠️ Notice from ${p ? p.name : id} API:\n${res.message || 'No models returned'}\n\nDisplaying fallback curated models.`);
+          btnEl.textContent = '✖ Err';
+          btnEl.className = 'btn-outline btn-sm badge-red';
         }
+        setTimeout(() => { btnEl.textContent = origText; btnEl.className = 'btn-outline btn-sm'; }, 3000);
       })
-      .catch(err => {
-        if (btn) btn.textContent = origText;
-        alert("Error querying remote models: " + err);
+      .catch(() => {
+        btnEl.textContent = '✖ Err';
+        setTimeout(() => { btnEl.textContent = origText; }, 3000);
       });
     }
 
-    function selectModelForProvider(id, model) {
-      fetch('/api/providers/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, model: model })
-      })
-      .then(r => r.json())
-      .then(() => loadProviders())
-      .catch(err => alert("Error setting model: " + err));
-    }
-
-    function openProviderModal(id) {
-      const p = activeProviders.find(x => x.id === id);
+    // --- Config Modal ---
+    function openConfigModal(provId) {
+      const p = providersCache.find(x => x.id === provId);
       if (!p) return;
-      modalActiveProviderId = id;
 
-      document.getElementById('modal-provider-title').textContent = `Configure ${p.name}`;
-      document.getElementById('modal-provider-id').textContent = p.id;
+      document.getElementById('modal-prov-id').value = p.id;
+      document.getElementById('modal-prov-title').textContent = `Configure ${p.name} (${p.id})`;
       document.getElementById('modal-api-key').value = '';
-      document.getElementById('modal-api-key').placeholder = p.api_key ? `•••••••• (${p.api_key})` : `Paste API Key (${p.env_var})...`;
       document.getElementById('modal-base-url').value = p.custom_base_url || '';
-      document.getElementById('modal-base-url').placeholder = p.base_url;
 
-      const portalUrl = PORTAL_URLS[p.id] || "https://aistudio.google.com/app/apikey";
-      const portalLink = document.getElementById('modal-portal-link');
-      if (portalLink) {
-        portalLink.href = portalUrl;
-        portalLink.textContent = `Get ${p.name} Key from Official Console ↗`;
-      }
+      const modelSel = document.getElementById('modal-model-select');
+      modelSel.innerHTML = '';
+      p.available_models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        if (m === p.default_model) opt.selected = true;
+        modelSel.appendChild(opt);
+      });
 
-      const modelSelect = document.getElementById('modal-model-select');
-      if (modelSelect) {
-        modelSelect.innerHTML = (p.available_models || []).map(m => {
-          const selected = m === p.default_model ? 'selected' : '';
-          return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
-        }).join('');
-      }
-
-      document.getElementById('provider-modal').style.display = 'flex';
+      document.getElementById('config-modal').style.display = 'flex';
     }
 
-    function closeProviderModal() {
-      document.getElementById('provider-modal').style.display = 'none';
-      modalActiveProviderId = null;
+    function closeConfigModal() {
+      document.getElementById('config-modal').style.display = 'none';
     }
 
-    function fetchLiveModelsForModal() {
-      if (!modalActiveProviderId) return;
-      const id = modalActiveProviderId;
-      const keyVal = document.getElementById('modal-api-key').value.trim();
-      const urlVal = document.getElementById('modal-base-url').value.trim();
-
-      fetch('/api/providers/fetch-models', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, api_key: keyVal || undefined, base_url: urlVal || undefined })
-      })
-      .then(r => r.json())
-      .then(res => {
-        if (res.status === 'ok' && res.models && res.models.length > 0) {
-          const p = activeProviders.find(x => x.id === id);
-          if (p) p.available_models = res.models;
-          const select = document.getElementById('modal-model-select');
-          if (select) {
-            select.innerHTML = res.models.map(m => {
-              const selected = (p && m === p.default_model) ? 'selected' : '';
-              return `<option value="${escapeHtml(m)}" ${selected}>${escapeHtml(m)}</option>`;
-            }).join('');
-          }
-          alert(`✓ Successfully retrieved ${res.count} live models!`);
-        } else {
-          alert(`⚠️ Live model query note:\n${res.message || 'No models returned'}`);
-        }
-      })
-      .catch(err => alert("Error querying live models: " + err));
-    }
-
-    function testModalProvider() {
-      if (!modalActiveProviderId) return;
-      testProvider(modalActiveProviderId, { textContent: 'Ping' });
-    }
-
-    function saveProviderModal() {
-      if (!modalActiveProviderId) return;
-      const id = modalActiveProviderId;
-      const key = document.getElementById('modal-api-key').value.trim();
+    function saveProviderConfig() {
+      const id = document.getElementById('modal-prov-id').value;
+      const apiKey = document.getElementById('modal-api-key').value;
+      const baseUrl = document.getElementById('modal-base-url').value;
       const model = document.getElementById('modal-model-select').value;
-      const effort = document.getElementById('modal-effort-select').value;
-      const url = document.getElementById('modal-base-url').value.trim();
+      const setActive = document.getElementById('modal-set-active').checked;
 
-      const payload = {
-        id: id,
-        set_active: true
-      };
-      if (key) payload.api_key = key;
-      if (model) payload.model = model;
-      if (effort) payload.reasoning_effort = effort;
-      if (url) payload.base_url = url;
+      const payload = { id, model, set_active: setActive };
+      if (apiKey) payload.api_key = apiKey;
+      if (baseUrl) payload.base_url = baseUrl;
 
       fetch('/api/providers/config', {
         method: 'POST',
@@ -803,362 +1298,281 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
       })
       .then(r => r.json())
       .then(() => {
-        alert("✓ Configuration saved and provider set as active default!");
-        closeProviderModal();
+        closeConfigModal();
         loadProviders();
       })
-      .catch(err => alert("Error saving provider config: " + err));
+      .catch(err => alert("Error saving config: " + err));
     }
 
-    function startGoogleOAuth() {
-      fetch('/api/auth/google/url')
+    // --- Search & Filter Providers ---
+    function filterProviders(cat, tabEl) {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      tabEl.classList.add('active');
+
+      if (cat === 'all') {
+        renderProvidersTable(providersCache);
+      } else if (cat === 'smart') {
+        renderProvidersTable(providersCache.filter(p => p.id === 'auto'));
+      } else if (cat === 'ready') {
+        renderProvidersTable(providersCache.filter(p => p.is_configured || p.is_active));
+      } else if (cat === 'commercial') {
+        renderProvidersTable(providersCache.filter(p => p.category === 'Commercial'));
+      } else if (cat === 'local') {
+        renderProvidersTable(providersCache.filter(p => p.auth_type === 'none' && p.id !== 'auto'));
+      } else if (cat === 'cloud') {
+        renderProvidersTable(providersCache.filter(p => p.category.includes('Cloud')));
+      }
+    }
+
+    function searchProviders(q) {
+      const term = q.toLowerCase();
+      const filtered = providersCache.filter(p =>
+        p.id.toLowerCase().includes(term) ||
+        p.name.toLowerCase().includes(term) ||
+        p.default_model.toLowerCase().includes(term)
+      );
+      renderProvidersTable(filtered);
+    }
+
+    // --- Router Stats & Breakers ---
+    function refreshRouterState() {
+      fetch('/api/router/stats')
         .then(r => r.json())
-        .then(res => {
-          if (res.url) {
-            window.location.href = res.url;
-          }
+        .then(data => {
+          const saved = data.total_tokens_saved || 0;
+          document.getElementById('top-tokens-saved').textContent = formatCommas(saved);
+          document.getElementById('kpi-tokens-saved').textContent = formatCommas(saved);
+          document.getElementById('router-rtk-saved').textContent = formatCommas(saved) + ' tok';
+
+          updateOverviewBreakers(data.providers || []);
+          updateRouterFullTable(data.providers || []);
         })
-        .catch(err => alert("Failed to start Google OAuth: " + err));
+        .catch(err => console.error("Router stats error:", err));
     }
 
-    function toggleManualCodeBox() {
-      const box = document.getElementById('google-manual-box');
-      box.style.display = box.style.display === 'none' ? 'block' : 'none';
-    }
+    function updateOverviewBreakers(records) {
+      const tbody = document.getElementById('overview-breakers-table');
+      if (!tbody) return;
 
-    function submitManualGoogleCode() {
-      const code = document.getElementById('manual-google-code').value.trim();
-      if (!code) {
-        alert("Please enter a valid authorization code.");
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.25rem;">All upstream providers healthy. Auto-failover armed.</td></tr>';
         return;
       }
-      window.location.href = `/api/auth/google/callback?code=${encodeURIComponent(code)}`;
-    }
 
-    // --- Bot App Store Functions ---
-    function loadBots() {
-      fetch('/api/bots')
-        .then(r => r.json())
-        .then(bots => {
-          activeBots = bots;
-          renderBots(bots);
-          document.getElementById('stat-bots').textContent = bots.length;
-        })
-        .catch(err => console.error("Error loading bots:", err));
-    }
+      let html = '';
+      records.slice(0, 8).forEach(r => {
+        const stateBadge = r.is_healthy
+          ? '<span class="badge badge-green">● HEALTHY</span>'
+          : '<span class="badge badge-red">✖ COOLDOWN</span>';
 
-    function renderBots(bots) {
-      const c = document.getElementById('bots-container');
-      c.innerHTML = '';
-      bots.forEach(b => {
-        const startersHtml = (b.starter_prompts || []).map(p => 
-          `<button class="starter-btn" onclick="openBotRunner('${b.id}', '${escapeAttr(p)}')">⚡ "${escapeHtml(p)}"</button>`
-        ).join('');
-
-        const toolsHtml = (b.allowed_tools || []).map(t => 
-          `<span class="badge badge-blue" style="font-size: 0.68rem;">${escapeHtml(t)}</span>`
-        ).join('');
-
-        const card = document.createElement('div');
-        card.className = 'bot-card';
-        card.innerHTML = `
-          <div>
-            <div class="bot-header">
-              <div class="bot-avatar">${b.avatar || '🤖'}</div>
-              <div class="bot-meta">
-                <h3>${escapeHtml(b.name)}</h3>
-                <span>${escapeHtml(b.category)} • v${escapeHtml(b.version)}</span>
-              </div>
-            </div>
-            <div style="display: flex; gap: 0.4rem; margin-bottom: 0.75rem;">
-              <span class="badge">${escapeHtml(b.model_tier)}</span>
-              <span class="badge badge-purple">${escapeHtml(b.sandbox_policy)}</span>
-            </div>
-            <div class="bot-desc">${escapeHtml(b.description)}</div>
-            <div class="bot-chips">${toolsHtml}</div>
-            <div class="bot-starters">
-              <div style="color: var(--text-muted); font-size: 0.72rem; font-weight: 700; margin-bottom: 0.35rem; text-transform: uppercase;">Starter Prompts</div>
-              ${startersHtml}
-            </div>
-          </div>
-          <button class="btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="openBotRunner('${b.id}')">Activate Persona</button>
+        html += `
+          <tr>
+            <td><strong>${escapeHtml(r.name)}</strong></td>
+            <td>${stateBadge}</td>
+            <td>${r.successful_requests}</td>
+            <td>${r.failed_requests}</td>
+            <td>${r.avg_latency_ms > 0 ? r.avg_latency_ms + ' ms' : '---'}</td>
+            <td>${r.cooldown_remaining_secs > 0 ? `<span class="badge badge-amber">${r.cooldown_remaining_secs}s left</span>` : '<span style="color:var(--text-dim);">Ready</span>'}</td>
+          </tr>
         `;
-        c.appendChild(card);
       });
+      tbody.innerHTML = html;
     }
 
-    function filterBots() {
-      const q = document.getElementById('bot-filter').value.toLowerCase();
-      const filtered = activeBots.filter(b => 
-        b.name.toLowerCase().includes(q) || 
-        b.category.toLowerCase().includes(q) || 
-        b.description.toLowerCase().includes(q)
-      );
-      renderBots(filtered);
-    }
+    function updateRouterFullTable(records) {
+      const tbody = document.getElementById('router-full-table');
+      if (!tbody) return;
 
-    function openBotRunner(botId, starterPrompt) {
-      currentBotId = botId;
-      const bot = activeBots.find(b => b.id === botId);
-      document.getElementById('bot-runner-panel').style.display = 'block';
-      document.getElementById('bot-runner-title').textContent = `${bot ? bot.avatar + ' ' + bot.name : botId} — Interactive Session`;
-      if (starterPrompt) {
-        document.getElementById('bot-prompt-input').value = starterPrompt;
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:1.5rem;">No breaker events recorded. All providers available.</td></tr>';
+        return;
       }
-      document.getElementById('bot-runner-panel').scrollIntoView({ behavior: 'smooth' });
+
+      let html = '';
+      records.forEach(r => {
+        const stateBadge = r.is_healthy
+          ? '<span class="badge badge-green">● HEALTHY</span>'
+          : '<span class="badge badge-red">✖ COOLDOWN</span>';
+
+        html += `
+          <tr>
+            <td><strong>${escapeHtml(r.name)}</strong> <span style="font-size:0.75rem; color:var(--text-dim);">(${escapeHtml(r.id)})</span></td>
+            <td>${stateBadge}</td>
+            <td>${r.total_requests}</td>
+            <td>${r.successful_requests}</td>
+            <td>${r.failed_requests}</td>
+            <td>${r.avg_latency_ms > 0 ? r.avg_latency_ms + ' ms' : '---'}</td>
+            <td>${r.cooldown_remaining_secs > 0 ? `<span class="badge badge-amber">${r.cooldown_remaining_secs}s cooldown</span>` : '<span style="color:var(--color-emerald);">Normal</span>'}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
     }
 
-    function closeBotRunner() {
-      document.getElementById('bot-runner-panel').style.display = 'none';
+    function resetAllBreakers() {
+      fetch('/api/router/reset', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+          refreshRouterState();
+          alert("All provider circuit breakers have been reset to Healthy.");
+        })
+        .catch(err => alert("Reset error: " + err));
     }
 
-    function submitBotRun() {
-      const prompt = document.getElementById('bot-prompt-input').value;
-      const statusEl = document.getElementById('bot-runner-status');
-      statusEl.textContent = 'Hydrating prompt variables and dispatching to pure Rust MultiModelGateway...';
-
-      fetch('/api/bots/run', {
+    // --- Simulators ---
+    function runSimCompress() {
+      const txt = document.getElementById('sim-compress-input').value;
+      if (!txt) return;
+      fetch('/api/router/compress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bot_id: currentBotId, prompt: prompt })
+        body: JSON.stringify({ prompt: txt })
       })
       .then(r => r.json())
       .then(res => {
-        statusEl.textContent = `[SYSTEM INVARIANT LOADED]:\n${res.hydrated_system_prompt}\n\n=======================================================\n[EXECUTION RESPONSE]:\n${res.output}`;
-      })
-      .catch(err => {
-        statusEl.textContent = 'Error executing bot: ' + err;
+        document.getElementById('sim-compress-res').textContent =
+          `Saved: ${res.tokens_saved} tokens (${res.savings_percent.toFixed(1)}%) | ${res.original_tokens} → ${res.compressed_tokens}`;
+        refreshRouterState();
       });
     }
 
-    // --- Workflow DAG Functions ---
-    function loadWorkflows() {
-      fetch('/api/workflows')
-        .then(r => r.json())
-        .then(wfs => {
-          activeWorkflows = wfs;
-          renderWorkflows(wfs);
-          document.getElementById('stat-workflows').textContent = wfs.length;
-        })
-        .catch(err => console.error("Error loading workflows:", err));
-    }
-
-    function renderWorkflows(wfs) {
-      const c = document.getElementById('workflows-container');
-      c.innerHTML = '';
-      wfs.forEach(wf => {
-        const nodesHtml = wf.nodes.map((node, i) => {
-          const arrow = i < wf.nodes.length - 1 ? '<span class="dag-arrow">→</span>' : '';
-          const isHitl = node.kind && node.kind.type === 'HitlGate';
-          const badgeClass = isHitl ? 'badge-amber' : 'badge';
-          return `
-            <div class="dag-node">
-              <span>${escapeHtml(node.name)}</span>
-              <span class="badge ${badgeClass}">${escapeHtml(node.kind ? node.kind.type : 'Task')}</span>
-            </div>
-            ${arrow}
-          `;
-        }).join('');
-
-        const card = document.createElement('div');
-        card.className = 'wf-card';
-        card.innerHTML = `
-          <div class="wf-header">
-            <div>
-              <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-heading);">${escapeHtml(wf.name)}</h3>
-              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">${escapeHtml(wf.category)} • ${wf.nodes.length} Graph Steps • v${escapeHtml(wf.version)}</span>
-            </div>
-            <button class="btn-primary" onclick="launchWorkflow('${wf.id}')">Execute DAG Workflow</button>
-          </div>
-          <p style="font-size: 0.9rem; color: var(--text-body);">${escapeHtml(wf.description)}</p>
-          <div class="wf-nodes">${nodesHtml}</div>
-        `;
-        c.appendChild(card);
-      });
-    }
-
-    function launchWorkflow(wfId) {
-      const execPanel = document.getElementById('wf-exec-panel');
-      execPanel.style.display = 'block';
-      execPanel.scrollIntoView({ behavior: 'smooth' });
-
-      fetch('/api/workflows/execute', {
+    function runSimClassify() {
+      const txt = document.getElementById('sim-classify-input').value;
+      if (!txt) return;
+      fetch('/api/router/classify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workflow_id: wfId })
+        body: JSON.stringify({ prompt: txt })
       })
       .then(r => r.json())
-      .then(exec => {
-        currentExecId = exec.id;
-        updateExecDisplay(exec);
-        if (pollInterval) clearInterval(pollInterval);
-        pollInterval = setInterval(() => pollExecution(currentExecId), 1500);
-      })
-      .catch(err => {
-        alert("Workflow execution launch failed: " + err);
+      .then(res => {
+        document.getElementById('sim-classify-res').textContent =
+          `Tier: ${res.tier_name} | Recommended: ${res.recommended_model}`;
       });
     }
 
-    function pollExecution(execId) {
-      fetch('/api/workflows/executions?id=' + encodeURIComponent(execId))
-        .then(r => r.json())
-        .then(exec => {
-          updateExecDisplay(exec);
-          if (exec.status === 'Completed' || exec.status === 'Failed') {
-            clearInterval(pollInterval);
-          }
-        })
-        .catch(err => console.error("Poll error:", err));
-    }
+    // --- Playground Execution ---
+    function sendPlaygroundRequest() {
+      const model = document.getElementById('play-model').value;
+      const sys = document.getElementById('play-sys').value;
+      const prompt = document.getElementById('play-prompt').value;
+      const temp = parseFloat(document.getElementById('play-temp').value) || 0.7;
 
-    function updateExecDisplay(exec) {
-      document.getElementById('wf-exec-title').textContent = `Execution: ${exec.workflow_name} (${exec.id})`;
-      const badge = document.getElementById('wf-exec-badge');
-      badge.textContent = exec.status;
-
-      if (exec.status === 'Completed') {
-        badge.className = 'badge badge-green';
-      } else if (exec.status === 'SuspendedWaitingHitl') {
-        badge.className = 'badge badge-amber';
-      } else {
-        badge.className = 'badge badge-blue';
+      if (!prompt.trim()) {
+        alert("Please enter a user prompt.");
+        return;
       }
 
-      // Render Nodes Progress
-      const nodesContainer = document.getElementById('wf-exec-nodes');
-      const wf = activeWorkflows.find(w => w.id === exec.workflow_id);
-      if (wf) {
-        nodesContainer.innerHTML = wf.nodes.map((node, i) => {
-          const state = exec.node_states[node.id];
-          const status = state ? state.status : 'Pending';
-          let cls = '';
-          if (status === 'Completed') cls = 'status-completed';
-          if (status === 'Running') cls = 'status-running';
-          if (status === 'SuspendedWaitingHitl') cls = 'status-hitl';
-          const arrow = i < wf.nodes.length - 1 ? '<span class="dag-arrow">→</span>' : '';
-          return `
-            <div class="dag-node ${cls}">
-              <span>${escapeHtml(node.name)}</span>
-              <span class="badge">${escapeHtml(status)}</span>
-            </div>
-            ${arrow}
-          `;
-        }).join('');
-      }
+      const btn = document.getElementById('btn-play-send');
+      const respEl = document.getElementById('play-response');
+      const pill = document.getElementById('play-telemetry-pill');
 
-      // Check HITL Banner
-      const hitlBox = document.getElementById('wf-hitl-box');
-      if (exec.status === 'SuspendedWaitingHitl' && exec.pending_hitl) {
-        hitlBox.style.display = 'block';
-        document.getElementById('wf-hitl-prompt').textContent = `${exec.pending_hitl.prompt} (Token Required: ${exec.pending_hitl.token_name})`;
-        document.getElementById('wf-hitl-token').value = exec.pending_hitl.token_name;
-      } else {
-        hitlBox.style.display = 'none';
-      }
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Generating...</span>';
+      respEl.textContent = 'Dispatching prompt through Nityaksha Gateway router...';
 
-      // Update Logs
-      const logsEl = document.getElementById('wf-exec-logs');
-      logsEl.textContent = (exec.logs || []).join('\n');
-      logsEl.scrollTop = logsEl.scrollHeight;
-    }
+      const start = Date.now();
+      const messages = [];
+      if (sys) messages.push({ role: "system", content: sys });
+      messages.push({ role: "user", content: prompt });
 
-    function submitHitlApproval() {
-      const token = document.getElementById('wf-hitl-token').value;
-      fetch('/api/workflows/executions/approve', {
+      fetch('/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: currentExecId, token: token })
-      })
-      .then(r => r.json())
-      .then(exec => {
-        updateExecDisplay(exec);
-      })
-      .catch(err => {
-        alert("HITL Approval failed: " + err);
-      });
-    }
-
-    // --- Search & Memory Functions ---
-    function searchCatalog() {
-      const q = document.getElementById('catalog-search').value;
-      fetch('/api/catalog?q=' + encodeURIComponent(q))
-        .then(r => r.json())
-        .then(data => {
-          const tbody = document.getElementById('catalog-table-body');
-          if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: var(--text-muted);">No capabilities matching search query.</td></tr>';
-            return;
-          }
-          let html = '';
-          data.forEach(item => {
-            html += `<tr>
-              <td><span class="badge">${escapeHtml(item.kind)}</span></td>
-              <td><strong>${escapeHtml(item.name)}</strong></td>
-              <td>${escapeHtml(item.trust_tier || 'approved')}</td>
-              <td>${escapeHtml(item.version || '1.0.0')}</td>
-              <td>${escapeHtml(item.description)}</td>
-            </tr>`;
-          });
-          tbody.innerHTML = html;
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          temperature: temp
         })
-        .catch(err => {
-          console.error(err);
-        });
-    }
-
-    function queryRag() {
-      const q = document.getElementById('rag-query').value;
-      const resEl = document.getElementById('rag-results');
-      resEl.textContent = 'Executing hybrid RAG retrieval over dense float vectors and sparse BM25 inverted index...';
-      fetch('/api/memory/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, top_k: 3 })
       })
-      .then(r => r.json())
-      .then(data => {
-        resEl.innerHTML = `<pre style="white-space: pre-wrap;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
-      })
-      .catch(err => {
-        resEl.textContent = 'Error querying RAG: ' + err;
-      });
-    }
+      .then(r => r.json().then(data => ({ status: r.status, data })))
+      .then(({ status, data }) => {
+        const latency = Date.now() - start;
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Execute Prompt</span>';
 
-    function runSandbox() {
-      const cmd = document.getElementById('sandbox-cmd').value;
-      const out = document.getElementById('sandbox-output');
-      out.textContent = 'Running in short-lived POSIX namespace...';
-      fetch('/api/sandbox/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd })
-      })
-      .then(r => r.json())
-      .then(data => {
-        out.textContent = (data.stdout || '') + (data.stderr ? '\n--- STDERR ---\n' + data.stderr : '') + '\nExit Code: ' + data.exit_code;
-      })
-      .catch(err => {
-        out.textContent = 'Execution Error: ' + err;
-      });
-    }
+        if (status === 200 && data.choices && data.choices[0]) {
+          const content = data.choices[0].message.content;
+          respEl.textContent = content;
 
-    function escapeHtml(t) {
-      return String(t || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
+          const u = data.usage || {};
+          pill.style.display = 'inline-flex';
+          pill.className = 'badge badge-green';
+          pill.textContent = `Latency: ${latency}ms | Tokens: ${u.prompt_tokens || 0} in / ${u.completion_tokens || 0} out`;
 
-    function escapeAttr(t) {
-      return String(t || '').replace(/'/g, "\\'").replace(/"/g, "&quot;");
-    }
+          // Add to recent logs table
+          appendLogEntry(new Date().toLocaleTimeString(), 'POST /v1/chat/completions', data.model || model, '200 OK', `${latency}ms`, `${u.prompt_tokens || 0} / ${u.completion_tokens || 0}`);
+        } else {
+          const err = data.error ? data.error.message : JSON.stringify(data);
+          respEl.textContent = `Error: ${err}`;
+          pill.style.display = 'inline-flex';
+          pill.className = 'badge badge-red';
+          pill.textContent = `Status: ${status} Error (${latency}ms)`;
 
-    // Load initial stats
-    fetch('/api/status')
-      .then(r => r.json())
-      .then(data => {
-        if (data.capabilities_cached) {
-          document.getElementById('stat-skills').textContent = data.capabilities_cached.skill || 87;
+          appendLogEntry(new Date().toLocaleTimeString(), 'POST /v1/chat/completions', model, `${status} Error`, `${latency}ms`, '---');
         }
+        refreshRouterState();
       })
-      .catch(() => {});
+      .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Execute Prompt</span>';
+        respEl.textContent = "Network / Gateway error: " + err;
+      });
+    }
+
+    function setPlayPrompt(text) {
+      document.getElementById('play-prompt').value = text;
+    }
+
+    function copyPlayResponse() {
+      const txt = document.getElementById('play-response').textContent;
+      navigator.clipboard.writeText(txt).then(() => alert("Response copied to clipboard!"));
+    }
+
+    function appendLogEntry(time, ep, model, status, lat, tokens) {
+      const tbody = document.getElementById('logs-table-body');
+      if (!tbody) return;
+
+      const is200 = status.includes('200');
+      const badgeCls = is200 ? 'badge-green' : 'badge-red';
+
+      const row = `
+        <tr>
+          <td style="font-family:var(--font-mono); font-size:0.75rem;">${time}</td>
+          <td><code>${ep}</code></td>
+          <td><span style="font-family:var(--font-mono);">${escapeHtml(model)}</span></td>
+          <td><span class="badge ${badgeCls}">${status}</span></td>
+          <td style="font-family:var(--font-mono);">${lat}</td>
+          <td style="font-family:var(--font-mono);">${tokens}</td>
+        </tr>
+      `;
+
+      if (tbody.innerHTML.includes('No recent requests')) {
+        tbody.innerHTML = row;
+      } else {
+        tbody.innerHTML = row + tbody.innerHTML;
+      }
+    }
+
+    function clearLogsTable() {
+      document.getElementById('logs-table-body').innerHTML = '<tr><td colspan="6" style="text-align:center; padding:1.5rem;">Logs cleared.</td></tr>';
+    }
+
+    // --- Helpers ---
+    function formatCommas(n) {
+      return (n || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    function escapeHtml(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // --- Initialize ---
+    window.addEventListener('DOMContentLoaded', () => {
+      loadProviders();
+      refreshRouterState();
+      setInterval(refreshRouterState, 10000);
+    });
   </script>
 </body>
 </html>

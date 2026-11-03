@@ -1889,7 +1889,7 @@ complete -F _ntx_completions ntx"#);
             println!("│  #   │ PROVIDER     │ CATEGORY     │ DEFAULT MODEL            │ STATUS     │ AUTH / CREDENTIALS       │");
             println!("├──────┼──────────────┼──────────────┼──────────────────────────┼────────────┼──────────────────────────┤");
             for (idx, p) in providers.iter().enumerate() {
-                let num = format!(" [{:>2}] ", idx + 1);
+                let num = format!(" [{:>2}] ", idx);
                 let id = format!(" {:<12} ", pad_truncate(&p.id, 12));
                 let cat = format!(" {:<12} ", pad_truncate(normalize_category(&p.category), 12));
                 let model = format!(" {:<24} ", pad_truncate(&p.default_model, 24));

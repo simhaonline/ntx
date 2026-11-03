@@ -683,6 +683,55 @@ fn handle_connection(
         return Ok(());
     }
 
+    if method == "POST" && uri == "/api/router/compress" {
+        use crate::provider::RtkTokenOptimizer;
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let prompt = req_val["prompt"].as_str().or_else(|| req_val["text"].as_str()).unwrap_or("");
+        let (compressed, orig, comp) = RtkTokenOptimizer::compress(prompt);
+        let saved = orig.saturating_sub(comp);
+        let pct = if orig > 0 { (saved as f64 / orig as f64) * 100.0 } else { 0.0 };
+        let payload = serde_json::json!({
+            "status": "ok",
+            "original_text": prompt,
+            "compressed_text": compressed,
+            "original_tokens": orig,
+            "compressed_tokens": comp,
+            "tokens_saved": saved,
+            "savings_percent": pct
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/router/classify" {
+        use crate::provider::AdaptiveComplexityRouter;
+        let req_val: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
+        let prompt = req_val["prompt"].as_str().or_else(|| req_val["text"].as_str()).unwrap_or("");
+        let (tier, rationale) = AdaptiveComplexityRouter::classify(prompt);
+        let rec = AdaptiveComplexityRouter::recommended_model(tier);
+        let payload = serde_json::json!({
+            "status": "ok",
+            "prompt": prompt,
+            "tier": format!("{:?}", tier),
+            "tier_name": tier.name(),
+            "rationale": rationale,
+            "recommended_model": rec
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/router/reset" {
+        use crate::provider::get_router_state;
+        get_router_state().reset();
+        let payload = serde_json::json!({
+            "status": "ok",
+            "message": "All circuit breakers and provider telemetry counters have been reset"
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
     if method == "GET" && (uri == "/v1/models" || uri == "/api/models") {
         let providers = ProviderRegistry::list_all();
         let mut model_entries = Vec::new();

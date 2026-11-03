@@ -1187,7 +1187,7 @@ impl InteractiveShell {
                 "".to_string()
             };
             let p_line = format!("  [{:2}] {}{:<13} - {:<20} [{:<12}] {} {:<24} ({}){}",
-                i + 1, active_mark, p.id, p.name, p.category, auth_tag, p.default_model, format_tokens_short(ctx), reasoning_tag);
+                i, active_mark, p.id, p.name, p.category, auth_tag, p.default_model, format_tokens_short(ctx), reasoning_tag);
             print_box_line(theme.accent, &p_line, inner_width, theme.reset);
         }
 

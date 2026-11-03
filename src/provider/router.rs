@@ -269,6 +269,11 @@ impl AdaptiveComplexityRouter {
     /// Selects optimal model for a classified tier under a provider
     pub fn recommended_model_for_tier(provider_id: &str, tier: RouterTier) -> &'static str {
         match provider_id {
+            "auto" => match tier {
+                RouterTier::FastFlash => "auto-fast",
+                RouterTier::Balanced => "auto-free",
+                RouterTier::DeepReasoning => "auto-reasoning",
+            },
             "gemini" | "aistudio" => match tier {
                 RouterTier::FastFlash => "gemini-2.5-flash-lite",
                 RouterTier::Balanced => "gemini-3.6-flash",

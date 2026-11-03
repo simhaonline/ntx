@@ -200,6 +200,34 @@ impl ProviderRegistry {
 
         let raw_providers = vec![
             ProviderDefinition {
+                id: "auto".to_string(),
+                name: "Auto (Smart Free Router)".to_string(),
+                category: "Smart Router".to_string(),
+                base_url: "http://127.0.0.1:8080/v1".to_string(),
+                default_model: "auto-free".to_string(),
+                available_models: vec![
+                    "auto-free".to_string(),
+                    "auto-fast".to_string(),
+                    "auto-reasoning".to_string(),
+                    "gemini-2.5-flash-lite".to_string(),
+                    "gemini-3.6-flash".to_string(),
+                    "llama-3.3-70b".to_string(),
+                    "deepseek-chat".to_string(),
+                    "qwen-2.5-coder".to_string(),
+                    "mistral-7b-instruct".to_string(),
+                ],
+                api_format: "auto".to_string(),
+                auth_type: "none".to_string(),
+                env_var: String::new(),
+                description: "Built-in smart router that aggregates and load-balances across all free tier AI models (Gemini free, OpenRouter free, Groq, Ollama, LM Studio, vLLM, GitHub Models, Cloudflare) with zero-cost guarantee and automatic cascading failover.".to_string(),
+                is_configured: true,
+                is_active: false,
+                auth_summary: "Zero Configuration (Active Free Pool)".to_string(),
+                api_key: None,
+                custom_base_url: None,
+                max_context_window: 1_048_576,
+            },
+            ProviderDefinition {
                 id: "gemini".to_string(),
                 name: "Google Gemini".to_string(),
                 category: "Commercial".to_string(),
@@ -1226,7 +1254,7 @@ impl ProviderRegistry {
         enriched
     }
 
-    /// Retrieve single provider by id, 1-based index, or alias
+    /// Retrieve single provider by id, index (0=auto, 1=gemini...), or alias
     pub fn get(id: &str) -> Option<ProviderDefinition> {
         let all = Self::list_all();
         let trimmed = id.trim();
@@ -1234,10 +1262,15 @@ impl ProviderRegistry {
             return None;
         }
 
-        // 1. Direct 1-based index from numbered provider listings (e.g. "1" -> gemini)
+        // 1. Direct 0 or "auto" match
+        if trimmed == "0" || trimmed.eq_ignore_ascii_case("auto") {
+            return all.iter().find(|p| p.id == "auto").cloned();
+        }
+
+        // Direct index from numbered provider listings (e.g. 0 -> auto, 1 -> gemini, 2 -> nous)
         if let Ok(idx) = trimmed.parse::<usize>() {
-            if idx >= 1 && idx <= all.len() {
-                return Some(all[idx - 1].clone());
+            if idx < all.len() {
+                return Some(all[idx].clone());
             }
         }
 
@@ -1289,41 +1322,28 @@ impl ProviderRegistry {
         let all = Self::list_all();
         let config = Self::load_config();
 
-        // 1. If explicitly selected active provider is configured, return it
+        // 1. If explicitly selected active provider is set, return it
         if !config.active_provider.is_empty() {
             if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(&config.active_provider)) {
                 return p.clone();
             }
         }
 
-        // 2. If any provider has saved keys in config, return it
+        // 2. If any provider has saved keys in config, check if user explicitly set credentials
         for (prov_id, key) in &config.keys {
-            if !key.is_empty() {
+            if !key.is_empty() && prov_id != "auto" {
                 if let Some(p) = all.iter().find(|p| p.id.eq_ignore_ascii_case(prov_id)) {
                     return p.clone();
                 }
             }
         }
 
-        // 3. If any provider has environment variable credentials, return it
-        for p in &all {
-            if !p.env_var.is_empty() {
-                if let Ok(k) = std::env::var(&p.env_var) {
-                    if !k.is_empty() {
-                        return p.clone();
-                    }
-                }
-            }
+        // 3. Default to Auto (Smart Free Router) at index 0!
+        if let Some(auto_p) = all.iter().find(|p| p.id == "auto") {
+            return auto_p.clone();
         }
 
-        // 4. If Google OAuth session exists, use gemini
-        if GoogleOAuthEngine::load_credentials().is_some() {
-            if let Some(p) = all.iter().find(|p| p.id == "gemini") {
-                return p.clone();
-            }
-        }
-
-        // 5. Default to the first configured provider, or unconfigured sentinel
+        // 4. Default to the first configured provider, or unconfigured sentinel
         all.into_iter().find(|p| p.is_configured).unwrap_or_else(Self::unconfigured_sentinel)
     }
 
@@ -1354,7 +1374,9 @@ impl ProviderRegistry {
     /// Infer native provider family from a model name identifier
     pub fn infer_provider_for_model(model: &str) -> Option<&'static str> {
         let lower = model.to_lowercase();
-        if lower.starts_with("google/") || lower.starts_with("gemini") || lower.starts_with("gemma") || lower.contains("argon") {
+        if lower.starts_with("auto") {
+            Some("auto")
+        } else if lower.starts_with("google/") || lower.starts_with("gemini") || lower.starts_with("gemma") || lower.contains("argon") {
             Some("gemini")
         } else if lower.starts_with("openai/") || lower.starts_with("gpt-") || lower.starts_with("chatgpt")
             || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4") {
@@ -1391,7 +1413,7 @@ impl ProviderRegistry {
         }
 
         // Multi-model aggregators, proxies, local runtimes, and custom endpoints can host models across vendors
-        if p_id == "openrouter" || p_id == "novita" || p_id == "together" || p_id == "groq"
+        if p_id == "auto" || p_id == "openrouter" || p_id == "novita" || p_id == "together" || p_id == "groq"
             || p_id == "fireworks" || p_id == "ollama" || p_id == "lmstudio" || p_id == "vllm"
             || p_id == "kilocode" || p_id == "cloudflare" || p_id == "nvidia" || p_id == "codebuddy"
             || p_id == "manus" || p_id == "huggingface" || p_id == "custom" {
@@ -1932,6 +1954,67 @@ impl ProviderRegistry {
         history: &[(String, String)],
     ) -> Result<PromptExecutionResult, String> {
         let start = Instant::now();
+
+        // Built-in Auto Smart Free Router: dynamically load balances across free tier models
+        if provider.id == "auto" {
+            let (tier, _rationale) = AdaptiveComplexityRouter::classify(prompt);
+            let all = Self::list_all();
+            let mut candidates: Vec<ProviderDefinition> = Vec::new();
+
+            // 1. Local sovereign endpoints (zero rate-limit, 100% free & private)
+            for local_id in &["ollama", "lmstudio", "vllm"] {
+                if let Some(p) = all.iter().find(|p| p.id == *local_id && p.is_configured && get_router_state().is_healthy(&p.id)) {
+                    candidates.push(p.clone());
+                }
+            }
+
+            // 2. Google Gemini (Generous free tier with 15 RPM / 1M TPM)
+            if let Some(p) = all.iter().find(|p| p.id == "gemini" && p.is_configured && get_router_state().is_healthy(&p.id)) {
+                candidates.push(p.clone());
+            }
+
+            // 3. GitHub Models (Free tier for developer core)
+            if let Some(p) = all.iter().find(|p| p.id == "github" && p.is_configured && get_router_state().is_healthy(&p.id)) {
+                candidates.push(p.clone());
+            }
+
+            // 4. Other configured healthy providers in pool (Groq, OpenRouter, DeepSeek, Cloudflare, etc.)
+            for p in &all {
+                if p.id != "auto" && p.is_configured && get_router_state().is_healthy(&p.id) {
+                    if !candidates.iter().any(|c| c.id == p.id) {
+                        candidates.push(p.clone());
+                    }
+                }
+            }
+
+            for cand in &candidates {
+                let rec_model = match tier {
+                    RouterTier::FastFlash => AdaptiveComplexityRouter::recommended_model_for_tier(&cand.id, RouterTier::FastFlash),
+                    RouterTier::Balanced => &cand.default_model,
+                    RouterTier::DeepReasoning => AdaptiveComplexityRouter::recommended_model_for_tier(&cand.id, RouterTier::DeepReasoning),
+                };
+                let mut active_cand = cand.clone();
+                if cand.available_models.iter().any(|m| m == rec_model) {
+                    active_cand.default_model = rec_model.to_string();
+                }
+
+                if let Ok(mut res) = Self::dispatch_to_provider(&active_cand, prompt, sys, temperature, history) {
+                    res.provider = format!("Auto [{}]", active_cand.name);
+                    get_router_state().mark_success(
+                        "auto",
+                        "Auto (Smart Free Router)",
+                        start.elapsed().as_millis(),
+                        res.input_tokens,
+                        res.output_tokens,
+                    );
+                    return Ok(res);
+                }
+            }
+
+            get_router_state().mark_failure("auto", "Auto (Smart Free Router)", "No free tier backends currently reachable");
+            return Err("Auto Free Router: All free tier providers in the pool are unreachable or exhausted.\n  • Connect Google Gemini (free quota): 'ntx provider add gemini <api_key>'\n  • Or start local Ollama: 'ollama serve'".to_string());
+        }
+
         let res = if provider.id == "gemini" || provider.id == "aistudio" {
             let raw_key = Self::resolve_raw_key(provider);
             let oauth_token = if raw_key.is_none() && provider.id == "gemini" {
@@ -2510,6 +2593,7 @@ impl ProviderRegistry {
 
     pub fn normalize_id(input: &str) -> Option<&'static str> {
         match input.to_ascii_lowercase().as_str() {
+            "0" | "auto" | "smart" | "free" | "auto-free" | "router" => Some("auto"),
             "google" | "gemini" => Some("gemini"),
             "aistudio" | "google-ai-studio" | "googleaistudio" => Some("aistudio"),
             "claude" | "anthropic" => Some("anthropic"),
@@ -2553,6 +2637,7 @@ impl ProviderRegistry {
 
     pub fn portal_url(id: &str) -> &'static str {
         match id {
+            "auto" => "https://simhaonline.ai",
             "gemini" | "aistudio" => "https://aistudio.google.com/app/apikey",
             "anthropic" => "https://console.anthropic.com/settings/keys",
             "openai" => "https://platform.openai.com/api-keys",
@@ -3376,5 +3461,25 @@ mod tests {
         // Aggregators allow all vendor model prefixes
         assert!(ProviderRegistry::is_model_compatible_with_provider("openrouter", "google/gemini-flash-1.5"));
         assert!(ProviderRegistry::is_model_compatible_with_provider("openrouter", "openai/gpt-4o"));
+    }
+
+    #[test]
+    fn test_auto_provider_index_zero() {
+        let all = ProviderRegistry::list_all();
+        assert_eq!(all[0].id, "auto");
+        assert_eq!(all[0].category, "Smart Router");
+        assert!(all[0].is_configured);
+
+        let auto_by_zero = ProviderRegistry::get("0");
+        assert!(auto_by_zero.is_some());
+        assert_eq!(auto_by_zero.unwrap().id, "auto");
+
+        let auto_by_name = ProviderRegistry::get("auto");
+        assert!(auto_by_name.is_some());
+        assert_eq!(auto_by_name.unwrap().id, "auto");
+
+        let gemini_by_one = ProviderRegistry::get("1");
+        assert!(gemini_by_one.is_some());
+        assert_eq!(gemini_by_one.unwrap().id, "gemini");
     }
 }
