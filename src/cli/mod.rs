@@ -2081,6 +2081,18 @@ complete -F _ntx_completions ntx"#);
                     Err(e) => eprintln!("[ERROR] {}", e),
                 }
             }
+            "set-model" | "model" => {
+                if args.len() < 3 {
+                    eprintln!("Usage: ntx provider set-model <id> <model_name>");
+                    return;
+                }
+                let id = &args[1];
+                let model = &args[2];
+                match ProviderRegistry::set_model(id, model) {
+                    Ok(()) => println!("\x1b[32m[SUCCESS]\x1b[0m Default model for '{}' updated to: \x1b[36m{}\x1b[0m", id, model),
+                    Err(e) => eprintln!("\x1b[31m[ERROR]\x1b[0m {}", e),
+                }
+            }
             "test" | "ping" => {
                 let id = if args.len() > 1 { args[1].as_str() } else { "gemini" };
                 println!("[INFO] Testing connectivity for provider '{}'...", id);
@@ -2216,11 +2228,25 @@ complete -F _ntx_completions ntx"#);
         }
 
         let target_model = &args[0];
-        match ProviderRegistry::set_model(&active.id, target_model) {
+        let lower = target_model.to_lowercase();
+        let target_provider_id = if (lower.starts_with("gemini") || lower.starts_with("gemma") || lower.contains("argon")) && active.id != "gemini" && active.id != "aistudio" {
+            let _ = ProviderRegistry::set_active("gemini");
+            "gemini"
+        } else if (lower.starts_with("gpt") || lower.starts_with("o1") || lower.starts_with("o3") || lower.starts_with("o4")) && active.id != "openai" {
+            let _ = ProviderRegistry::set_active("openai");
+            "openai"
+        } else if lower.starts_with("claude") && active.id != "anthropic" {
+            let _ = ProviderRegistry::set_active("anthropic");
+            "anthropic"
+        } else {
+            &active.id
+        };
+        let target_p = ProviderRegistry::get(target_provider_id).unwrap_or(active);
+        match ProviderRegistry::set_model(&target_p.id, target_model) {
             Ok(()) => {
-                let ctx = active.context_window_for_model(target_model);
+                let ctx = target_p.context_window_for_model(target_model);
                 println!("\x1b[32m[SUCCESS]\x1b[0m Default model for {} set to: \x1b[32m{}\x1b[0m (context limit: {} tokens)",
-                    active.name, target_model, ctx);
+                    target_p.name, target_model, ctx);
             }
             Err(e) => eprintln!("[ERROR] Failed to switch model: {}", e),
         }
