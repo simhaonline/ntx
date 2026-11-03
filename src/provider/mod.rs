@@ -666,24 +666,24 @@ impl ProviderRegistry {
                     p.default_model = model.clone();
                 }
 
-                // Check Google OAuth
+                // Check Google OAuth or API Key
                 if p.id == "gemini" {
-                    if let Some(ref creds) = google_creds {
+                    if let Some(key) = config.keys.get("gemini") {
                         p.is_configured = true;
-                        let email_display = creds.email.as_deref().unwrap_or("Connected Account");
-                        p.auth_summary = format!("Google OAuth ({})", email_display);
+                        p.api_key = Some(mask_key(key));
+                        p.auth_summary = "API Key (Config)".to_string();
                     } else if let Ok(key) = std::env::var("GEMINI_API_KEY") {
                         if !key.is_empty() {
                             p.is_configured = true;
                             p.api_key = Some(mask_key(&key));
                             p.auth_summary = "API Key (Env)".to_string();
                         }
-                    } else if let Some(key) = config.keys.get("gemini") {
+                    } else if let Some(ref creds) = google_creds {
                         p.is_configured = true;
-                        p.api_key = Some(mask_key(key));
-                        p.auth_summary = "API Key (Config)".to_string();
+                        let email_display = creds.email.as_deref().unwrap_or("Connected Account");
+                        p.auth_summary = format!("Google OAuth ({})", email_display);
                     } else {
-                        p.auth_summary = "Requires Google OAuth or API Key".to_string();
+                        p.auth_summary = "Requires Gemini API Key or Google OAuth".to_string();
                     }
                 } else if p.auth_type == "none" {
                     p.is_configured = true;
@@ -793,8 +793,12 @@ impl ProviderRegistry {
         };
 
         if provider.id == "gemini" {
-            let oauth_token = GoogleOAuthEngine::get_valid_access_token().ok();
             let raw_key = Self::resolve_raw_key(&provider);
+            let oauth_token = if raw_key.is_none() {
+                GoogleOAuthEngine::get_valid_access_token().ok()
+            } else {
+                None
+            };
             let url = if let Some(ref key) = raw_key {
                 format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", key)
             } else if oauth_token.is_some() {
@@ -1026,10 +1030,14 @@ impl ProviderRegistry {
         let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
 
         if active.id == "gemini" {
-            let oauth_token = GoogleOAuthEngine::get_valid_access_token().ok();
             let raw_key = Self::resolve_raw_key(&active);
+            let oauth_token = if raw_key.is_none() {
+                GoogleOAuthEngine::get_valid_access_token().ok()
+            } else {
+                None
+            };
             if oauth_token.is_none() && raw_key.is_none() {
-                return Err("Google Gemini requires authentication. Run '/auth' or 'ntx auth login google' to connect your Google account or provide an API key (from https://aistudio.google.com/app/apikey).".to_string());
+                return Err("Google Gemini requires authentication. Run 'ntx auth login gemini <api_key>' (Get a free key at https://aistudio.google.com/app/apikey) or 'ntx auth login google'.".to_string());
             }
             return Self::call_gemini(
                 prompt,
@@ -1587,20 +1595,67 @@ impl ProviderRegistry {
         // 2. Handle Google Gemini Authentication Flow
         if provider.id == "gemini" {
             if let Some(key) = key_arg {
-                Self::set_key("gemini", key)?;
-                Self::set_active("gemini")?;
-                println!("✓ Stored Gemini API key and activated Google Gemini.");
-                return Ok(());
+                let clean = key.trim();
+                // Check if key is actually an OAuth callback URL or raw authorization code
+                if clean.starts_with("http://") || clean.starts_with("https://") || clean.contains("code=") || clean.starts_with("4/") {
+                    let code = GoogleOAuthEngine::extract_code_from_input(clean);
+                    println!("[INFO] Exchanging authorization code with Google...");
+                    let client_id = GoogleOAuthEngine::get_client_id(None);
+                    let client_secret = GoogleOAuthEngine::get_client_secret(None);
+                    match GoogleOAuthEngine::exchange_authorization_code(&code, &client_id, &client_secret, google_oauth::DEFAULT_REDIRECT_URI) {
+                        Ok(creds) => {
+                            Self::set_active("gemini")?;
+                            println!("✓ Successfully authenticated with Google OAuth!");
+                            if let Some(ref email) = creds.email {
+                                println!("  Connected Account: {}", email);
+                            }
+                            println!("  Google Gemini activated as active provider.");
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            eprintln!("\n[ERROR] Google OAuth Token Exchange failed: {}", e);
+                            if e.contains("invalid_client") {
+                                eprintln!("\n┌────────────────────────────────────────────────────────────────────────┐");
+                                eprintln!("│ ⚠️  GOOGLE OAUTH CLIENT CONFIGURATION NOTICE                           │");
+                                eprintln!("├────────────────────────────────────────────────────────────────────────┤");
+                                eprintln!("│ Google requires an authorized GCP OAuth 2.0 Client Secret for this flow. │");
+                                eprintln!("│ For zero-friction setup without GCP console configuration, use your    │");
+                                eprintln!("│ Google AI Studio API Key (instant, free, all Gemini models).           │");
+                                eprintln!("│ Get your key at: https://aistudio.google.com/app/apikey                │");
+                                eprintln!("└────────────────────────────────────────────────────────────────────────┘");
+                                print!("Enter Gemini API Key (or press Enter to cancel): ");
+                                let _ = std::io::stdout().flush();
+                                let mut fallback_key = String::new();
+                                if std::io::stdin().read_line(&mut fallback_key).is_ok() {
+                                    let clean_fallback = fallback_key.trim();
+                                    if !clean_fallback.is_empty() {
+                                        Self::set_key("gemini", clean_fallback)?;
+                                        Self::set_active("gemini")?;
+                                        println!("✓ Successfully configured and activated Google Gemini with API Key!");
+                                        return Ok(());
+                                    }
+                                }
+                            }
+                            return Err(e);
+                        }
+                    }
+                } else {
+                    Self::set_key("gemini", clean)?;
+                    Self::set_active("gemini")?;
+                    println!("✓ Stored Gemini API key and activated Google Gemini.");
+                    return Ok(());
+                }
             }
 
             println!("\n┌────────────────────────────────────────────────────────────────────────┐");
             println!("│ 🌐 GOOGLE GEMINI AUTHENTICATION METHOD                                 │");
             println!("├────────────────────────────────────────────────────────────────────────┤");
-            println!("│   [1] Google OAuth 2.0 (Browser sign-in with Google Account)           │");
-            println!("│   [2] Gemini API Key (Enter key from https://aistudio.google.com)      │");
-            println!("│   [3] Use existing Google Cloud ADC (gcloud credentials)               │");
+            println!("│   [1] Gemini API Key (Recommended: instant, no redirects, all models) │");
+            println!("│   [2] Google OAuth 2.0 (Browser sign-in via local/remote loopback)     │");
+            println!("│   [3] Google Cloud ADC (Use local gcloud application credentials)      │");
+            println!("│   [4] Custom GCP OAuth (Enter your custom GCP Client ID & Secret)      │");
             println!("└────────────────────────────────────────────────────────────────────────┘");
-            print!("Select method [1-3 | Enter for Browser OAuth]: ");
+            print!("Select method [1-4 | Enter for Gemini API Key]: ");
             let _ = std::io::stdout().flush();
 
             let mut method_input = String::new();
@@ -1609,7 +1664,55 @@ impl ProviderRegistry {
 
             match method {
                 "2" => {
-                    println!("\nGet your API key at: {}", Self::portal_url("gemini"));
+                    println!("[INFO] Launching Google OAuth 2.0 flow...");
+                    GoogleOAuthEngine::interactive_login(None, None)?;
+                    Self::set_active("gemini")?;
+                    println!("✓ Google Gemini is active.");
+                    return Ok(());
+                }
+                "3" => {
+                    if let Some(creds) = GoogleOAuthEngine::load_credentials() {
+                        if creds.auth_source == "gcloud_adc" {
+                            Self::set_active("gemini")?;
+                            println!("✓ Successfully activated Google Gemini using gcloud ADC credentials.");
+                            return Ok(());
+                        }
+                    }
+                    if let Ok(output) = Command::new("gcloud").arg("auth").arg("print-access-token").output() {
+                        if output.status.success() {
+                            Self::set_active("gemini")?;
+                            println!("✓ Found active gcloud access token. Google Gemini activated.");
+                            return Ok(());
+                        }
+                    }
+                    return Err("No active gcloud credentials found. Run 'gcloud auth application-default login' first.".to_string());
+                }
+                "4" => {
+                    print!("Enter Google Cloud Client ID: ");
+                    let _ = std::io::stdout().flush();
+                    let mut cid = String::new();
+                    std::io::stdin().read_line(&mut cid).map_err(|e| e.to_string())?;
+                    let cid = cid.trim();
+
+                    print!("Enter Google Cloud Client Secret: ");
+                    let _ = std::io::stdout().flush();
+                    let mut csec = String::new();
+                    std::io::stdin().read_line(&mut csec).map_err(|e| e.to_string())?;
+                    let csec = csec.trim();
+
+                    if cid.is_empty() || csec.is_empty() {
+                        return Err("Client ID and Client Secret cannot be empty.".to_string());
+                    }
+
+                    let _ = GoogleOAuthEngine::save_custom_client(cid, csec);
+                    GoogleOAuthEngine::interactive_login(Some(cid), Some(csec))?;
+                    Self::set_active("gemini")?;
+                    println!("✓ Custom GCP OAuth credentials saved and Google Gemini activated.");
+                    return Ok(());
+                }
+                _ => {
+                    // Option 1 (Default): Gemini API Key
+                    println!("\nGet your free Gemini API key at: https://aistudio.google.com/app/apikey");
                     print!("Enter Gemini API Key (AIza...): ");
                     let _ = std::io::stdout().flush();
                     let mut key_in = String::new();
@@ -1621,28 +1724,6 @@ impl ProviderRegistry {
                     Self::set_key("gemini", clean_key)?;
                     Self::set_active("gemini")?;
                     println!("✓ Successfully configured and activated Google Gemini with API Key.");
-                    return Ok(());
-                }
-                "3" => {
-                    if let Some(creds) = GoogleOAuthEngine::load_credentials() {
-                        if creds.auth_source == "gcloud_adc" {
-                            Self::set_active("gemini")?;
-                            println!("✓ Successfully activated Google Gemini using gcloud ADC credentials.");
-                            return Ok(());
-                        }
-                    }
-                    println!("[INFO] Launching browser Google OAuth 2.0 flow...");
-                    GoogleOAuthEngine::interactive_login(None, None)?;
-                    Self::set_active("gemini")?;
-                    println!("✓ Successfully authenticated with Google OAuth and activated Google Gemini.");
-                    return Ok(());
-                }
-                _ => {
-                    // Default: Browser OAuth with clean scopes
-                    println!("[INFO] Launching browser Google OAuth 2.0 flow...");
-                    GoogleOAuthEngine::interactive_login(None, None)?;
-                    Self::set_active("gemini")?;
-                    println!("✓ Successfully authenticated with Google OAuth and activated Google Gemini.");
                     return Ok(());
                 }
             }

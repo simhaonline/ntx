@@ -53,6 +53,44 @@ impl GoogleOAuthEngine {
         PathBuf::from("google_oauth.json")
     }
 
+    /// Returns path for custom GCP client ID and secret configuration
+    pub fn client_config_path() -> PathBuf {
+        let system_path = PathBuf::from("/etc/nityaksha/auth/google_client.json");
+        if system_path.parent().map(|p| p.exists()).unwrap_or(false) {
+            return system_path;
+        }
+
+        if let Ok(home) = std::env::var("HOME") {
+            let user_path = PathBuf::from(home).join(".config/nityaksha/auth/google_client.json");
+            if let Some(parent) = user_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            return user_path;
+        }
+
+        PathBuf::from("google_client.json")
+    }
+
+    /// Save custom GCP client ID and secret
+    pub fn save_custom_client(client_id: &str, client_secret: &str) -> Result<(), String> {
+        let path = Self::client_config_path();
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let val = serde_json::json!({
+            "client_id": client_id.trim(),
+            "client_secret": client_secret.trim(),
+        });
+        fs::write(&path, serde_json::to_string_pretty(&val).unwrap_or_default())
+            .map_err(|e| format!("Failed to save client credentials: {}", e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+        }
+        Ok(())
+    }
+
     /// Load persisted credentials
     pub fn load_credentials() -> Option<GoogleOAuthCredentials> {
         let path = Self::credential_path();
@@ -128,11 +166,22 @@ impl GoogleOAuthEngine {
     /// Resolves active client id
     pub fn get_client_id(custom_id: Option<&str>) -> String {
         if let Some(id) = custom_id {
-            return id.to_string();
+            if !id.trim().is_empty() {
+                return id.trim().to_string();
+            }
         }
         if let Ok(id) = std::env::var("GOOGLE_CLIENT_ID") {
-            if !id.is_empty() {
-                return id;
+            if !id.trim().is_empty() {
+                return id.trim().to_string();
+            }
+        }
+        if let Ok(data) = fs::read_to_string(Self::client_config_path()) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&data) {
+                if let Some(cid) = val.get("client_id").and_then(|v| v.as_str()) {
+                    if !cid.trim().is_empty() {
+                        return cid.trim().to_string();
+                    }
+                }
             }
         }
         DEFAULT_CLIENT_ID.to_string()
@@ -141,11 +190,22 @@ impl GoogleOAuthEngine {
     /// Resolves active client secret
     pub fn get_client_secret(custom_secret: Option<&str>) -> String {
         if let Some(secret) = custom_secret {
-            return secret.to_string();
+            if !secret.trim().is_empty() {
+                return secret.trim().to_string();
+            }
         }
         if let Ok(secret) = std::env::var("GOOGLE_CLIENT_SECRET") {
-            if !secret.is_empty() {
-                return secret;
+            if !secret.trim().is_empty() {
+                return secret.trim().to_string();
+            }
+        }
+        if let Ok(data) = fs::read_to_string(Self::client_config_path()) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&data) {
+                if let Some(csec) = val.get("client_secret").and_then(|v| v.as_str()) {
+                    if !csec.trim().is_empty() {
+                        return csec.trim().to_string();
+                    }
+                }
             }
         }
         DEFAULT_CLIENT_SECRET.to_string()
@@ -362,7 +422,27 @@ impl GoogleOAuthEngine {
         }
     }
 
-    /// Interactive CLI OAuth flow with local TCP listener and manual fallback
+    /// Extracts an authorization code from input, handling raw codes or full redirect URLs
+    pub fn extract_code_from_input(input: &str) -> String {
+        let mut trimmed = input.trim();
+        if (trimmed.starts_with('"') && trimmed.ends_with('"'))
+            || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
+        {
+            if trimmed.len() >= 2 {
+                trimmed = &trimmed[1..trimmed.len() - 1].trim();
+            }
+        }
+
+        if let Some(code_idx) = trimmed.find("code=") {
+            let sub = &trimmed[code_idx + 5..];
+            let raw_code = sub.split(['&', ' ', '#', '"', '\'']).next().unwrap_or("");
+            url_decode(raw_code)
+        } else {
+            url_decode(trimmed)
+        }
+    }
+
+    /// Interactive CLI OAuth flow with non-blocking local TCP listener and concurrent manual fallback
     pub fn interactive_login(
         custom_client_id: Option<&str>,
         custom_client_secret: Option<&str>,
@@ -379,73 +459,99 @@ impl GoogleOAuthEngine {
         println!("1. Open this URL in your web browser to grant Gemini permissions:\n");
         println!("   \x1b[36m{}\x1b[0m\n", auth_url);
         println!("2. Sign in with your Google account and grant access.");
-        println!("3. Awaiting callback on http://127.0.0.1:8085/oauth/callback ...");
-        println!("   (If running on a remote headless server without local browser access,");
-        println!("    copy the 'code' parameter from the redirected URL and paste it below.)");
+        println!("3. Redirect Handling:");
+        println!("   • Local Machine: Browser redirects automatically to http://127.0.0.1:8085.");
+        println!("   • Remote / VPS : Your browser will show '127.0.0.1 refused to connect'.");
+        println!("                    This is NORMAL because the server is remote. Simply COPY the");
+        println!("                    full URL from your browser address bar and PASTE it below.");
         println!("--------------------------------------------------------------------------------");
+        print!("Paste full redirect URL or authorization code here: ");
+        let _ = io::stdout().flush();
 
         // Attempt to open browser automatically
         let _ = open_browser(&auth_url);
 
-        // Bind temporary TCP listener on 127.0.0.1:8085
-        let listener = TcpListener::bind("127.0.0.1:8085");
-        let mut captured_code: Option<String> = None;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::mpsc;
+        use std::sync::Arc;
 
-        if let Ok(listener) = listener {
-            // Set 90-second timeout on socket
-            listener.set_nonblocking(true).unwrap_or(());
-            let start = Utc::now().timestamp();
+        let done = Arc::new(AtomicBool::new(false));
+        let done_tcp = done.clone();
+        let (tx, rx) = mpsc::channel();
+        let tx_tcp = tx.clone();
 
-            while Utc::now().timestamp() - start < 90 {
-                match listener.accept() {
-                    Ok((mut stream, _)) => {
-                        let mut buf = [0u8; 4096];
-                        if let Ok(n) = stream.read(&mut buf) {
-                            let req = String::from_utf8_lossy(&buf[..n]);
-                            if let Some(line) = req.lines().next() {
-                                if let Some(code_idx) = line.find("code=") {
-                                    let sub = &line[code_idx + 5..];
-                                    let code = sub.split(['&', ' ']).next().unwrap_or("");
-                                    if !code.is_empty() {
-                                        captured_code = Some(code.to_string());
-
-                                        let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
-                                            <html><body style='font-family:sans-serif;background:#0D2340;color:#F4F6F9;text-align:center;padding:50px;'>\
-                                            <h2 style='color:#C05A28;'>✓ Nityaksha Gemini Authentication Successful</h2>\
-                                            <p>Google OAuth credentials exchanged. You can safely close this window and return to your terminal.</p>\
-                                            </body></html>";
-                                        let _ = stream.write_all(resp.as_bytes());
-                                        break;
+        // Spawn background TCP listener on 127.0.0.1:8085
+        std::thread::spawn(move || {
+            if let Ok(listener) = TcpListener::bind("127.0.0.1:8085") {
+                let _ = listener.set_nonblocking(true);
+                let start = std::time::Instant::now();
+                while !done_tcp.load(Ordering::Relaxed) && start.elapsed().as_secs() < 180 {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            let mut buf = [0u8; 4096];
+                            if let Ok(n) = stream.read(&mut buf) {
+                                let req = String::from_utf8_lossy(&buf[..n]);
+                                if let Some(line) = req.lines().next() {
+                                    if let Some(code_idx) = line.find("code=") {
+                                        let sub = &line[code_idx + 5..];
+                                        let raw = sub.split(['&', ' ']).next().unwrap_or("");
+                                        let code = url_decode(raw);
+                                        if !code.is_empty() {
+                                            let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+                                                <html><body style='font-family:sans-serif;background:#0D2340;color:#F4F6F9;text-align:center;padding:50px;'>\
+                                                <h2 style='color:#C05A28;'>✓ Nityaksha Gemini Authentication Successful</h2>\
+                                                <p>Google OAuth credentials exchanged. You can safely close this window and return to your terminal.</p>\
+                                                </body></html>";
+                                            let _ = stream.write_all(resp.as_bytes());
+                                            let _ = tx_tcp.send(code);
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
+                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(std::time::Duration::from_millis(100));
+                        }
+                        Err(_) => break,
                     }
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        std::thread::sleep(std::time::Duration::from_millis(150));
-                    }
-                    Err(_) => break,
                 }
             }
-        }
+        });
 
-        // If local listener didn't catch the code, prompt the user for manual entry
-        let code = if let Some(c) = captured_code {
-            c
-        } else {
-            print!("Enter authorization code (or full redirect URL): ");
-            io::stdout().flush().map_err(|e| e.to_string())?;
+        // Spawn background stdin reader
+        let (stdin_tx, stdin_rx) = mpsc::channel();
+        let done_stdin = done.clone();
+        std::thread::spawn(move || {
             let mut input = String::new();
-            io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
-            let trimmed = input.trim();
-
-            if trimmed.contains("code=") {
-                let code_idx = trimmed.find("code=").unwrap();
-                let sub = &trimmed[code_idx + 5..];
-                sub.split(['&', ' ']).next().unwrap_or("").to_string()
-            } else {
-                trimmed.to_string()
+            if io::stdin().read_line(&mut input).is_ok() {
+                if !done_stdin.load(Ordering::Relaxed) {
+                    let _ = stdin_tx.send(input);
+                }
             }
+        });
+
+        // Main thread polls both channels
+        let start = std::time::Instant::now();
+        let code = loop {
+            if let Ok(browser_code) = rx.try_recv() {
+                println!("\n[INFO] Callback received automatically via local browser redirect.");
+                done.store(true, Ordering::Relaxed);
+                break browser_code;
+            }
+            if let Ok(user_input) = stdin_rx.try_recv() {
+                let parsed = Self::extract_code_from_input(&user_input);
+                if !parsed.is_empty() {
+                    println!("\n[INFO] Authorization code received from terminal input.");
+                    done.store(true, Ordering::Relaxed);
+                    break parsed;
+                }
+            }
+            if start.elapsed().as_secs() > 180 {
+                done.store(true, Ordering::Relaxed);
+                return Err("Authentication timed out after 3 minutes.".to_string());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         };
 
         if code.is_empty() {
@@ -453,17 +559,55 @@ impl GoogleOAuthEngine {
         }
 
         println!("\n[INFO] Exchanging authorization code with Google OAuth servers...");
-        let creds = Self::exchange_authorization_code(&code, &client_id, &client_secret, redirect_uri)?;
-
-        println!("[SUCCESS] Google OAuth Token Issued!");
-        if let Some(ref email) = creds.email {
-            println!("  Authenticated Account: \x1b[32m{}\x1b[0m", email);
+        match Self::exchange_authorization_code(&code, &client_id, &client_secret, redirect_uri) {
+            Ok(creds) => {
+                println!("[SUCCESS] Google OAuth Token Issued!");
+                if let Some(ref email) = creds.email {
+                    println!("  Authenticated Account: \x1b[32m{}\x1b[0m", email);
+                }
+                println!("  Expires In           : ~{} minutes", (creds.expires_at - Utc::now().timestamp()) / 60);
+                println!("  Credential Vault     : {}", Self::credential_path().display());
+                println!("  Status               : Gemini Provider Activated with Google OAuth");
+                Ok(creds)
+            }
+            Err(e) => {
+                eprintln!("\n[ERROR] Google OAuth Token Exchange failed: {}", e);
+                if e.contains("invalid_client") {
+                    eprintln!("\n┌────────────────────────────────────────────────────────────────────────┐");
+                    eprintln!("│ ⚠️  GOOGLE OAUTH CLIENT CONFIGURATION NOTICE                           │");
+                    eprintln!("├────────────────────────────────────────────────────────────────────────┤");
+                    eprintln!("│ Google requires an authorized GCP OAuth 2.0 Client Secret for this flow. │");
+                    eprintln!("│ For zero-friction setup without GCP console configuration, use your    │");
+                    eprintln!("│ Google AI Studio API Key (instant, free, all Gemini models).           │");
+                    eprintln!("│ Get your key at: https://aistudio.google.com/app/apikey                │");
+                    eprintln!("└────────────────────────────────────────────────────────────────────────┘");
+                    print!("Enter Gemini API Key (or press Enter to cancel): ");
+                    let _ = io::stdout().flush();
+                    let mut fallback_key = String::new();
+                    if io::stdin().read_line(&mut fallback_key).is_ok() {
+                        let clean = fallback_key.trim();
+                        if !clean.is_empty() {
+                            use crate::provider::ProviderRegistry;
+                            let _ = ProviderRegistry::set_key("gemini", clean);
+                            let _ = ProviderRegistry::set_active("gemini");
+                            println!("✓ Successfully configured and activated Google Gemini with API Key!");
+                            return Ok(GoogleOAuthCredentials {
+                                access_token: clean.to_string(),
+                                refresh_token: None,
+                                expires_at: i64::MAX,
+                                token_type: "ApiKey".to_string(),
+                                email: Some("aistudio-apikey@google.com".to_string()),
+                                scopes: vec!["gemini".to_string()],
+                                client_id: None,
+                                client_secret: None,
+                                auth_source: "api_key".to_string(),
+                            });
+                        }
+                    }
+                }
+                Err(e)
+            }
         }
-        println!("  Expires In           : ~{} minutes", (creds.expires_at - Utc::now().timestamp()) / 60);
-        println!("  Credential Vault     : {}", Self::credential_path().display());
-        println!("  Status               : Gemini Provider Activated with Google OAuth");
-
-        Ok(creds)
     }
 }
 
@@ -483,7 +627,7 @@ fn open_browser(url: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn url_encode(input: &str) -> String {
+pub fn url_encode(input: &str) -> String {
     let mut encoded = String::new();
     for b in input.bytes() {
         match b {
@@ -497,4 +641,61 @@ fn url_encode(input: &str) -> String {
         }
     }
     encoded
+}
+
+pub fn url_decode(s: &str) -> String {
+    let mut result = String::new();
+    let mut bytes = s.bytes().peekable();
+    while let Some(b) = bytes.next() {
+        if b == b'%' {
+            let h1 = bytes.next().unwrap_or(b'0');
+            let h2 = bytes.next().unwrap_or(b'0');
+            let hex_str = format!("{}{}", h1 as char, h2 as char);
+            if let Ok(byte) = u8::from_str_radix(&hex_str, 16) {
+                result.push(byte as char);
+            } else {
+                result.push('%');
+                result.push(h1 as char);
+                result.push(h2 as char);
+            }
+        } else if b == b'+' {
+            result.push(' ');
+        } else {
+            result.push(b as char);
+        }
+    }
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_code_from_full_url() {
+        let url = "http://127.0.0.1:8085/oauth/callback?iss=https://accounts.google.com&code=4/0AUn6Hd8kQpBySe2lVen9ETKEv2JkLn43oV1JUAMUQAc_Pvl6psOgT1isCno-Dp58Alg1xw&scope=email%20profile%20openid";
+        let code = GoogleOAuthEngine::extract_code_from_input(url);
+        assert_eq!(code, "4/0AUn6Hd8kQpBySe2lVen9ETKEv2JkLn43oV1JUAMUQAc_Pvl6psOgT1isCno-Dp58Alg1xw");
+    }
+
+    #[test]
+    fn test_extract_code_from_encoded_url() {
+        let url = "http://127.0.0.1:8085/oauth/callback?code=4%2F0AUn6Hd8kQpBySe2lVen&scope=email";
+        let code = GoogleOAuthEngine::extract_code_from_input(url);
+        assert_eq!(code, "4/0AUn6Hd8kQpBySe2lVen");
+    }
+
+    #[test]
+    fn test_extract_code_from_raw_code() {
+        let raw = "4/0AUn6Hd8kQpBySe2lVen9ETKEv2JkLn43oV1JUAMUQAc_Pvl6psOgT1isCno-Dp58Alg1xw";
+        let code = GoogleOAuthEngine::extract_code_from_input(raw);
+        assert_eq!(code, raw);
+    }
+
+    #[test]
+    fn test_extract_code_quoted() {
+        let quoted = "\"4/0AUn6Hd8kQpBySe2lVen9ETKEv2JkLn43oV1JUAMUQAc_Pvl6psOgT1isCno-Dp58Alg1xw\"";
+        let code = GoogleOAuthEngine::extract_code_from_input(quoted);
+        assert_eq!(code, "4/0AUn6Hd8kQpBySe2lVen9ETKEv2JkLn43oV1JUAMUQAc_Pvl6psOgT1isCno-Dp58Alg1xw");
+    }
 }
