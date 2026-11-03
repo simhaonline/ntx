@@ -938,7 +938,12 @@ impl InteractiveShell {
 
         println!("  {bold}INTERACTIVE GUIDED COMMANDS:{reset}", bold = theme.bold, reset = theme.reset);
         println!("    {accent}/provider [id]{reset}          - Select AI provider (Gemini, Claude, Ollama Cloud, OpenAI...)", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/key [id] [key]{reset}         - Store API key and query remote live models from API", accent = theme.accent, reset = theme.reset);
+        println!("    {accent}/provider add [id] [key]{reset}- Add / configure API key and activate provider", accent = theme.accent, reset = theme.reset);
+        println!("    {accent}/provider set-key [id] [k]{reset} Set or update provider API key", accent = theme.accent, reset = theme.reset);
+        println!("    {accent}/key [id] [key]{reset}         - Directly store API key and fetch remote models from API", accent = theme.accent, reset = theme.reset);
+        println!("    {accent}/auth login [id] [key]{reset}  - Authenticate provider via API key or Google OAuth PKCE", accent = theme.accent, reset = theme.reset);
+        println!("    {accent}/auth status{reset}            - View authentication status across all 22 providers", accent = theme.accent, reset = theme.reset);
+        println!("    {accent}/auth logout [id]{reset}       - Remove stored API key or OAuth token", accent = theme.accent, reset = theme.reset);
         println!("    {accent}/model [name|idx]{reset}       - Fetch live models from provider API & switch active model", accent = theme.accent, reset = theme.reset);
         println!("    {accent}/effort [level]{reset}         - Adjust thinking/reasoning effort budget (low, med, high, max, off)", accent = theme.accent, reset = theme.reset);
         println!("    {accent}/memory <query>{reset}         - Search episodic and semantic memory vectors", accent = theme.accent, reset = theme.reset);
@@ -1104,15 +1109,20 @@ impl InteractiveShell {
             }
             "provider" | "providers" | "ai" => {
                 if parts.len() > 1 {
-                    let id = parts[1];
-                    if parts.len() >= 3 {
+                    let sub = parts[1].to_lowercase();
+                    if (sub == "add" || sub == "set-key" || sub == "key") && parts.len() >= 4 {
+                        let id = parts[2];
+                        let key = parts[3..].join(" ");
+                        self.interactive_set_api_key(Some(id), Some(&key));
+                    } else if (sub == "add" || sub == "set-key" || sub == "key") && parts.len() == 3 {
+                        let id = parts[2];
+                        self.interactive_set_api_key(Some(id), None);
+                    } else if parts.len() >= 3 {
+                        let id = parts[1];
                         let key = parts[2..].join(" ");
-                        let _ = ProviderRegistry::set_key(id, &key);
-                        let _ = ProviderRegistry::set_active(id);
-                        println!("{}✓ Stored API key for {} and activated provider.{}", theme.success, id, theme.reset);
-                        self.interactive_configure_provider(id);
+                        self.interactive_set_api_key(Some(id), Some(&key));
                     } else {
-                        self.interactive_configure_provider(id);
+                        self.interactive_configure_provider(parts[1]);
                     }
                 } else {
                     self.set_view(CockpitView::Providers);

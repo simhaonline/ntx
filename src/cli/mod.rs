@@ -183,7 +183,10 @@ impl CliHandler {
             "harness" => self.cmd_harness(&sub_args),
             "scrape" => self.cmd_scrape(&sub_args),
             "provider" | "providers" => self.cmd_provider(&sub_args),
+            "key" | "setkey" | "apikey" => self.cmd_key(&sub_args),
             "auth" => self.cmd_auth(&sub_args),
+            "model" | "models" => self.cmd_model(&sub_args),
+            "effort" | "reasoning" | "thinking" => self.cmd_effort(&sub_args),
             "install" => self.cmd_install(&sub_args),
             "update" | "upgrade" => self.cmd_update(&sub_args),
             "repl" | "interactive" | "tui" | "cockpit" | "console" => {
@@ -415,6 +418,18 @@ impl CliHandler {
             } else if arg == "--exec" {
                 if i + 1 < raw.len() {
                     opts.exec_cmd = Some(raw[i + 1].clone());
+                    i += 1;
+                }
+            } else if arg == "--api-key" || arg == "--key" {
+                if i + 1 < raw.len() {
+                    let val = &raw[i + 1];
+                    if let Some((prov, k)) = val.split_once('=') {
+                        let _ = ProviderRegistry::set_key(prov.trim(), k.trim());
+                        let _ = ProviderRegistry::set_active(prov.trim());
+                    } else {
+                        let active = ProviderRegistry::active();
+                        let _ = ProviderRegistry::set_key(&active.id, val.trim());
+                    }
                     i += 1;
                 }
             } else if arg == "--swarm" {
@@ -1824,17 +1839,41 @@ complete -F _ntx_completions ntx"#);
             }
             println!("-----------------------------------------------------------------------------------------------------------------");
             println!("Active Provider: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
-            println!("Commands:");
+            println!("Commands & API Key Setup:");
+            println!("  ntx provider add <id> <key>     - Add API key, activate provider, and query live models");
+            println!("  ntx provider set-key <id> <key> - Set or update API key for a provider");
             println!("  ntx provider select <id>        - Switch active default provider");
             println!("  ntx provider inspect <id>       - View available models, base URL, and configuration");
-            println!("  ntx provider set-key <id> <key> - Set provider API key");
             println!("  ntx provider set-url <id> <url> - Set custom base URL (e.g. self-hosted Ollama/vLLM)");
             println!("  ntx provider test <id>          - Test connectivity and latency ping");
+            println!("  ntx key <id> <key>              - Directly configure provider API key");
             println!("  ntx auth login google           - Authenticate with Google OAuth for Gemini");
+            println!("  ntx auth login <id> <key>       - Authenticate provider via API key");
             return;
         }
 
         match args[0].as_str() {
+            "add" | "set-key" | "key" => {
+                if args.len() < 3 {
+                    eprintln!("Usage: ntx provider set-key <provider_id> <api_key>\nExample: ntx provider add gemini AIzaSy...\n         ntx provider set-key openai sk-proj-...");
+                    return;
+                }
+                let id = &args[1];
+                let key = &args[2];
+                match ProviderRegistry::set_key(id, key) {
+                    Ok(()) => {
+                        let _ = ProviderRegistry::set_active(id);
+                        println!("\x1b[32m[SUCCESS]\x1b[0m API key for '{}' saved successfully. Marked as active provider.", id);
+                        match ProviderRegistry::fetch_remote_models_with_key(id, Some(key), None) {
+                            Ok(models) if !models.is_empty() => {
+                                println!("\x1b[32m[SUCCESS]\x1b[0m Connected to {} API! Retrieved {} live models.", id, models.len());
+                            }
+                            _ => {}
+                        }
+                    }
+                    Err(e) => eprintln!("\x1b[31m[ERROR]\x1b[0m Failed to save API key: {}", e),
+                }
+            }
             "inspect" => {
                 if args.len() < 2 {
                     eprintln!("Usage: ntx provider inspect <id>");
@@ -1873,18 +1912,6 @@ complete -F _ntx_completions ntx"#);
                     Err(e) => eprintln!("[ERROR] Failed to switch provider: {}", e),
                 }
             }
-            "set-key" => {
-                if args.len() < 3 {
-                    eprintln!("Usage: ntx provider set-key <id> <api_key>");
-                    return;
-                }
-                let id = &args[1];
-                let key = &args[2];
-                match ProviderRegistry::set_key(id, key) {
-                    Ok(()) => println!("[SUCCESS] API key for '{}' saved successfully.", id),
-                    Err(e) => eprintln!("[ERROR] {}", e),
-                }
-            }
             "set-url" => {
                 if args.len() < 3 {
                     eprintln!("Usage: ntx provider set-url <id> <base_url>");
@@ -1905,8 +1932,35 @@ complete -F _ntx_completions ntx"#);
                     Err(e) => eprintln!("\x1b[31m[FAIL]\x1b[0m {}", e),
                 }
             }
-            _ => {
-                eprintln!("Unknown provider subcommand '{}'. Available: list, inspect, select, set-key, set-url, test", args[0]);
+            provider_id => {
+                if ProviderRegistry::get(provider_id).is_some() {
+                    if args.len() >= 2 {
+                        let key = &args[1];
+                        match ProviderRegistry::set_key(provider_id, key) {
+                            Ok(()) => {
+                                let _ = ProviderRegistry::set_active(provider_id);
+                                println!("\x1b[32m[SUCCESS]\x1b[0m API key for '{}' saved successfully. Marked as active provider.", provider_id);
+                                match ProviderRegistry::fetch_remote_models_with_key(provider_id, Some(key), None) {
+                                    Ok(models) if !models.is_empty() => {
+                                        println!("\x1b[32m[SUCCESS]\x1b[0m Connected to {} API! Retrieved {} live models.", provider_id, models.len());
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            Err(e) => eprintln!("\x1b[31m[ERROR]\x1b[0m Failed to save API key: {}", e),
+                        }
+                    } else {
+                        match ProviderRegistry::set_active(provider_id) {
+                            Ok(()) => {
+                                let active = ProviderRegistry::active();
+                                println!("[SUCCESS] Active provider switched to: \x1b[32m{} ({})\x1b[0m", active.name, active.default_model);
+                            }
+                            Err(e) => eprintln!("[ERROR] Failed to switch provider: {}", e),
+                        }
+                    }
+                } else {
+                    eprintln!("Unknown provider subcommand or ID '{}'. Available: list, inspect, select, add, set-key, set-url, test", provider_id);
+                }
             }
         }
     }
@@ -1940,6 +1994,94 @@ complete -F _ntx_completions ntx"#);
                     eprintln!("[ERROR] Authentication failed: {}", e);
                 }
             }
+        }
+    }
+
+    pub fn cmd_key(&self, args: &[String]) {
+        use crate::provider::ProviderRegistry;
+        if args.is_empty() {
+            eprintln!("Usage: ntx key <provider_id> <api_key>\nExample: ntx key gemini AIzaSy...\n         ntx key openai sk-proj-...");
+            println!("\nRun 'ntx auth status' to see configured keys across all 22 providers.");
+            return;
+        }
+
+        let (target_id, key) = if args.len() >= 2 {
+            (args[0].clone(), args[1].clone())
+        } else {
+            // User ran `ntx key <key>` for active provider
+            let active = ProviderRegistry::active();
+            (active.id.clone(), args[0].clone())
+        };
+
+        if ProviderRegistry::get(&target_id).is_none() {
+            eprintln!("[ERROR] Unknown provider '{}'. Run 'ntx provider' to see available backends.", target_id);
+            return;
+        }
+
+        match ProviderRegistry::set_key(&target_id, &key) {
+            Ok(()) => {
+                let _ = ProviderRegistry::set_active(&target_id);
+                println!("\x1b[32m[SUCCESS]\x1b[0m API key for '{}' saved successfully. Marked as active provider.", target_id);
+                match ProviderRegistry::fetch_remote_models_with_key(&target_id, Some(&key), None) {
+                    Ok(models) if !models.is_empty() => {
+                        println!("\x1b[32m[SUCCESS]\x1b[0m Connected to {} API! Retrieved {} live models.", target_id, models.len());
+                    }
+                    _ => {}
+                }
+            }
+            Err(e) => eprintln!("\x1b[31m[ERROR]\x1b[0m Failed to store API key: {}", e),
+        }
+    }
+
+    pub fn cmd_model(&self, args: &[String]) {
+        use crate::provider::ProviderRegistry;
+        let active = ProviderRegistry::active();
+
+        if args.is_empty() {
+            println!("================================================================================");
+            println!("Available Models for Active Provider: {} ({})", active.name, active.id);
+            println!("================================================================================");
+            let models = match ProviderRegistry::fetch_remote_models_with_key(&active.id, None, None) {
+                Ok(m) if !m.is_empty() => m,
+                _ => active.available_models.clone(),
+            };
+            for (i, m) in models.iter().enumerate() {
+                let is_cur = m == &active.default_model;
+                let mark = if is_cur { "\x1b[32m* (active)\x1b[0m" } else { "          " };
+                let ctx = active.context_window_for_model(m);
+                println!("  [{:2}] {} {:<32} (max context: {} tokens)", i + 1, mark, m, ctx);
+            }
+            println!("\nRun 'ntx model <model_name>' to switch default model.");
+            return;
+        }
+
+        let target_model = &args[0];
+        match ProviderRegistry::set_model(&active.id, target_model) {
+            Ok(()) => {
+                let ctx = active.context_window_for_model(target_model);
+                println!("\x1b[32m[SUCCESS]\x1b[0m Default model for {} set to: \x1b[32m{}\x1b[0m (context limit: {} tokens)",
+                    active.name, target_model, ctx);
+            }
+            Err(e) => eprintln!("[ERROR] Failed to switch model: {}", e),
+        }
+    }
+
+    pub fn cmd_effort(&self, args: &[String]) {
+        use crate::provider::ProviderRegistry;
+        if args.is_empty() {
+            let current = ProviderRegistry::get_reasoning_effort();
+            println!("Current Reasoning / Thinking Effort: \x1b[32m{}\x1b[0m", current.to_uppercase());
+            println!("Levels: low (2k tokens), medium (4k tokens), high (8k tokens), max (16k tokens), off (0 tokens)");
+            println!("Usage: ntx effort <level>");
+            return;
+        }
+        let level = &args[0];
+        match ProviderRegistry::set_reasoning_effort(level) {
+            Ok(()) => {
+                let updated = ProviderRegistry::get_reasoning_effort().to_uppercase();
+                println!("\x1b[32m[SUCCESS]\x1b[0m Reasoning effort set to: \x1b[32m{}\x1b[0m", updated);
+            }
+            Err(e) => eprintln!("[ERROR] {}", e),
         }
     }
 
@@ -1986,6 +2128,7 @@ complete -F _ntx_completions ntx"#);
         println!("      --no-session-persistence    Disable disk persistence (in-memory only)");
         println!("  -m, --model <MODEL>             Set primary model for current session");
         println!("      --fallback-model <MODEL>    Fallback model if primary is overloaded");
+        println!("      --api-key, --key <P=KEY>    Set API key for provider inline (e.g. --key gemini=AIza...)");
         println!("      --oss                       Use local open-source provider");
         println!("      --local-provider <NAME>     Specify local provider (ollama, lmstudio)");
         println!("      --effort <LEVEL>            Reasoning effort (minimal, low, medium, high, max)");
@@ -2022,6 +2165,23 @@ complete -F _ntx_completions ntx"#);
         println!("  tui | cockpit [VIEW]            Launch Ruflo-grade full-screen interactive TUI cockpit");
         println!("  swarm                           Open Autonomous Multi-Agent Swarm cockpit directly");
         println!("  repl                            Start interactive pure Rust REPL shell with cockpit tabs");
+        println!();
+        println!("AI Provider & API Key Management:");
+        println!("  provider [list]                 List all 22 AI providers (Gemini, Claude, OpenAI, Ollama...)");
+        println!("  provider add <ID> <KEY>         Add / configure API key, activate provider, and query models");
+        println!("  provider set-key <ID> <KEY>     Set or update API key for any AI provider");
+        println!("  provider select <ID>            Select and activate default AI provider");
+        println!("  provider inspect <ID>           View provider details, models, and endpoint URL");
+        println!("  provider set-url <ID> <URL>     Set custom base URL (e.g. self-hosted Ollama/vLLM)");
+        println!("  provider test <ID>              Test connectivity and latency ping to provider");
+        println!("  key <ID> <KEY>                  Quickly set API key for any provider and fetch remote models");
+        println!("  auth status                     Display authentication and API key status across all backends");
+        println!("  auth login <PROVIDER> [KEY]     Authenticate provider via API key or Google OAuth 2.0 PKCE");
+        println!("  auth logout [PROVIDER]          Remove stored API key or OAuth credentials");
+        println!("  model [NAME]                    Query live models from provider API and switch default model");
+        println!("  effort [LEVEL]                  Set reasoning/thinking effort (low, medium, high, max, off)");
+        println!();
+        println!("Agent & Autonomous System Commands:");
         println!("  status                          System health, runtimes, and catalog overview");
         println!("  doctor                          Verify policy, cgroups, sandboxes, and invariants");
         println!("  exec [PROMPT]                   Execute a prompt or task non-interactively");
@@ -2062,7 +2222,6 @@ complete -F _ntx_completions ntx"#);
         println!("  sre [LOG]                       Triage system log incidents");
         println!("  redteam [PROMPT]                Audit prompt for injection attacks");
         println!("  ring                            Benchmark lock-free atomic ring buffer");
-        println!("  repl                            Start interactive pure Rust REPL shell");
     }
 }
 
