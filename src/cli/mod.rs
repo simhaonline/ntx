@@ -22,7 +22,7 @@ use crate::sre::SreEngine;
 use crate::workflow::{ExecutionStatus, GraphRunner, MultiModelGateway, NodeKind};
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, IsTerminal, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -114,7 +114,7 @@ impl CliHandler {
 
     pub fn dispatch(&self, args: &[String]) {
         if args.len() < 2 {
-            self.interactive_repl(None);
+            self.interactive_repl_with_options(&CliOptions::default(), None);
             return;
         }
 
@@ -191,16 +191,17 @@ impl CliHandler {
             "update" | "upgrade" => self.cmd_update(&sub_args),
             "repl" | "interactive" | "tui" | "cockpit" | "console" => {
                 let view = options.view.as_deref().or_else(|| sub_args.first().map(|s| s.as_str())).and_then(interactive::CockpitView::parse);
-                self.interactive_repl_with_view(options.session_id.clone(), view);
+                self.interactive_repl_with_options(&options, view);
             }
             "swarm" => {
-                self.interactive_repl_with_view(options.session_id.clone(), Some(interactive::CockpitView::Swarm));
+                self.interactive_repl_with_options(&options, Some(interactive::CockpitView::Swarm));
             }
             _ => {
-                // If the command is not a known subcommand, treat it as a prompt or print-mode task
-                if options.print_mode || options.prompt.is_some() || !cmd.starts_with('-') {
+                let is_piped = !io::stdin().is_terminal();
+                // If the command is not a known subcommand, treat it as a prompt, piped task, or flag-based REPL launch
+                if options.print_mode || options.prompt.is_some() || (!cmd.is_empty() && !cmd.starts_with('-')) || is_piped {
                     let mut prompt_parts = Vec::new();
-                    if !cmd.starts_with('-') {
+                    if !cmd.is_empty() && !cmd.starts_with('-') {
                         prompt_parts.push(cmd);
                     }
                     prompt_parts.extend(sub_args);
@@ -208,7 +209,11 @@ impl CliHandler {
                 } else if options.serve {
                     self.cmd_serve(&options, &sub_args);
                 } else if options.continue_session || options.resume_session.is_some() {
-                    self.interactive_repl(options.resume_session.or(options.session_id));
+                    self.interactive_repl_with_options(&options, None);
+                } else if cmd.is_empty() {
+                    // No subcommand or prompt provided; e.g. `ntx -y`, `ntx -m ...`, `ntx --effort ...`
+                    let view = options.view.as_deref().and_then(interactive::CockpitView::parse);
+                    self.interactive_repl_with_options(&options, view);
                 } else {
                     eprintln!("Unknown command or flag '{}'. Run 'ntx help' for available commands.", cmd);
                     std::process::exit(1);
@@ -2101,14 +2106,31 @@ complete -F _ntx_completions ntx"#);
     }
 
     pub fn interactive_repl(&self, session_id: Option<String>) {
-        self.interactive_repl_with_view(session_id, None);
+        let mut opts = CliOptions::default();
+        opts.session_id = session_id;
+        self.interactive_repl_with_options(&opts, None);
     }
 
     pub fn interactive_repl_with_view(&self, session_id: Option<String>, initial_view: Option<interactive::CockpitView>) {
+        let mut opts = CliOptions::default();
+        opts.session_id = session_id;
+        self.interactive_repl_with_options(&opts, initial_view);
+    }
+
+    pub fn interactive_repl_with_options(&self, options: &CliOptions, initial_view: Option<interactive::CockpitView>) {
         let mut shell = interactive::InteractiveShell::new(self.engine.clone());
+        shell.dangerously_skip_permissions = options.dangerously_skip_permissions;
+        if let Some(ref m) = options.model {
+            let active = ProviderRegistry::active();
+            let _ = ProviderRegistry::set_model(&active.id, m);
+        }
+        if let Some(ref eff) = options.effort {
+            let _ = ProviderRegistry::set_reasoning_effort(eff);
+        }
         if let Some(view) = initial_view {
             shell.set_view(view);
         }
+        let session_id = options.resume_session.clone().or_else(|| options.session_id.clone());
         shell.run_interactive_loop(session_id);
     }
 

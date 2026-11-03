@@ -245,6 +245,7 @@ pub struct InteractiveShell {
     pub last_turn_total: usize,
     pub last_memory_query: Option<String>,
     pub conversation_history: Vec<(String, String)>,
+    pub dangerously_skip_permissions: bool,
 }
 
 impl InteractiveShell {
@@ -278,6 +279,7 @@ impl InteractiveShell {
             last_turn_total: 0,
             last_memory_query: None,
             conversation_history: Vec::new(),
+            dangerously_skip_permissions: false,
         }
     }
 
@@ -350,25 +352,38 @@ impl InteractiveShell {
     // ==============================================================================
 
     pub fn run_onboarding_wizard_if_needed(&mut self) {
+        if self.dangerously_skip_permissions {
+            if !self.is_current_dir_trusted() {
+                self.config.trusted_dirs.push(self.current_dir.clone());
+            }
+            if !self.config.onboarded {
+                self.config.onboarded = true;
+            }
+            self.save_config();
+            return;
+        }
+
         let theme = self.get_theme();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
 
         // 1. Check Directory Trust
         if !self.is_current_dir_trusted() {
-            let cols = terminal_cols().clamp(72, 280);
-            let border = "═".repeat(cols);
-            let thin_border = "─".repeat(cols);
-
-            println!("\n{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-            println!("  {accent}🛡️  WORKSPACE TRUST VERIFICATION{reset}", accent = theme.accent, reset = theme.reset);
-            println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-            println!("  Directory   : {bold}{}{reset}", self.current_dir, bold = theme.bold, reset = theme.reset);
-            println!("  Description : Do you trust the authors and scripts in this directory?");
-            println!("                Trusting permits Nityaksha to inspect repository AST,");
-            println!("                execute isolated tools, and apply code diffs within security gates.");
-            println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
-            println!("    [Y] Yes, trust this folder (Recommended)");
-            println!("    [N] No, run in strictly read-only mode");
-            println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+            println!();
+            print_box_top(
+                theme.accent,
+                Some(&format!("{bold}{accent}🛡️  WORKSPACE TRUST VERIFICATION{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+                inner_width,
+                theme.reset,
+            );
+            print_box_line(theme.accent, &format!("  Directory   : {bold}{}{reset}", self.current_dir, bold = theme.bold, reset = theme.reset), inner_width, theme.reset);
+            print_box_line(theme.accent, "  Description : Do you trust the authors and scripts in this directory?", inner_width, theme.reset);
+            print_box_line(theme.accent, "                Trusting permits Nityaksha to inspect repository AST,", inner_width, theme.reset);
+            print_box_line(theme.accent, "                execute isolated tools, and apply code diffs within security gates.", inner_width, theme.reset);
+            print_box_divider(theme.accent, None, inner_width, theme.reset);
+            print_box_line(theme.accent, "    [Y] Yes, trust this folder (Recommended)", inner_width, theme.reset);
+            print_box_line(theme.accent, "    [N] No, run in strictly read-only mode", inner_width, theme.reset);
+            print_box_bottom(theme.accent, inner_width, theme.reset);
 
             print!("{}Trust this directory? [Y/n]:{} ", theme.bold, theme.reset);
             let _ = io::stdout().flush();
@@ -394,16 +409,21 @@ impl InteractiveShell {
 
     pub fn interactive_select_theme(&mut self) {
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(72, 280);
-        let border = "═".repeat(cols);
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
 
-        println!("\n{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}🎨 SELECT CLI COLOR PALETTE & PRESENTATION THEME{reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        println!();
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}🎨 SELECT CLI COLOR PALETTE & PRESENTATION THEME{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
         for (i, t) in THEMES.iter().enumerate() {
-            println!("    [{}] {}{}{}", i + 1, t.primary, t.name, t.reset);
+            let row = format!("    [{}] {}{}{}", i + 1, t.primary, t.name, t.reset);
+            print_box_line(theme.accent, &row, inner_width, theme.reset);
         }
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_bottom(theme.accent, inner_width, theme.reset);
 
         print!("Select palette [1-{} | Enter to keep current]: ", THEMES.len());
         let _ = io::stdout().flush();
@@ -531,14 +551,8 @@ impl InteractiveShell {
     }
 
     /// Renders the Unified Top Navigation Bar showing all 6 views + Help
-    fn render_nav_header(&self) {
+    fn render_nav_header(&self, inner_width: usize) {
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(78, 280);
-        let inner_width = cols.saturating_sub(2);
-        let top_bar = format!("╭{}╮", "─".repeat(inner_width));
-        let mid_bar = format!("├{}┤", "─".repeat(inner_width));
-        let bot_bar = format!("╰{}╯", "─".repeat(inner_width));
-
         let trusted_str = if self.is_current_dir_trusted() {
             format!("{}TRUSTED ✓{}", theme.success, theme.reset)
         } else {
@@ -547,13 +561,16 @@ impl InteractiveShell {
         let git_info = self.git_branch.as_deref().unwrap_or("none");
         let active_p = ProviderRegistry::active();
 
-        println!("\n{accent}{top_bar}{reset}", accent = theme.accent, top_bar = top_bar, reset = theme.reset);
-        println!(
-            "│ {bold}{primary}◈ NITYAKSHA AGENT META-HARNESS & SWARM COCKPIT{reset} {dim}(v1.0.0 Pure Native Rust){reset}",
+        println!();
+        print_box_top(theme.accent, None, inner_width, theme.reset);
+        let line1 = format!(
+            " {bold}{primary}◈ NITYAKSHA AGENT META-HARNESS & SWARM COCKPIT{reset} {dim}(v1.0.0 Pure Native Rust){reset}",
             bold = theme.bold, primary = theme.primary, dim = theme.dim, reset = theme.reset
         );
-        println!(
-            "│ {dim}Dir: {dir} [{trusted}] │ Git: {git} │ AI: {p_name} ({model}) │ Session: {sid}{reset}",
+        print_box_line(theme.accent, &line1, inner_width, theme.reset);
+
+        let line2 = format!(
+            " {dim}Dir: {dir} [{trusted}] │ Git: {git} │ AI: {p_name} ({model}) │ Session: {sid}{reset}",
             dim = theme.dim,
             dir = clean_path(&self.current_dir, 26),
             trusted = trusted_str,
@@ -563,14 +580,16 @@ impl InteractiveShell {
             sid = clean_path(&self.session_id, 14),
             reset = theme.reset
         );
-        println!("{accent}{mid_bar}{reset}", accent = theme.accent, mid_bar = mid_bar, reset = theme.reset);
+        print_box_line(theme.accent, &line2, inner_width, theme.reset);
+
+        print_box_divider(theme.accent, None, inner_width, theme.reset);
 
         // Tab Navigation Bar
-        print!("│ ");
+        let mut tabs_str = String::from(" ");
         for view in CockpitView::all() {
             let is_active = *view == self.current_view;
             if is_active {
-                print!(
+                tabs_str.push_str(&format!(
                     "{bold}{accent}[{key}] {icon} {name} ●{reset}  ",
                     bold = theme.bold,
                     accent = theme.accent,
@@ -578,25 +597,27 @@ impl InteractiveShell {
                     icon = view.icon(),
                     name = view.title(),
                     reset = theme.reset
-                );
+                ));
             } else {
-                print!(
+                tabs_str.push_str(&format!(
                     "{dim}[{key}] {icon} {name}{reset}  ",
                     dim = theme.dim,
                     key = view.key_label(),
                     icon = view.icon(),
                     name = view.title(),
                     reset = theme.reset
-                );
+                ));
             }
         }
-        println!();
-        println!("{accent}{bot_bar}{reset}", accent = theme.accent, bot_bar = bot_bar, reset = theme.reset);
+        print_box_line(theme.accent, &tabs_str, inner_width, theme.reset);
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     /// [1] OVERVIEW COCKPIT VIEW
     fn render_view_overview(&self) {
-        self.render_nav_header();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
+        self.render_nav_header(inner_width);
         let theme = self.get_theme();
         let active_p = ProviderRegistry::active();
         let ctx_limit = active_p.context_window_for_model(&active_p.default_model);
@@ -616,28 +637,36 @@ impl InteractiveShell {
         let wfs_count = self.engine.relational.list_workflows().len();
         let caps_count: usize = self.engine.relational.count_capabilities().values().sum();
 
-        let cols = terminal_cols().clamp(78, 280);
-        let border = "═".repeat(cols);
-        let thin_border = "─".repeat(cols);
-
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}⚡ SYSTEM COCKPIT & LIVE ENGINE STATUS{reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}⚡ SYSTEM COCKPIT & LIVE ENGINE STATUS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
         // Section A: Active AI Provider & Model Gateway
-        println!("  {bold}Active AI Provider :{reset} {primary}{:<24}{reset} [Category: {:<14}] (Auth: {})",
+        let line_p = format!("  {bold}Active AI Provider :{reset} {primary}{:<24}{reset} [Category: {:<14}] (Auth: {})",
             active_p.name, active_p.category, active_p.auth_summary, primary = theme.primary, bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Active AI Model    :{reset} {accent}{:<24}{reset} [Max Context: {} / {} tokens]",
+        let line_m = format!("  {bold}Active AI Model    :{reset} {accent}{:<24}{reset} [Max Context: {} / {} tokens]",
             active_p.default_model, format_num_commas(ctx_limit), format_tokens_short(ctx_limit), accent = theme.accent, bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Reasoning Level    :{reset} {accent}{:<24}{reset} [Portal: {}]",
+        let line_r = format!("  {bold}Reasoning Level    :{reset} {accent}{:<24}{reset} [Portal: {}]",
             reasoning_effort.to_uppercase(), ProviderRegistry::portal_url(&active_p.id), accent = theme.accent, bold = theme.bold, reset = theme.reset);
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        print_box_line(theme.accent, &line_p, inner_width, theme.reset);
+        print_box_line(theme.accent, &line_m, inner_width, theme.reset);
+        print_box_line(theme.accent, &line_r, inner_width, theme.reset);
 
         // Section B: Real-Time Headroom & Budget Gauges
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}📊 REAL-TIME CONTEXT & BUDGET GAUGES{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
         let gauge_w = (cols.saturating_sub(44)).clamp(16, 40);
         let ctx_gauge = render_progress_bar(ctx_pct, gauge_w, theme.accent, theme.dim, theme.reset);
-        println!("  {bold}Context Headroom   :{reset} {} {:>5.1}% ({}/{} tok)",
+        let line_ctx = format!("  {bold}Context Headroom   :{reset} {} {:>5.1}% ({}/{} tok)",
             ctx_gauge, ctx_pct, format_tokens_short(history_tokens), format_tokens_short(ctx_limit), bold = theme.bold, reset = theme.reset);
 
         let effort_budget = match reasoning_effort.to_lowercase().as_str() {
@@ -649,131 +678,215 @@ impl InteractiveShell {
         };
         let effort_pct = if effort_budget > 0 { (effort_budget as f64 / 16384.0 * 100.0).min(100.0) } else { 0.0 };
         let effort_gauge = render_progress_bar(effort_pct, gauge_w, theme.warning, theme.dim, theme.reset);
-        println!("  {bold}Thinking Budget    :{reset} {} {:>5} tokens ({})",
+        let line_eff = format!("  {bold}Thinking Budget    :{reset} {} {:>5} tokens ({})",
             effort_gauge, effort_budget, reasoning_effort.to_uppercase(), bold = theme.bold, reset = theme.reset);
 
         let est_cost = estimate_cost_usd(&active_p.id, &active_p.default_model, self.session_input_tokens, self.session_output_tokens);
-        println!("  {bold}Session Token Burn :{reset} In: {} | Out: {} | Total: {bold}{} tok{reset} (~${:.4} USD)",
+        let line_cost = format!("  {bold}Session Token Burn :{reset} In: {} | Out: {} | Total: {bold}{} tok{reset} (~${:.4} USD)",
             format_num_commas(self.session_input_tokens), format_num_commas(self.session_output_tokens),
             format_num_commas(self.session_total_tokens), est_cost, bold = theme.bold, reset = theme.reset);
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        print_box_line(theme.accent, &line_ctx, inner_width, theme.reset);
+        print_box_line(theme.accent, &line_eff, inner_width, theme.reset);
+        print_box_line(theme.accent, &line_cost, inner_width, theme.reset);
 
         // Section C: Multi-Agent Swarm Health Summary
-        println!("  {bold}Multi-Agent Swarm  :{reset} {success}● {} Autonomous Bots Ready{reset} | {} registered skills & personas",
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}🤖 MULTI-AGENT SWARM & SECURITY SUB-SYSTEMS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let line_swarm = format!("  {bold}Multi-Agent Swarm  :{reset} {success}● {} Autonomous Bots Ready{reset} | {} registered skills & personas",
             bots_count, caps_count, bold = theme.bold, success = theme.success, reset = theme.reset);
-        println!("  {bold}Execution DAGs     :{reset} {success}● {} Loaded Pipelines{reset} (Kahn's cycle check: 0 cycles)",
+        let line_dags = format!("  {bold}Execution DAGs     :{reset} {success}● {} Loaded Pipelines{reset} (Kahn's cycle check: 0 cycles)",
             wfs_count, bold = theme.bold, success = theme.success, reset = theme.reset);
-        println!("  {bold}Security & IBAC    :{reset} {success}● Armed POSIX Sandbox{reset} | cgroups v2 quotas & memory.max enforced",
+        let line_sec = format!("  {bold}Security & IBAC    :{reset} {success}● Armed POSIX Sandbox{reset} | cgroups v2 quotas & memory.max enforced",
             bold = theme.bold, success = theme.success, reset = theme.reset);
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {}Quick Navigation: Type '2' for Swarm, '3' for Memory, '4' for Cost, '5' for Missions, '6' for AI Gateway.{}", theme.dim, theme.reset);
-        println!("  {}Type your natural language prompt below to execute an autonomous swarm turn.{}", theme.dim, theme.reset);
+        print_box_line(theme.accent, &line_swarm, inner_width, theme.reset);
+        print_box_line(theme.accent, &line_dags, inner_width, theme.reset);
+        print_box_line(theme.accent, &line_sec, inner_width, theme.reset);
+
+        // Section D: Quick Navigation & Hints
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{dim}💡 QUICK NAVIGATION & HINTS{reset}", dim = theme.dim, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let line_hint1 = format!("  {}Quick Navigation: Type '2' for Swarm, '3' for Memory, '4' for Cost, '5' for Missions, '6' for AI Gateway.{}", theme.dim, theme.reset);
+        let line_hint2 = format!("  {}Type your natural language prompt below to execute an autonomous swarm turn.{}", theme.dim, theme.reset);
+
+        print_box_line(theme.accent, &line_hint1, inner_width, theme.reset);
+        print_box_line(theme.accent, &line_hint2, inner_width, theme.reset);
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     /// [2] SWARM COCKPIT VIEW
     fn render_view_swarm(&self) {
-        self.render_nav_header();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
+        self.render_nav_header(inner_width);
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(78, 280);
-        let border = "═".repeat(cols);
-        let thin_border = "─".repeat(cols);
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}🐝 AUTONOMOUS MULTI-AGENT SWARM TOPOLOGY (Ruflo Meta-Harness){reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}🐝 AUTONOMOUS MULTI-AGENT SWARM TOPOLOGY (Ruflo Meta-Harness){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
         // Swarm Hierarchy Graph
-        println!("  ╭─────────────────────────────────────────────────────────────────────────────────────────╮");
-        println!("  │ {bold}👑 Queen Coordinator (ntx-intent-router){reset}       {success}[ACTIVE]{reset}  ● Intent routing & task synthesis     │", bold = theme.bold, success = theme.success, reset = theme.reset);
-        println!("  │    ├── {bold}⚙️  Code Engineer (ntx-eval-test-synth){reset}   {accent}[READY]{reset}   ● AST pruner, diff engine & cargo     │", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("  │    ├── {bold}🏛️  System Architect (sqlite-wal-engine){reset}  {accent}[READY]{reset}   ● Kahn's DAG cycle gate & storage     │", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("  │    ├── {bold}🛡️  RedTeam Shield (ntx-container-jail){reset}   {warning}[ARMED]{reset}   ● Invariants 100% | IBAC sandboxing   │", bold = theme.bold, warning = theme.warning, reset = theme.reset);
-        println!("  │    ├── {bold}📊 Quant Specialist (pine-matrix-engine){reset} {accent}[READY]{reset}   ● Pine Script v6 QA & CVD stream      │", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("  │    ├── {bold}🔍 AST Pruner & Deep Inspector{reset}           {accent}[READY]{reset}   ● Targeted AST slice extraction       │", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("  │    └── {bold}✨ Anti-Slop Sanitizer (ntx-anti-slop){reset}    {success}[ACTIVE]{reset}  ● Real-time boilerplate elimination   │", bold = theme.bold, success = theme.success, reset = theme.reset);
-        println!("  ╰─────────────────────────────────────────────────────────────────────────────────────────╯");
+        let h1 = format!("  👑 {bold}Queen Coordinator (ntx-intent-router){reset}       {success}[ACTIVE]{reset}  ● Intent routing & task synthesis", bold = theme.bold, success = theme.success, reset = theme.reset);
+        let h2 = format!("     ├── ⚙️  {bold}Code Engineer (ntx-eval-test-synth){reset}   {accent}[READY]{reset}   ● AST pruner, diff engine & cargo", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let h3 = format!("     ├── 🏛️  {bold}System Architect (sqlite-wal-engine){reset}  {accent}[READY]{reset}   ● Kahn's DAG cycle gate & storage", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let h4 = format!("     ├── 🛡️  {bold}RedTeam Shield (ntx-container-jail){reset}   {warning}[ARMED]{reset}   ● Invariants 100% | IBAC sandboxing", bold = theme.bold, warning = theme.warning, reset = theme.reset);
+        let h5 = format!("     ├── 📊 {bold}Quant Specialist (pine-matrix-engine){reset} {accent}[READY]{reset}   ● Pine Script v6 QA & CVD stream", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let h6 = format!("     ├── 🔍 {bold}AST Pruner & Deep Inspector{reset}           {accent}[READY]{reset}   ● Targeted AST slice extraction", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let h7 = format!("     └── ✨ {bold}Anti-Slop Sanitizer (ntx-anti-slop){reset}    {success}[ACTIVE]{reset}  ● Real-time boilerplate elimination", bold = theme.bold, success = theme.success, reset = theme.reset);
 
-        println!("  {bold}Swarm Strategy :{reset} Hierarchical Dynamic Routing (Self-Balancing Meta-Harness)", bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Inter-Agent IPC:{reset} Zero-Copy Lock-Free Ring Buffer (Acquire-Release Atomics)", bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Isolation Jail :{reset} POSIX Mount/PID Namespaces + cgroups v2 Quotas (memory.max, pids.max)", bold = theme.bold, reset = theme.reset);
+        print_box_line(theme.accent, &h1, inner_width, theme.reset);
+        print_box_line(theme.accent, &h2, inner_width, theme.reset);
+        print_box_line(theme.accent, &h3, inner_width, theme.reset);
+        print_box_line(theme.accent, &h4, inner_width, theme.reset);
+        print_box_line(theme.accent, &h5, inner_width, theme.reset);
+        print_box_line(theme.accent, &h6, inner_width, theme.reset);
+        print_box_line(theme.accent, &h7, inner_width, theme.reset);
+
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}⚙️ SWARM ARCHITECTURE & ACTIVE PERSONA{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
         let active_bot_name = self.config.active_bot.as_deref().unwrap_or("Concierge Master");
-        println!("  {bold}Active Persona :{reset} {primary}{}{reset} (Type '/bot <id>' to switch)", active_bot_name, primary = theme.primary, bold = theme.bold, reset = theme.reset);
+        let a1 = format!("  {bold}Swarm Strategy :{reset} Hierarchical Dynamic Routing (Self-Balancing Meta-Harness)", bold = theme.bold, reset = theme.reset);
+        let a2 = format!("  {bold}Inter-Agent IPC:{reset} Zero-Copy Lock-Free Ring Buffer (Acquire-Release Atomics)", bold = theme.bold, reset = theme.reset);
+        let a3 = format!("  {bold}Isolation Jail :{reset} POSIX Mount/PID Namespaces + cgroups v2 Quotas (memory.max, pids.max)", bold = theme.bold, reset = theme.reset);
+        let a4 = format!("  {bold}Active Persona :{reset} {primary}{}{reset} (Type '/bot <id>' to switch)", active_bot_name, primary = theme.primary, bold = theme.bold, reset = theme.reset);
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        print_box_line(theme.accent, &a1, inner_width, theme.reset);
+        print_box_line(theme.accent, &a2, inner_width, theme.reset);
+        print_box_line(theme.accent, &a3, inner_width, theme.reset);
+        print_box_line(theme.accent, &a4, inner_width, theme.reset);
 
-        // Preconfigured Bots Table
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}🤖 SPECIALIZED AUTONOMOUS BOT PERSONAS IN REGISTRY{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
         let bots = self.engine.relational.list_bots();
-        println!("  {bold}Specialized Autonomous Bot Personas in Registry:{reset}", bold = theme.bold, reset = theme.reset);
         for b in &bots {
             let is_active = self.config.active_bot.as_deref() == Some(&b.id);
             let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
-            println!("    {} {:<2} {:<26} - {:<30} [{}]",
-                mark, b.avatar, b.id, b.name, b.category);
+            let bot_line = format!("    {} {:<2} {:<24} - {:<28} [{}]", mark, b.avatar, b.id, b.name, b.category);
+            print_box_line(theme.accent, &bot_line, inner_width, theme.reset);
         }
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {}Switch persona with '/bot <id>' or execute prompts directly with active coordinator.{}", theme.dim, theme.reset);
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{dim}💡 NAVIGATION{reset}", dim = theme.dim, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let h_line = format!("  {}Switch persona with '/bot <id>' or execute prompts directly with active coordinator.{}", theme.dim, theme.reset);
+        print_box_line(theme.accent, &h_line, inner_width, theme.reset);
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     /// [3] VECTOR MEMORY & LOCI VIEW
     fn render_view_memory(&self) {
-        self.render_nav_header();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
+        self.render_nav_header(inner_width);
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(78, 280);
-        let border = "═".repeat(cols);
-        let thin_border = "─".repeat(cols);
 
         let drawers_count = self.engine.relational.list_palace_drawers(None).len();
         let assets_count = self.engine.multimodal.list_assets().len();
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}🧠 VECTOR MEMORY & METHOD OF LOCI ENGINE{reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}🧠 VECTOR MEMORY & METHOD OF LOCI ENGINE{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
-        println!("  {bold}Storage Architecture :{reset} SQLite WAL + SIMD Vector CAS Storage Engine", bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Hybrid Search Index  :{reset} Fused Dense Cosine Similarity + Sparse Inverted Keyword BM25", bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Memory Palace Drawers:{reset} {accent}{} registered spatial associative memory nodes{reset}", drawers_count, accent = theme.accent, bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Multimodal CAS Cache :{reset} {accent}{} binary media assets stored with SHA-256 integrity{reset}", assets_count, accent = theme.accent, bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Negative Cache Gate  :{reset} {success}Active{reset} (Proactively blocks known syntax breaks & catastrophic patterns)", success = theme.success, bold = theme.bold, reset = theme.reset);
+        let m1 = format!("  {bold}Storage Architecture :{reset} SQLite WAL + SIMD Vector CAS Storage Engine", bold = theme.bold, reset = theme.reset);
+        let m2 = format!("  {bold}Hybrid Search Index  :{reset} Fused Dense Cosine Similarity + Sparse Inverted Keyword BM25", bold = theme.bold, reset = theme.reset);
+        let m3 = format!("  {bold}Memory Palace Drawers:{reset} {accent}{} registered spatial associative memory nodes{reset}", drawers_count, accent = theme.accent, bold = theme.bold, reset = theme.reset);
+        let m4 = format!("  {bold}Multimodal CAS Cache :{reset} {accent}{} binary media assets stored with SHA-256 integrity{reset}", assets_count, accent = theme.accent, bold = theme.bold, reset = theme.reset);
+        let m5 = format!("  {bold}Negative Cache Gate  :{reset} {success}Active{reset} (Proactively blocks known syntax breaks & catastrophic patterns)", success = theme.success, bold = theme.bold, reset = theme.reset);
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        print_box_line(theme.accent, &m1, inner_width, theme.reset);
+        print_box_line(theme.accent, &m2, inner_width, theme.reset);
+        print_box_line(theme.accent, &m3, inner_width, theme.reset);
+        print_box_line(theme.accent, &m4, inner_width, theme.reset);
+        print_box_line(theme.accent, &m5, inner_width, theme.reset);
+
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}🔍 RECENT QUERIES & SAMPLE DRAWERS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
         if let Some(ref q) = self.last_memory_query {
-            println!("  {bold}Recent Query Search Results for '{accent}{}{reset}':", q, accent = theme.accent, bold = theme.bold, reset = theme.reset);
+            let q_line = format!("  {bold}Recent Query Search Results for '{accent}{}{reset}':", q, accent = theme.accent, bold = theme.bold, reset = theme.reset);
+            print_box_line(theme.accent, &q_line, inner_width, theme.reset);
             let results = self.engine.hybrid_rag.search(q, None, 5, 0.4);
             if results.is_empty() {
-                println!("    {}No high-confidence memory fragments matched (threshold >= 0.40).{}", theme.dim, theme.reset);
+                let empty_line = format!("    {}No high-confidence memory fragments matched (threshold >= 0.40).{}", theme.dim, theme.reset);
+                print_box_line(theme.accent, &empty_line, inner_width, theme.reset);
             } else {
                 for (i, r) in results.iter().enumerate() {
-                    println!("    [{}] score: {accent}{:.4}{reset} | fragment: {}",
+                    let r_line = format!("    [{}] score: {accent}{:.4}{reset} | fragment: {}",
                         i + 1, r.hybrid_score, clean_path(&r.text, 64), accent = theme.accent, reset = theme.reset);
+                    print_box_line(theme.accent, &r_line, inner_width, theme.reset);
                 }
             }
         } else {
             let sample_drawers = self.engine.relational.list_palace_drawers(None);
             if !sample_drawers.is_empty() {
-                println!("  {bold}Sample Spatial Memory Palace Drawers:{reset}", bold = theme.bold, reset = theme.reset);
+                let s_title = format!("  {bold}Sample Spatial Memory Palace Drawers:{reset}", bold = theme.bold, reset = theme.reset);
+                print_box_line(theme.accent, &s_title, inner_width, theme.reset);
                 for d in sample_drawers.iter().take(6) {
-                    println!("    • [{}:{}:{}] - {}", d.wing, d.room, d.drawer, clean_path(&d.content, 50));
+                    let d_line = format!("    • [{}:{}:{}] - {}", d.wing, d.room, d.drawer, clean_path(&d.content, 50));
+                    print_box_line(theme.accent, &d_line, inner_width, theme.reset);
                 }
             } else {
-                println!("  {}Memory palace is ready. Use '/memory <query>' to run live semantic searches.{}", theme.dim, theme.reset);
+                let ready_line = format!("  {}Memory palace is ready. Use '/memory <query>' to run live semantic searches.{}", theme.dim, theme.reset);
+                print_box_line(theme.accent, &ready_line, inner_width, theme.reset);
             }
         }
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {}Query memory at any time with '/memory <terms>' (e.g. '/memory auth token' or '/memory pine matrix').{}", theme.dim, theme.reset);
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{dim}💡 USAGE{reset}", dim = theme.dim, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let hint = format!("  {}Query memory at any time with '/memory <terms>' (e.g. '/memory auth token' or '/memory pine matrix').{}", theme.dim, theme.reset);
+        print_box_line(theme.accent, &hint, inner_width, theme.reset);
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     /// [4] TELEMETRY & COST COCKPIT VIEW
     fn render_view_cost(&self) {
-        self.render_nav_header();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
+        self.render_nav_header(inner_width);
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(78, 280);
-        let border = "═".repeat(cols);
-        let thin_border = "─".repeat(cols);
 
         let active_p = ProviderRegistry::active();
         let ctx_limit = active_p.context_window_for_model(&active_p.default_model);
@@ -791,96 +904,156 @@ impl InteractiveShell {
         let remaining_headroom = ctx_limit.saturating_sub(history_tokens);
         let est_cost = estimate_cost_usd(&active_p.id, &active_p.default_model, self.session_input_tokens, self.session_output_tokens);
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}📊 REAL-TIME TELEMETRY, CONTEXT HEADROOM & COST BURN{reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}📊 REAL-TIME TELEMETRY, CONTEXT HEADROOM & COST BURN{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let p1 = format!("  {bold}Active AI Provider :{reset} {primary}{}{reset} [{}]", active_p.name, active_p.category, primary = theme.primary, bold = theme.bold, reset = theme.reset);
+        let p2 = format!("  {bold}Active AI Model    :{reset} {accent}{}{reset} (Reasoning: {})", active_p.default_model, reasoning_effort.to_uppercase(), accent = theme.accent, bold = theme.bold, reset = theme.reset);
+        let p3 = format!("  {bold}Model Context Limit:{reset} {accent}{} tokens{reset} ({})",
+            format_num_commas(ctx_limit), format_tokens_short(ctx_limit), bold = theme.bold, accent = theme.accent, reset = theme.reset);
+
+        print_box_line(theme.accent, &p1, inner_width, theme.reset);
+        print_box_line(theme.accent, &p2, inner_width, theme.reset);
+        print_box_line(theme.accent, &p3, inner_width, theme.reset);
+
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}📈 CONTEXT WINDOW UTILIZATION{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
         let bar_w = (cols.saturating_sub(44)).clamp(20, 50);
         let ctx_bar = render_progress_bar(ctx_pct, bar_w, theme.accent, theme.dim, theme.reset);
-
-        println!("  {bold}Active AI Provider :{reset} {primary}{}{reset} [{}]", active_p.name, active_p.category, primary = theme.primary, bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Active AI Model    :{reset} {accent}{}{reset} (Reasoning: {})", active_p.default_model, reasoning_effort.to_uppercase(), accent = theme.accent, bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Model Context Limit:{reset} {accent}{} tokens{reset} ({})",
-            format_num_commas(ctx_limit), format_tokens_short(ctx_limit),
-            bold = theme.bold, accent = theme.accent, reset = theme.reset);
-
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
-
-        println!("  {bold}Context Window Utilization:{reset}", bold = theme.bold, reset = theme.reset);
-        println!("    {} {:>5.2}%", ctx_bar, ctx_pct);
-        println!("    Utilized: {accent}{} tokens{reset} │ Available Headroom: {success}{} tokens{reset}",
+        let u1 = format!("    {} {:>5.2}%", ctx_bar, ctx_pct);
+        let u2 = format!("    Utilized: {accent}{} tokens{reset} │ Available Headroom: {success}{} tokens{reset}",
             format_num_commas(history_tokens), format_num_commas(remaining_headroom), accent = theme.accent, success = theme.success, reset = theme.reset);
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        print_box_line(theme.accent, &u1, inner_width, theme.reset);
+        print_box_line(theme.accent, &u2, inner_width, theme.reset);
 
-        println!("  {bold}Session Token Cumulative Metrics:{reset}", bold = theme.bold, reset = theme.reset);
-        println!("    • Session Prompts (In) : {accent}{:>10} tokens{reset}", format_num_commas(self.session_input_tokens), accent = theme.accent, reset = theme.reset);
-        println!("    • Session Output (Out) : {accent}{:>10} tokens{reset}", format_num_commas(self.session_output_tokens), accent = theme.accent, reset = theme.reset);
-        println!("    • Total Cumulative     : {bold}{:>10} tokens{reset}", format_num_commas(self.session_total_tokens), bold = theme.bold, reset = theme.reset);
-        println!("    • Estimated Cost Burn  : {success}${:.5} USD{reset}", est_cost, success = theme.success, reset = theme.reset);
-        println!("    • Last Turn Latency    : {dim}{} ms{reset}", self.last_latency_ms, dim = theme.dim, reset = theme.reset);
-        println!("    • Conversational Turns : {} active turns in rolling context window", self.conversation_history.len());
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}💰 SESSION TOKEN CUMULATIVE METRICS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {}Tip: Check '/doctor' for network latency and sandbox quota checks.{}", theme.dim, theme.reset);
+        let c1 = format!("    • Session Prompts (In) : {accent}{:>10} tokens{reset}", format_num_commas(self.session_input_tokens), accent = theme.accent, reset = theme.reset);
+        let c2 = format!("    • Session Output (Out) : {accent}{:>10} tokens{reset}", format_num_commas(self.session_output_tokens), accent = theme.accent, reset = theme.reset);
+        let c3 = format!("    • Total Cumulative     : {bold}{:>10} tokens{reset}", format_num_commas(self.session_total_tokens), bold = theme.bold, reset = theme.reset);
+        let c4 = format!("    • Estimated Cost Burn  : {success}${:.5} USD{reset}", est_cost, success = theme.success, reset = theme.reset);
+        let c5 = format!("    • Last Turn Latency    : {dim}{} ms{reset}", self.last_latency_ms, dim = theme.dim, reset = theme.reset);
+        let c6 = format!("    • Conversational Turns : {} active turns in rolling context window", self.conversation_history.len());
+
+        print_box_line(theme.accent, &c1, inner_width, theme.reset);
+        print_box_line(theme.accent, &c2, inner_width, theme.reset);
+        print_box_line(theme.accent, &c3, inner_width, theme.reset);
+        print_box_line(theme.accent, &c4, inner_width, theme.reset);
+        print_box_line(theme.accent, &c5, inner_width, theme.reset);
+        print_box_line(theme.accent, &c6, inner_width, theme.reset);
+
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{dim}💡 DIAGNOSTICS{reset}", dim = theme.dim, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let hint = format!("  {}Tip: Check '/doctor' for network latency and sandbox quota checks.{}", theme.dim, theme.reset);
+        print_box_line(theme.accent, &hint, inner_width, theme.reset);
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     /// [5] MISSIONS & DAG WORKFLOWS VIEW
     fn render_view_missions(&self) {
-        self.render_nav_header();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
+        self.render_nav_header(inner_width);
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(78, 280);
-        let border = "═".repeat(cols);
-        let thin_border = "─".repeat(cols);
 
         let wfs = self.engine.relational.list_workflows();
         let execs = self.engine.relational.list_executions();
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}📋 MISSIONS & KAHN'S TOPOLOGICAL WORKFLOW DAGS{reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}📋 MISSIONS & KAHN'S TOPOLOGICAL WORKFLOW DAGS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
-        println!("  {bold}DAG Execution Engine :{reset} Pure Native Rust Graph Runner (Kahn's Topological Sort)", bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Cycle Invariant Gate :{reset} {success}0 Cycles Detected (Strict Invariant Verified){reset}", success = theme.success, bold = theme.bold, reset = theme.reset);
-        println!("  {bold}Human-in-the-Loop    :{reset} HITL Approval Gates Enforced for Merges & Shell Mutations", bold = theme.bold, reset = theme.reset);
+        let d1 = format!("  {bold}DAG Execution Engine :{reset} Pure Native Rust Graph Runner (Kahn's Topological Sort)", bold = theme.bold, reset = theme.reset);
+        let d2 = format!("  {bold}Cycle Invariant Gate :{reset} {success}0 Cycles Detected (Strict Invariant Verified){reset}", success = theme.success, bold = theme.bold, reset = theme.reset);
+        let d3 = format!("  {bold}Human-in-the-Loop    :{reset} HITL Approval Gates Enforced for Merges & Shell Mutations", bold = theme.bold, reset = theme.reset);
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        print_box_line(theme.accent, &d1, inner_width, theme.reset);
+        print_box_line(theme.accent, &d2, inner_width, theme.reset);
+        print_box_line(theme.accent, &d3, inner_width, theme.reset);
 
-        println!("  {bold}Registered Execution Pipelines:{reset}", bold = theme.bold, reset = theme.reset);
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}🗂️ REGISTERED EXECUTION PIPELINES{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
         for wf in &wfs {
-            println!("    • {bold}{:<26}{reset} - {:<32} [{} steps | Category: {}]",
+            let wf_line = format!("    • {bold}{:<24}{reset} - {:<30} [{} steps | Category: {}]",
                 wf.id, wf.name, wf.nodes.len(), wf.category, bold = theme.bold, reset = theme.reset);
+            print_box_line(theme.accent, &wf_line, inner_width, theme.reset);
             for n in wf.nodes.iter().take(3) {
-                println!("        └── step: {:<16} (deps: {:?})", n.id, n.dependencies);
+                let n_line = format!("        └── step: {:<16} (deps: {:?})", n.id, n.dependencies);
+                print_box_line(theme.accent, &n_line, inner_width, theme.reset);
             }
         }
 
         if !execs.is_empty() {
-            println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
-            println!("  {bold}Recent Workflow Executions:{reset}", bold = theme.bold, reset = theme.reset);
+            print_box_divider(
+                theme.accent,
+                Some(&format!("{bold}{accent}⏱️ RECENT WORKFLOW EXECUTIONS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+                inner_width,
+                theme.reset,
+            );
             for ex in execs.iter().take(4) {
-                println!("    • {:<20} - Status: {:<12} (Started: {})",
+                let ex_line = format!("    • {:<20} - Status: {:<12} (Started: {})",
                     ex.workflow_id, format!("{:?}", ex.status), ex.started_at);
+                print_box_line(theme.accent, &ex_line, inner_width, theme.reset);
             }
         }
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {}Launch any workflow pipeline with 'ntx workflow run <id>' or trigger in chat.{}", theme.dim, theme.reset);
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{dim}💡 EXECUTION{reset}", dim = theme.dim, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let hint = format!("  {}Launch any workflow pipeline with 'ntx workflow run <id>' or trigger in chat.{}", theme.dim, theme.reset);
+        print_box_line(theme.accent, &hint, inner_width, theme.reset);
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     /// [6] AI GATEWAY & PROVIDERS VIEW
     fn render_view_providers(&self) {
-        self.render_nav_header();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
+        self.render_nav_header(inner_width);
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(78, 280);
-        let border = "═".repeat(cols);
-        let thin_border = "─".repeat(cols);
 
         let providers = ProviderRegistry::list_all();
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}🌐 AI PROVIDER GATEWAY & MULTI-MODEL ROUTER (22 Native Backends){reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}🌐 AI PROVIDER GATEWAY & MULTI-MODEL ROUTER (22 Native Backends){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
         for (i, p) in providers.iter().enumerate() {
             let active_mark = if p.is_active { "*" } else { " " };
@@ -899,64 +1072,99 @@ impl InteractiveShell {
             } else {
                 "".to_string()
             };
-            println!("  [{:2}] {}{:<13} - {:<22} [{:<12}] {} {:<26} ({}){}",
+            let p_line = format!("  [{:2}] {}{:<13} - {:<20} [{:<12}] {} {:<24} ({}){}",
                 i + 1, active_mark, p.id, p.name, p.category, auth_tag, p.default_model, format_tokens_short(ctx), reasoning_tag);
+            print_box_line(theme.accent, &p_line, inner_width, theme.reset);
         }
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
-        println!("  {bold}Quick Configuration Commands:{reset}", bold = theme.bold, reset = theme.reset);
-        println!("    • {accent}/provider [id]{reset}          - Select provider & switch active backend", accent = theme.accent, reset = theme.reset);
-        println!("    • {accent}/key [id] [key]{reset}         - Configure API key directly & fetch live models", accent = theme.accent, reset = theme.reset);
-        println!("    • {accent}/model [name|idx]{reset}       - Query provider API for live models & switch default", accent = theme.accent, reset = theme.reset);
-        println!("    • {accent}/effort [level]{reset}         - Set reasoning effort (low, medium, high, max, off)", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}⚡ QUICK CONFIGURATION COMMANDS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let q1 = format!("    • {accent}/provider [id]{reset}          - Select provider & switch active backend", accent = theme.accent, reset = theme.reset);
+        let q2 = format!("    • {accent}/key [id] [key]{reset}         - Configure API key directly & fetch live models", accent = theme.accent, reset = theme.reset);
+        let q3 = format!("    • {accent}/model [name|idx]{reset}       - Query provider API for live models & switch default", accent = theme.accent, reset = theme.reset);
+        let q4 = format!("    • {accent}/effort [level]{reset}         - Set reasoning effort (low, medium, high, max, off)", accent = theme.accent, reset = theme.reset);
+
+        print_box_line(theme.accent, &q1, inner_width, theme.reset);
+        print_box_line(theme.accent, &q2, inner_width, theme.reset);
+        print_box_line(theme.accent, &q3, inner_width, theme.reset);
+        print_box_line(theme.accent, &q4, inner_width, theme.reset);
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     /// [?] REFERENCE MANUAL VIEW
     fn render_view_help(&self) {
-        self.render_nav_header();
+        let cols = terminal_cols().clamp(80, 240);
+        let inner_width = cols.saturating_sub(2);
+        self.render_nav_header(inner_width);
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(78, 280);
-        let border = "═".repeat(cols);
-        let thin_border = "─".repeat(cols);
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
-        println!("  {accent}💡 NITYAKSHA AGENT COCKPIT INTERACTIVE REFERENCE MANUAL{reset}", accent = theme.accent, reset = theme.reset);
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}💡 NITYAKSHA AGENT COCKPIT INTERACTIVE REFERENCE MANUAL{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
-        println!("  {bold}COCKPIT VIEW HOTKEYS (Jump instantly without '/'):{reset}", bold = theme.bold, reset = theme.reset);
-        println!("    {bold}1{reset} or {bold}o{reset} or {accent}/overview{reset}   - System Overview, status cards, and live headroom gauges", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("    {bold}2{reset} or {bold}s{reset} or {accent}/swarm{reset}      - Autonomous Multi-Agent Swarm hierarchy and bot personas", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("    {bold}3{reset} or {bold}m{reset} or {accent}/memory{reset}     - Vector memory, method of loci drawers, and hybrid RAG", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("    {bold}4{reset} or {bold}c{reset} or {accent}/cost{reset}       - Detailed token telemetry, headroom gauges, and cost burn", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("    {bold}5{reset} or {bold}w{reset} or {accent}/missions{reset}   - Workflow DAG execution pipelines and Kahn's cycle checks", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("    {bold}6{reset} or {bold}a{reset} or {accent}/ai{reset}         - AI Provider Gateway (22 backends) and live model router", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("    {bold}?{reset} or {bold}h{reset} or {accent}/help{reset}       - This comprehensive reference manual", bold = theme.bold, accent = theme.accent, reset = theme.reset);
-        println!("    {bold}tab{reset} or {bold}n{reset}                  - Cycle to next cockpit view (Shift+Tab / 'b' for prev)", bold = theme.bold, reset = theme.reset);
+        let hk_title = format!("  {bold}COCKPIT VIEW HOTKEYS (Jump instantly without '/'):{reset}", bold = theme.bold, reset = theme.reset);
+        print_box_line(theme.accent, &hk_title, inner_width, theme.reset);
 
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        let hk1 = format!("    {bold}1{reset} or {bold}o{reset} or {accent}/overview{reset}   - System Overview, status cards, and live headroom gauges", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let hk2 = format!("    {bold}2{reset} or {bold}s{reset} or {accent}/swarm{reset}      - Autonomous Multi-Agent Swarm hierarchy and bot personas", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let hk3 = format!("    {bold}3{reset} or {bold}m{reset} or {accent}/memory{reset}     - Vector memory, method of loci drawers, and hybrid RAG", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let hk4 = format!("    {bold}4{reset} or {bold}c{reset} or {accent}/cost{reset}       - Detailed token telemetry, headroom gauges, and cost burn", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let hk5 = format!("    {bold}5{reset} or {bold}w{reset} or {accent}/missions{reset}   - Workflow DAG execution pipelines and Kahn's cycle checks", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let hk6 = format!("    {bold}6{reset} or {bold}a{reset} or {accent}/ai{reset}         - AI Provider Gateway (22 backends) and live model router", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let hk7 = format!("    {bold}?{reset} or {bold}h{reset} or {accent}/help{reset}       - This comprehensive reference manual", bold = theme.bold, accent = theme.accent, reset = theme.reset);
+        let hk8 = format!("    {bold}tab{reset} or {bold}n{reset}                  - Cycle to next cockpit view (Shift+Tab / 'b' for prev)", bold = theme.bold, reset = theme.reset);
 
-        println!("  {bold}INTERACTIVE GUIDED COMMANDS:{reset}", bold = theme.bold, reset = theme.reset);
-        println!("    {accent}/provider [id]{reset}          - Select AI provider (Gemini, Claude, Ollama Cloud, OpenAI...)", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/provider add [id] [key]{reset}- Add / configure API key and activate provider", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/provider set-key [id] [k]{reset} Set or update provider API key", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/key [id] [key]{reset}         - Directly store API key and fetch remote models from API", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/auth login [id] [key]{reset}  - Authenticate provider via API key or Google OAuth PKCE", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/auth status{reset}            - View authentication status across all 22 providers", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/auth logout [id]{reset}       - Remove stored API key or OAuth token", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/model [name|idx]{reset}       - Fetch live models from provider API & switch active model", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/effort [level]{reset}         - Adjust thinking/reasoning effort budget (low, med, high, max, off)", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/memory <query>{reset}         - Search episodic and semantic memory vectors", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/bot [id]{reset}               - Switch autonomous bot persona (coding, architect, quant...)", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/workflow [id]{reset}          - List or trigger registered DAG workflow pipelines", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/doctor{reset}                 - Security sandboxing, cgroup quotas, and network diagnostics", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/theme{reset}                  - Select CLI color palette (Rust, Cyan, Emerald, Neon)", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/trust{reset}                  - View or toggle workspace directory authorization", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/update [--force]{reset}       - Check & install latest release from GitHub", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/clear{reset}                  - Clear screen and re-render current cockpit view", accent = theme.accent, reset = theme.reset);
-        println!("    {accent}/exit{reset} or {accent}/quit{reset}          - Safely close interactive concierge session", accent = theme.accent, reset = theme.reset);
+        print_box_line(theme.accent, &hk1, inner_width, theme.reset);
+        print_box_line(theme.accent, &hk2, inner_width, theme.reset);
+        print_box_line(theme.accent, &hk3, inner_width, theme.reset);
+        print_box_line(theme.accent, &hk4, inner_width, theme.reset);
+        print_box_line(theme.accent, &hk5, inner_width, theme.reset);
+        print_box_line(theme.accent, &hk6, inner_width, theme.reset);
+        print_box_line(theme.accent, &hk7, inner_width, theme.reset);
+        print_box_line(theme.accent, &hk8, inner_width, theme.reset);
 
-        println!("{bold}{border}{reset}", bold = theme.bold, border = border, reset = theme.reset);
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}🛠️ INTERACTIVE GUIDED COMMANDS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let cmd_lines = [
+            format!("    {accent}/provider [id]{reset}          - Select AI provider (Gemini, Claude, Ollama Cloud, OpenAI...)", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/provider add [id] [key]{reset}- Add / configure API key and activate provider", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/provider set-key [id] [k]{reset} Set or update provider API key", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/key [id] [key]{reset}         - Directly store API key and fetch remote models from API", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/auth login [id] [key]{reset}  - Authenticate provider via API key or Google OAuth PKCE", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/auth status{reset}            - View authentication status across all 22 providers", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/auth logout [id]{reset}       - Remove stored API key or OAuth token", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/model [name|idx]{reset}       - Fetch live models from provider API & switch active model", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/effort [level]{reset}         - Adjust thinking/reasoning effort budget (low, med, high, max, off)", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/memory <query>{reset}         - Search episodic and semantic memory vectors", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/bot [id]{reset}               - Switch autonomous bot persona (coding, architect, quant...)", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/workflow [id]{reset}          - List or trigger registered DAG workflow pipelines", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/doctor{reset}                 - Security sandboxing, cgroup quotas, and network diagnostics", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/theme{reset}                  - Select CLI color palette (Rust, Cyan, Emerald, Neon)", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/trust{reset}                  - View or toggle workspace directory authorization", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/update [--force]{reset}       - Check & install latest release from GitHub", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/clear{reset}                  - Clear screen and re-render current cockpit view", accent = theme.accent, reset = theme.reset),
+            format!("    {accent}/exit{reset} or {accent}/quit{reset}          - Safely close interactive concierge session", accent = theme.accent, reset = theme.reset),
+        ];
+
+        for cl in &cmd_lines {
+            print_box_line(theme.accent, cl, inner_width, theme.reset);
+        }
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     // ==============================================================================
@@ -1308,21 +1516,26 @@ impl InteractiveShell {
         }
 
         let p = ProviderRegistry::active();
-        let cols = terminal_cols().clamp(72, 280);
+        let cols = terminal_cols().clamp(80, 240);
         let inner_width = cols.saturating_sub(2);
-        let top_bar = format!("╭{}╮", "─".repeat(inner_width));
-        let mid_bar = format!("├{}┤", "─".repeat(inner_width));
-        let bot_bar = format!("╰{}╯", "─".repeat(inner_width));
 
-        println!("\n{accent}{top_bar}{reset}", accent = theme.accent, top_bar = top_bar, reset = theme.reset);
-        println!("│  {bold}⚙️  CONFIGURE AI PROVIDER: {}{reset} [{}]", p.name, p.id, bold = theme.bold, reset = theme.reset);
-        println!("│  Category : {:<16} | Auth Summary: {}", p.category, p.auth_summary);
-        println!("{accent}{mid_bar}{reset}", accent = theme.accent, mid_bar = mid_bar, reset = theme.reset);
+        println!();
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}⚙️  CONFIGURE AI PROVIDER: {}{reset} [{}]", p.name, p.id, bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+        let l1 = format!("  Category : {:<16} | Auth Summary: {}", p.category, p.auth_summary);
+        print_box_line(theme.accent, &l1, inner_width, theme.reset);
 
         if !p.is_configured && p.auth_type != "none" {
-            println!("│  {warning}⚠️  API key is required for {}.{reset}", p.name, warning = theme.warning, reset = theme.reset);
-            println!("│  Official Console: {}{}{}", theme.accent, ProviderRegistry::portal_url(&p.id), theme.reset);
-            println!("{accent}{bot_bar}{reset}", accent = theme.accent, bot_bar = bot_bar, reset = theme.reset);
+            print_box_divider(theme.accent, None, inner_width, theme.reset);
+            let l2 = format!("  {warning}⚠️  API key is required for {}.{reset}", p.name, warning = theme.warning, reset = theme.reset);
+            let l3 = format!("  Official Console: {}{}{}", theme.accent, ProviderRegistry::portal_url(&p.id), theme.reset);
+            print_box_line(theme.accent, &l2, inner_width, theme.reset);
+            print_box_line(theme.accent, &l3, inner_width, theme.reset);
+            print_box_bottom(theme.accent, inner_width, theme.reset);
 
             print!("Enter API key for {} (or press Enter to skip / use curated models): ", p.name);
             let _ = io::stdout().flush();
@@ -1334,7 +1547,7 @@ impl InteractiveShell {
                 println!("{}✓ API key saved for {}.{}", theme.success, p.name, theme.reset);
             }
         } else {
-            println!("{accent}{bot_bar}{reset}", accent = theme.accent, bot_bar = bot_bar, reset = theme.reset);
+            print_box_bottom(theme.accent, inner_width, theme.reset);
         }
 
         self.interactive_select_model_and_reasoning(&p.id);
@@ -1343,11 +1556,8 @@ impl InteractiveShell {
     fn interactive_select_model_and_reasoning(&self, provider_id: &str) {
         let theme = self.get_theme();
         let active = ProviderRegistry::active();
-        let cols = terminal_cols().clamp(72, 280);
+        let cols = terminal_cols().clamp(80, 240);
         let inner_width = cols.saturating_sub(2);
-        let top_bar = format!("╭{}╮", "─".repeat(inner_width));
-        let bot_bar = format!("╰{}╯", "─".repeat(inner_width));
-        let thin_border = "─".repeat(cols);
 
         println!("\n{}🔄 Querying latest live AI models from {} API...{}", theme.dim, active.name, theme.reset);
         let models = match ProviderRegistry::fetch_remote_models_with_key(provider_id, None, None) {
@@ -1358,9 +1568,14 @@ impl InteractiveShell {
             _ => active.available_models.clone(),
         };
 
-        println!("\n{accent}{top_bar}{reset}", accent = theme.accent, top_bar = top_bar, reset = theme.reset);
-        println!("│  {bold}SELECT AI MODEL FOR {}{reset}", active.name, bold = theme.bold, reset = theme.reset);
-        println!("{dim}{thin_border}{reset}", dim = theme.dim, thin_border = thin_border, reset = theme.reset);
+        println!();
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}SELECT AI MODEL FOR {}{reset}", active.name, bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
         for (i, m) in models.iter().enumerate() {
             let is_active = m == &active.default_model;
             let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
@@ -1370,10 +1585,11 @@ impl InteractiveShell {
             } else {
                 "".to_string()
             };
-            println!("  [{:2}] {} {:<34} - Max Context: {:>10} tokens ({}){}",
+            let row = format!("  [{:2}] {} {:<32} - Max Context: {:>10} tokens ({}){}",
                 i + 1, mark, m, format_num_commas(ctx), format_tokens_short(ctx), reasoning_tag);
+            print_box_line(theme.accent, &row, inner_width, theme.reset);
         }
-        println!("{accent}{bot_bar}{reset}", accent = theme.accent, bot_bar = bot_bar, reset = theme.reset);
+        print_box_bottom(theme.accent, inner_width, theme.reset);
 
         print!("Select model [1-{} or model name | Enter for '{}']: ", models.len(), active.default_model);
         let _ = io::stdout().flush();
@@ -1416,15 +1632,16 @@ impl InteractiveShell {
 
     pub fn run_doctor(&self) {
         let theme = self.get_theme();
-        let cols = terminal_cols().clamp(72, 280);
+        let cols = terminal_cols().clamp(80, 240);
         let inner_width = cols.saturating_sub(2);
-        let top_bar = format!("╭{}╮", "─".repeat(inner_width));
-        let mid_bar = format!("├{}┤", "─".repeat(inner_width));
-        let bot_bar = format!("╰{}╯", "─".repeat(inner_width));
 
-        println!("\n{accent}{top_bar}{reset}", accent = theme.accent, top_bar = top_bar, reset = theme.reset);
-        println!("│  {bold}🩺 NITYAKSHA DIAGNOSTIC & SECURITY AUDIT (v1.0.0 Pure Rust){reset}", bold = theme.bold, reset = theme.reset);
-        println!("{accent}{mid_bar}{reset}", accent = theme.accent, mid_bar = mid_bar, reset = theme.reset);
+        println!();
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}🩺 NITYAKSHA DIAGNOSTIC & SECURITY AUDIT (v1.0.0 Pure Rust){reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
 
         #[cfg(target_os = "linux")]
         let service_user_ok = nix::unistd::User::from_name("nityaksha").map_or(false, |u| u.is_some());
@@ -1456,15 +1673,28 @@ impl InteractiveShell {
             } else {
                 format!("{}✗ WARN{}", theme.warning, theme.reset)
             };
-            println!("│  {} {:<42} [System verified]", tag, desc);
+            let row = format!("  {} {:<42} [System verified]", tag, desc);
+            print_box_line(theme.accent, &row, inner_width, theme.reset);
         }
-        println!("{accent}{mid_bar}{reset}", accent = theme.accent, mid_bar = mid_bar, reset = theme.reset);
-        println!("│  {bold}Active AI Provider Diagnostics:{reset}", bold = theme.bold, reset = theme.reset);
-        println!("│    Provider ID      : {}{}{}", theme.primary, active_p.id, theme.reset);
-        println!("│    Auth Status      : {}{}{}", if active_has_auth { theme.success } else { theme.warning }, active_p.auth_summary, theme.reset);
-        println!("│    Default Model    : {}{}{}", theme.accent, active_p.default_model, theme.reset);
-        println!("│    Reasoning Effort : {}{}{}", theme.accent, ProviderRegistry::get_reasoning_effort().to_uppercase(), theme.reset);
-        println!("{accent}{bot_bar}{reset}", accent = theme.accent, bot_bar = bot_bar, reset = theme.reset);
+
+        print_box_divider(
+            theme.accent,
+            Some(&format!("{bold}{accent}ACTIVE AI PROVIDER DIAGNOSTICS{reset}", bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+
+        let d1 = format!("  Provider ID      : {}{}{}", theme.primary, active_p.id, theme.reset);
+        let d2 = format!("  Auth Status      : {}{}{}", if active_has_auth { theme.success } else { theme.warning }, active_p.auth_summary, theme.reset);
+        let d3 = format!("  Default Model    : {}{}{}", theme.accent, active_p.default_model, theme.reset);
+        let d4 = format!("  Reasoning Effort : {}{}{}", theme.accent, ProviderRegistry::get_reasoning_effort().to_uppercase(), theme.reset);
+
+        print_box_line(theme.accent, &d1, inner_width, theme.reset);
+        print_box_line(theme.accent, &d2, inner_width, theme.reset);
+        print_box_line(theme.accent, &d3, inner_width, theme.reset);
+        print_box_line(theme.accent, &d4, inner_width, theme.reset);
+
+        print_box_bottom(theme.accent, inner_width, theme.reset);
     }
 
     // ==============================================================================
@@ -1476,17 +1706,23 @@ impl InteractiveShell {
         let active_p = ProviderRegistry::active();
         let effort = ProviderRegistry::get_reasoning_effort();
 
-        let cols = terminal_cols().clamp(72, 280);
+        let cols = terminal_cols().clamp(80, 240);
         let inner_width = cols.saturating_sub(2);
-        let top_box = format!("╭─ TURN #{} {}╮", turn, "─".repeat(inner_width.saturating_sub(12 + turn.to_string().len())));
-        let bot_box = format!("╰{}╯", "─".repeat(inner_width));
 
-        // Ruflo Turn Execution Card
-        println!("\n{accent}{top_box}{reset}", accent = theme.accent, top_box = top_box, reset = theme.reset);
-        println!("│  {bold}Target AI Model :{reset} {accent}{}{reset} │ Provider: {bold}{}{reset} │ Effort: {bold}{}{reset}",
+        // Ruflo Turn Execution Card Box
+        println!();
+        print_box_top(
+            theme.accent,
+            Some(&format!("{bold}{accent}TURN #{}{reset}", turn, bold = theme.bold, accent = theme.accent, reset = theme.reset)),
+            inner_width,
+            theme.reset,
+        );
+        let turn_line = format!("  {bold}Target AI Model :{reset} {accent}{}{reset} │ Provider: {bold}{}{reset} │ Effort: {bold}{}{reset}",
             active_p.default_model, active_p.name, effort.to_uppercase(),
             accent = theme.accent, bold = theme.bold, reset = theme.reset);
-        println!("{accent}{bot_box}{reset}\n", accent = theme.accent, bot_box = bot_box, reset = theme.reset);
+        print_box_line(theme.accent, &turn_line, inner_width, theme.reset);
+        print_box_bottom(theme.accent, inner_width, theme.reset);
+        println!();
 
         let system_prompt = if let Some(ref bot_id) = self.config.active_bot {
             if let Some(bot) = self.engine.relational.get_bot(bot_id) {
@@ -1531,16 +1767,18 @@ impl InteractiveShell {
                 // Print AI Response Markdown
                 println!("{}\n", result.text);
 
-                // Print Ruflo Turn Telemetry Card
+                // Print Ruflo Turn Telemetry Card Box
                 let gauge_w = (cols.saturating_sub(44)).clamp(16, 40);
                 let ctx_gauge = render_progress_bar(ctx_pct, gauge_w, theme.accent, theme.dim, theme.reset);
                 let turn_cost = estimate_cost_usd(&result.provider, &result.model, result.input_tokens, result.output_tokens);
 
-                let card_top = format!("┌─ TURN TELEMETRY ────────────────────────────────────────────────────────{}", "─".repeat(cols.saturating_sub(74)));
-                let card_bot = format!("└{}", "─".repeat(cols.saturating_sub(1)));
-
-                println!("{dim}{card_top}{reset}", dim = theme.dim, card_top = card_top, reset = theme.reset);
-                println!(
+                print_box_top(
+                    theme.dim,
+                    Some(&format!("{bold}{dim}TURN TELEMETRY{reset}", bold = theme.bold, dim = theme.dim, reset = theme.reset)),
+                    inner_width,
+                    theme.reset,
+                );
+                let t1 = format!(
                     "  {bold}Turn Tokens:{reset} In: {accent}{}{reset} │ Out: {accent}{}{reset} │ Total: {bold}{}{reset} │ Latency: {dim}{}ms{reset}",
                     format_num_commas(result.input_tokens),
                     format_num_commas(result.output_tokens),
@@ -1548,20 +1786,23 @@ impl InteractiveShell {
                     result.duration_ms,
                     bold = theme.bold, accent = theme.accent, dim = theme.dim, reset = theme.reset
                 );
-                println!(
+                let t2 = format!(
                     "  {bold}Context Headroom:{reset} {} {:>5.1}% ({}/{} tok) │ Turn Cost: ~${:.5}",
                     ctx_gauge, ctx_pct, format_tokens_short(result.input_tokens),
                     format_tokens_short(result.context_limit), turn_cost,
                     bold = theme.bold, reset = theme.reset
                 );
-                println!(
+                let t3 = format!(
                     "  {bold}Session Cumulative:{reset} In: {} │ Out: {} │ Total: {bold}{} tokens{reset}",
                     format_num_commas(self.session_input_tokens),
                     format_num_commas(self.session_output_tokens),
                     format_num_commas(self.session_total_tokens),
                     bold = theme.bold, reset = theme.reset
                 );
-                println!("{dim}{card_bot}{reset}", dim = theme.dim, card_bot = card_bot, reset = theme.reset);
+                print_box_line(theme.dim, &t1, inner_width, theme.reset);
+                print_box_line(theme.dim, &t2, inner_width, theme.reset);
+                print_box_line(theme.dim, &t3, inner_width, theme.reset);
+                print_box_bottom(theme.dim, inner_width, theme.reset);
             }
             Err(e) => {
                 eprintln!("\n{}❌ Execution Error: {}{}", theme.warning, e, theme.reset);
@@ -1704,4 +1945,128 @@ fn clean_path(path: &str, max_len: usize) -> String {
     } else {
         path.to_string()
     }
+}
+
+// ==============================================================================
+// 11. UNICODE BOX RENDERING UTILITIES
+// ==============================================================================
+
+pub fn char_display_width(c: char) -> usize {
+    let cp = c as u32;
+    if cp < 32 || (cp >= 0x7F && cp < 0xA0) || cp == 0xFE0F || cp == 0x200D {
+        return 0;
+    }
+    if (0x1F300..=0x1FAFF).contains(&cp)
+        || (0x2600..=0x27BF).contains(&cp)
+        || (0x1100..=0x11FF).contains(&cp)
+        || (0x2E80..=0x9FFF).contains(&cp)
+        || (0xAC00..=0xD7AF).contains(&cp)
+        || (0xF900..=0xFAFF).contains(&cp)
+        || (0xFF01..=0xFF60).contains(&cp)
+        || (0xFFE0..=0xFFE6).contains(&cp)
+    {
+        return 2;
+    }
+    1
+}
+
+pub fn visible_width(s: &str) -> usize {
+    let mut width = 0;
+    let mut in_escape = false;
+    for c in s.chars() {
+        if c == '\x1b' {
+            in_escape = true;
+        } else if in_escape {
+            if c.is_ascii_alphabetic() {
+                in_escape = false;
+            }
+        } else {
+            width += char_display_width(c);
+        }
+    }
+    width
+}
+
+pub fn truncate_to_visible_width(s: &str, max_w: usize, reset: &str) -> String {
+    if visible_width(s) <= max_w {
+        return s.to_string();
+    }
+    let target_w = max_w.saturating_sub(3);
+    let mut out = String::new();
+    let mut w = 0;
+    let mut in_escape = false;
+    let mut esc_buf = String::new();
+
+    for c in s.chars() {
+        if c == '\x1b' {
+            in_escape = true;
+            esc_buf.push(c);
+        } else if in_escape {
+            esc_buf.push(c);
+            if c.is_ascii_alphabetic() {
+                in_escape = false;
+                out.push_str(&esc_buf);
+                esc_buf.clear();
+            }
+        } else {
+            let cw = char_display_width(c);
+            if w + cw > target_w {
+                break;
+            }
+            w += cw;
+            out.push(c);
+        }
+    }
+    out.push_str("...");
+    out.push_str(reset);
+    out
+}
+
+pub fn print_box_top(border_color: &str, title: Option<&str>, inner_width: usize, reset: &str) {
+    if let Some(t) = title {
+        let t_vis = visible_width(t);
+        if t_vis + 4 <= inner_width {
+            let rem = inner_width - (t_vis + 4);
+            println!("{border_color}╭─ {reset}{t}{border_color} ─{}╮{reset}", "─".repeat(rem));
+        } else {
+            let trunc = truncate_to_visible_width(t, inner_width.saturating_sub(6), reset);
+            let rem = inner_width.saturating_sub(visible_width(&trunc) + 4);
+            println!("{border_color}╭─ {reset}{trunc}{border_color} ─{}╮{reset}", "─".repeat(rem));
+        }
+    } else {
+        println!("{border_color}╭{}╮{reset}", "─".repeat(inner_width));
+    }
+}
+
+pub fn print_box_divider(border_color: &str, title: Option<&str>, inner_width: usize, reset: &str) {
+    if let Some(t) = title {
+        let t_vis = visible_width(t);
+        if t_vis + 4 <= inner_width {
+            let rem = inner_width - (t_vis + 4);
+            println!("{border_color}├─ {reset}{t}{border_color} ─{}┤{reset}", "─".repeat(rem));
+        } else {
+            let trunc = truncate_to_visible_width(t, inner_width.saturating_sub(6), reset);
+            let rem = inner_width.saturating_sub(visible_width(&trunc) + 4);
+            println!("{border_color}├─ {reset}{trunc}{border_color} ─{}┤{reset}", "─".repeat(rem));
+        }
+    } else {
+        println!("{border_color}├{}┤{reset}", "─".repeat(inner_width));
+    }
+}
+
+pub fn print_box_line(border_color: &str, text: &str, inner_width: usize, reset: &str) {
+    let vis_w = visible_width(text);
+    if vis_w <= inner_width {
+        let pad = " ".repeat(inner_width - vis_w);
+        println!("{border_color}│{reset}{text}{pad}{border_color}│{reset}");
+    } else {
+        let trunc = truncate_to_visible_width(text, inner_width, reset);
+        let rem_vis = visible_width(&trunc);
+        let pad = " ".repeat(inner_width.saturating_sub(rem_vis));
+        println!("{border_color}│{reset}{trunc}{pad}{border_color}│{reset}");
+    }
+}
+
+pub fn print_box_bottom(border_color: &str, inner_width: usize, reset: &str) {
+    println!("{border_color}╰{}╯{reset}", "─".repeat(inner_width));
 }
