@@ -38,13 +38,13 @@ pub struct CliPalette {
 pub const THEMES: &[CliPalette] = &[
     CliPalette {
         id: "rust",
-        name: "◈ Nityaksha Orbit (Rust Orange & Deep Navy)",
-        primary: "\x1b[38;2;192;90;40m",
-        accent: "\x1b[38;2;14;165;233m",
-        success: "\x1b[38;2;16;185;129m",
-        warning: "\x1b[38;2;245;158;11m",
-        muted: "\x1b[38;2;100;116;139m",
-        dim: "\x1b[90m",
+        name: "◈ Nityaksha Precision (Electric Cyan & Deep Steel Slate)",
+        primary: "\x1b[38;2;56;189;248m",      // #38BDF8 Electric Cyan
+        accent: "\x1b[38;2;46;79;111m",        // #2E4F6F Deep Steel Slate Blue
+        success: "\x1b[38;2;16;185;129m",      // #10B981 Emerald Pulse
+        warning: "\x1b[38;2;192;90;40m",       // #C05A28 Signature Rust Orange
+        muted: "\x1b[38;2;148;163;184m",       // #94A3B8 Ice Slate
+        dim: "\x1b[38;2;100;116;139m",         // #64748B Slate Dim
         bold: "\x1b[1m",
         reset: "\x1b[0m",
         prompt_glyph: "◈ ntx",
@@ -686,9 +686,9 @@ impl InteractiveShell {
             let is_active = *view == self.current_view;
             if is_active {
                 tabs_str.push_str(&format!(
-                    "{bold}{accent}[{key}] {icon} {name} ●{reset}  ",
+                    "{bold}{primary}[{key}] {icon} {name} ●{reset}  ",
                     bold = theme.bold,
-                    accent = theme.accent,
+                    primary = theme.primary,
                     key = view.key_label(),
                     icon = view.icon(),
                     name = view.title(),
@@ -720,29 +720,31 @@ impl InteractiveShell {
             &self.session_id
         };
 
-        // 1. Sleek Radiant Brand Banner (NITYAKSHA - Rust Orange / Warm Amber Palette)
-        let c_top = "\x1b[38;5;208m";
-        let c_mid = "\x1b[38;5;166m";
-        let c_bot = "\x1b[38;5;130m";
-        let c_shd = "\x1b[38;5;94m";
+        // 1. Sleek Gradient Brand Banner (NITYAKSHA - Electric Cyan & Azure to Deep Steel Slate)
+        let b_top = "\x1b[38;2;56;189;248m";  // #38BDF8 Electric Cyan
+        let b_mid = "\x1b[38;2;14;165;233m";  // #0EA5E9 Azure Velocity
+        let b_bot = "\x1b[38;2;46;79;111m";   // #2E4F6F Deep Steel Slate Blue
+        let b_shd = "\x1b[38;2;25;50;80m";    // #193250 Navy Slate Shadow
         let rst = "\x1b[0m";
 
         println!();
-        println!("  {}███    ██ ██ ████████ ██    ██  █████  ██   ██ ███████ ██   ██  █████ {}", c_top, rst);
-        println!("  {}████   ██ ██    ██     ██  ██  ██   ██ ██  ██  ██      ██   ██ ██   ██{}", c_mid, rst);
-        println!("  {}██ ██  ██ ██    ██      ████   ███████ █████   ███████ ███████ ███████{}", c_mid, rst);
-        println!("  {}██  ██ ██ ██    ██       ██    ██   ██ ██  ██       ██ ██   ██ ██   ██{}", c_bot, rst);
-        println!("  {}██   ████ ██    ██       ██    ██   ██ ██   ██ ███████ ██   ██ ██   ██{}", c_shd, rst);
-        println!("  \x1b[38;5;244m◈ AN AI CONCIERGE PLATFORM · PURE RUST NATIVE CONTROL PLANE (v1.0.0) ◈\x1b[0m");
+        println!("  {}███    ██ ██ ████████ ██    ██  █████  ██   ██ ███████ ██   ██  █████ {}", b_top, rst);
+        println!("  {}████   ██ ██    ██     ██  ██  ██   ██ ██  ██  ██      ██   ██ ██   ██{}", b_mid, rst);
+        println!("  {}██ ██  ██ ██    ██      ████   ███████ █████   ███████ ███████ ███████{}", b_mid, rst);
+        println!("  {}██  ██ ██ ██    ██       ██    ██   ██ ██  ██       ██ ██   ██ ██   ██{}", b_bot, rst);
+        println!("  {}██   ████ ██    ██       ██    ██   ██ ██   ██ ███████ ██   ██ ██   ██{}", b_shd, rst);
+        println!("  \x1b[38;2;148;163;184m◈ AN AI CONCIERGE PLATFORM · \x1b[38;2;192;90;40m[ PURE RUST NATIVE CONTROL PLANE v1.0.0 ]\x1b[38;2;148;163;184m ◈\x1b[0m");
         println!();
 
-        // 2. Card Box Parameters
-        let c_border = "\x1b[38;5;166m";
-        let c_gold = "\x1b[38;5;220m";
-        let c_amber = "\x1b[38;5;178m";
-        let c_white = "\x1b[1;37m";
-        let c_dim = "\x1b[38;5;244m";
-        let c_olive = "\x1b[38;5;136m";
+        // 2. Nityaksha Workstation Palette (Architectural Steel Slate Blue & Electric Cyan)
+        let c_border = "\x1b[38;2;46;79;111m";    // #2E4F6F Deep Steel Slate Blue
+        let c_cyan = "\x1b[38;2;56;189;248m";      // #38BDF8 Electric Cyan
+        let c_azure = "\x1b[38;2;14;165;233m";     // #0EA5E9 Azure
+        let c_ice = "\x1b[38;2;148;163;184m";      // #94A3B8 Ice Slate / Field Labels
+        let c_white = "\x1b[1;37m";                // Crisp Pure White
+        let c_dim = "\x1b[38;2;100;116;139m";      // #64748B Slate Dim
+        let c_rust = "\x1b[38;2;192;90;40m";       // #C05A28 Rust Orange Accent
+        let c_emerald = "\x1b[38;2;16;185;129m";   // #10B981 Emerald Pulse
 
         let left_w = 38usize;
         let right_w = total_w.saturating_sub(left_w + 5);
@@ -751,75 +753,75 @@ impl InteractiveShell {
         let title = format!(" Nityaksha Concierge Control Plane v1.0.0 (Pure Native Rust) · stable · local {} ", short_sid);
         let dashes_left = 14usize;
         let dashes_right = total_w.saturating_sub(2 + dashes_left + title.chars().count());
-        println!("{c_border}╭{left_dash}{c_gold}{title}{c_border}{right_dash}╮{rst}",
+        println!("{c_border}╭{left_dash}{c_cyan}{title}{c_border}{right_dash}╮{rst}",
             left_dash = "─".repeat(dashes_left),
             right_dash = "─".repeat(dashes_right),
             c_border = c_border,
-            c_gold = c_gold,
+            c_cyan = c_cyan,
             title = title,
             rst = rst
         );
 
         // Left Column: NITYAKSHA Orbital Kinetic Eye (The Eternal Eye) Logomark
         let emblem = [
-            "             .───────.             ",
-            "          .·'    ▲    '·.          ",
-            "       .·'    .·' '·.    '·.       ",
-            "     .·'   .·'  ╭─╮  '·.   '·.     ",
-            "    /    .·'    │●│    '·.    \\    ",
-            "   │   .·'   .──┴─┴──.   '·.   │   ",
-            "  ─◈━━━┫    │  ◈   ◈  │    ┣━━━◈─  ",
-            "   │    '·.  '──┬─┬──'  .·'    │   ",
-            "    \\     '·.   │●│   .·'     /    ",
-            "     '·.    '·. ╰─╯ .·'    .·'     ",
-            "       '·.    '·. .·'    .·'       ",
-            "          '·.    ▼    .·'          ",
-            "             '───────'             ",
+            format!("{c_azure}             .───────.             {rst}"),
+            format!("{c_azure}          .·'    {c_white}▲{c_azure}    '·.          {rst}"),
+            format!("{c_azure}       .·'    .·' '·.    '·.       {rst}"),
+            format!("{c_azure}     .·'   .·'  {c_border}╭─╮{c_azure}  '·.   '·.     {rst}"),
+            format!("{c_azure}    /    .·'    {c_border}│{c_rust}●{c_border}│{c_azure}    '·.    \\    {rst}"),
+            format!("{c_azure}   │   .·'   {c_border}.──┴─┴──.{c_azure}   '·.   │   {rst}"),
+            format!("{c_cyan}  ─◈━━━{c_border}┫{rst}    {c_border}│{rst}  {c_rust}◈{rst}   {c_rust}◈{rst}  {c_border}│{rst}    {c_border}┣{c_cyan}━━━◈─  {rst}"),
+            format!("{c_azure}   │    '·.  {c_border}'──┬─┬──'{c_azure}  .·'    │   {rst}"),
+            format!("{c_azure}    \\     '·.   {c_border}│{c_rust}●{c_border}│{c_azure}   .·'     /    {rst}"),
+            format!("{c_azure}     '·.    '·. {c_border}╰─╯{c_azure} .·'    .·'     {rst}"),
+            format!("{c_azure}       '·.    '·. .·'    .·'       {rst}"),
+            format!("{c_azure}          '·.    {c_white}▼{c_azure}    .·'          {rst}"),
+            format!("{c_azure}             '───────'             {rst}"),
         ];
 
-        let mut left_col: Vec<String> = emblem.iter().map(|l| format!("{}{}{}", c_amber, l, rst)).collect();
+        let mut left_col: Vec<String> = emblem.to_vec();
         left_col.push(String::new());
-        left_col.push(format!("    \x1b[1m{c_gold}◈ NITYAKSHA CONCIERGE ◈{rst}"));
+        left_col.push(format!("    \x1b[1m{c_cyan}◈ NITYAKSHA CONCIERGE ◈{rst}"));
         left_col.push(format!("    {c_dim}Deterministic Pure Rust Core{rst}"));
         left_col.push(String::new());
 
         let ai_status = if active_p.id == "auto" {
-            format!("{c_gold}Auto Router{rst} ({c_white}{}{rst})", active_p.default_model)
+            format!("{c_emerald}● {c_white}Auto Router{rst} {c_dim}(auto-free){rst}")
         } else if active_p.is_configured {
-            format!("{c_gold}{}{rst} ({c_white}{}{rst})", pad_truncate(&active_p.name, 12), pad_truncate(&active_p.default_model, 14))
+            format!("{c_emerald}● {c_white}{}{rst} {c_dim}({}){rst}", pad_truncate(&active_p.name, 12), pad_truncate(&active_p.default_model, 14))
         } else {
-            format!("\x1b[1;33m⚠️ No Active Provider\x1b[0m")
+            format!("{c_rust}⚠ No Active Provider{rst}")
         };
-        left_col.push(format!(" {c_amber}Active AI :{rst} {}", ai_status));
+        left_col.push(format!(" {c_ice}Active AI :{rst} {}", ai_status));
 
         let dir_disp = clean_path(&self.current_dir, 22);
-        left_col.push(format!(" {c_amber}Workspace :{rst} {c_olive}{}{rst}", dir_disp));
-        left_col.push(format!(" {c_amber}Sandbox   :{rst} {c_white}Sovereign POSIX Jail{rst}"));
-        left_col.push(format!(" {c_amber}Session ID:{rst} {c_dim}{}{rst}", short_sid));
+        left_col.push(format!(" {c_ice}Workspace :{rst} {c_white}{}{rst}", dir_disp));
+        left_col.push(format!(" {c_ice}Sandbox   :{rst} {c_cyan}Sovereign POSIX Jail{rst}"));
+        left_col.push(format!(" {c_ice}Session ID:{rst} {c_dim}{}{rst}", short_sid));
 
         // Right Column: Authentic Operational Architecture & High-Signal Telemetry
         let right_col = vec![
-            format!("{c_gold}◈ GATEWAY CONTROL PLANE & TELEMETRY{rst}"),
-            format!("  {c_amber}Provider Pool :{rst} {c_white}39 AI Backends{rst} {c_dim}(Commercial, Sovereign, Cloud){rst}"),
-            format!("  {c_amber}Active Route  :{rst} {c_white}Auto Smart Free Router{rst} {c_gold}[Index 0]{rst}"),
-            format!("  {c_amber}Failover Gate :{rst} {c_white}Local Core → Free Quotas → Fallback Cascade{rst}"),
-            format!("  {c_amber}Prompt Opt    :{rst} {c_white}RTK Token Compressor{rst} {c_dim}(15–35% Cost Reduction){rst}"),
-            format!("  {c_amber}LLM Classifier:{rst} {c_white}Adaptive Tiers{rst} {c_dim}(FastFlash ↔ Balanced ↔ DeepReasoning){rst}"),
-            format!("  {c_amber}Circuit Breaker:{rst} {c_white}Active{rst} {c_dim}(60s Auto-Cooldown on Rate Limits/503){rst}"),
-            format!("  {c_amber}Memory Stack  :{rst} {c_white}SQLite WAL{rst} + {c_dim}Associative Spatial Loci Engine{rst}"),
-            format!("  {c_amber}HTTP Gateway  :{rst} {c_white}http://127.0.0.1:8080{rst} {c_dim}(Drop-in OpenAI API){rst}"),
+            format!("{c_cyan}◈ GATEWAY CONTROL PLANE & TELEMETRY{rst}"),
+            format!("  {c_ice}Provider Pool :{rst} {c_white}39 AI Backends{rst} {c_dim}(Commercial, Sovereign, Cloud){rst}"),
+            format!("  {c_ice}Active Route  :{rst} {c_white}Auto Smart Free Router{rst} {c_cyan}[Index 0]{rst}"),
+            format!("  {c_ice}Failover Gate :{rst} {c_white}Local Core → Free Quotas → Fallback Cascade{rst}"),
+            format!("  {c_ice}Prompt Opt    :{rst} {c_white}RTK Token Compressor{rst} {c_dim}(15–35% Cost Reduction){rst}"),
+            format!("  {c_ice}LLM Classifier:{rst} {c_white}Adaptive Tiers{rst} {c_dim}(FastFlash ↔ Balanced ↔ DeepReasoning){rst}"),
+            format!("  {c_ice}Circuit Breaker:{rst} {c_emerald}Active{rst} {c_dim}(60s Auto-Cooldown on Rate Limits/503){rst}"),
+            format!("  {c_ice}Memory Stack  :{rst} {c_white}SQLite WAL{rst} + {c_dim}Associative Spatial Loci Engine{rst}"),
+            format!("  {c_ice}HTTP Gateway  :{rst} {c_white}http://127.0.0.1:8080{rst} {c_dim}(Drop-in OpenAI API){rst}"),
             String::new(),
-            format!("{c_gold}◈ WORKSTATION VIEWS & SHORTCUTS{rst}"),
+            format!("{c_cyan}◈ WORKSTATION VIEWS & SHORTCUTS{rst}"),
             format!("  {c_white}[1] Overview  [2] Swarm  [3] Memory  [4] Cost  [5] Missions  [6] Gateway{rst}"),
             String::new(),
-            format!("{c_gold}◈ ESSENTIAL COMMAND PALETTE{rst}"),
-            format!("  {c_amber}/provider{rst} (or {c_white}6{rst})      {c_dim}Manage 39 providers, test latency, guided wizard{rst}"),
-            format!("  {c_amber}/model [name]{rst}        {c_dim}Discover remote provider models & set active{rst}"),
-            format!("  {c_amber}/key [id] [key]{rst}     {c_dim}Configure credentials directly for any provider{rst}"),
-            format!("  {c_amber}/router{rst}              {c_dim}Inspect live router telemetry, RTK savings & reset{rst}"),
-            format!("  {c_amber}/effort [level]{rst}      {c_dim}Set reasoning thinking budget (low, med, max...){rst}"),
-            format!("  {c_amber}/help{rst} (or {c_white}?{rst})          {c_dim}Display complete interactive command manual{rst}"),
-            format!("  {c_amber}/exit{rst} (or {c_white}exit{rst})       {c_dim}Cleanly exit Nityaksha Concierge Platform{rst}"),
+            format!("{c_cyan}◈ ESSENTIAL COMMAND PALETTE{rst}"),
+            format!("  {c_cyan}/provider{rst} {c_dim}(or {c_white}6{c_dim}){rst}      {c_dim}Manage 39 providers, test latency, guided wizard{rst}"),
+            format!("  {c_cyan}/model [name]{rst}        {c_dim}Discover remote provider models & set active{rst}"),
+            format!("  {c_cyan}/key [id] [key]{rst}     {c_dim}Configure credentials directly for any provider{rst}"),
+            format!("  {c_cyan}/router{rst}              {c_dim}Inspect live router telemetry, RTK savings & reset{rst}"),
+            format!("  {c_cyan}/effort [level]{rst}      {c_dim}Set reasoning thinking budget (low, med, max...){rst}"),
+            format!("  {c_cyan}/help{rst} {c_dim}(or {c_white}?{c_dim}){rst}          {c_dim}Display complete interactive command manual{rst}"),
+            format!("  {c_cyan}/exit{rst} {c_dim}(or {c_white}exit{c_dim}){rst}       {c_dim}Cleanly exit Nityaksha Concierge Platform{rst}"),
         ];
 
         let max_rows = left_col.len().max(right_col.len());
@@ -840,8 +842,8 @@ impl InteractiveShell {
         println!("{c_border}╰{bot_dash}╯{rst}");
 
         // Bottom Navigation Bar & Hints
-        println!("  \x1b[38;5;244m💡 Navigation: Press '1'-'6' to switch views, '/provider' to manage AI backends, or 'exit' to quit.\x1b[0m");
-        println!("  \x1b[38;5;244m   Type your natural language prompt below to execute an autonomous concierge turn.\x1b[0m");
+        println!("  \x1b[38;2;148;163;184m💡 Navigation: Press '1'-'6' to switch views, '/provider' to manage AI backends, or 'exit' to quit.\x1b[0m");
+        println!("  \x1b[38;2;100;116;139m   Type your natural language prompt below to execute an autonomous concierge turn.\x1b[0m");
     }
 
     /// [2] SWARM COCKPIT VIEW
