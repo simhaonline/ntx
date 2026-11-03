@@ -2038,11 +2038,28 @@ complete -F _ntx_completions ntx"#);
                     if p.is_configured {
                         match ProviderRegistry::fetch_remote_models_with_key(&p.id, None, None) {
                             Ok(live) if !live.is_empty() => {
-                                println!("  Live Models ({}) : Top {} newest releases from {} endpoint:", live.len(), live.len().min(12), p.name);
-                                for (idx, m) in live.iter().take(12).enumerate() {
-                                    let is_cur = m == &p.default_model;
-                                    let mark = if is_cur { " * (active default)" } else { "" };
-                                    println!("    [{:>2}] {:<36}{}", idx + 1, m, mark);
+                                println!("  Live Models ({}) : All models retrieved from {} endpoint:", live.len(), p.name);
+                                if live.len() > 16 {
+                                    let half = (live.len() + 1) / 2;
+                                    for i in 0..half {
+                                        let m1 = &live[i];
+                                        let cur1 = if m1 == &p.default_model { "*" } else { " " };
+                                        let left = format!("[{:>2}] {} {:<32}", i + 1, cur1, m1);
+                                        if i + half < live.len() {
+                                            let m2 = &live[i + half];
+                                            let cur2 = if m2 == &p.default_model { "*" } else { " " };
+                                            let right = format!("[{:>2}] {} {:<32}", i + half + 1, cur2, m2);
+                                            println!("    {} │ {}", left, right);
+                                        } else {
+                                            println!("    {}", left);
+                                        }
+                                    }
+                                } else {
+                                    for (idx, m) in live.iter().enumerate() {
+                                        let is_cur = m == &p.default_model;
+                                        let mark = if is_cur { " * (active default)" } else { "" };
+                                        println!("    [{:>2}] {:<36}{}", idx + 1, m, mark);
+                                    }
                                 }
                             }
                             _ => {}

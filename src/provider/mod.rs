@@ -42,9 +42,9 @@ fn default_context_window() -> usize {
 impl ProviderDefinition {
     pub fn context_window_for_model(&self, model: &str) -> usize {
         let m = model.to_lowercase();
-        if m.contains("2.5-pro") || m.contains("1.5-pro") {
+        if m.contains("2.5-pro") || m.contains("1.5-pro") || m.contains("4-argon") || m.contains("gemini-4") || m.contains("deep-research") {
             2_097_152
-        } else if m.contains("2.5-flash") || m.contains("gemini-2.0") || m.contains("1.5-flash") {
+        } else if m.contains("2.5-flash") || m.contains("gemini-3") || m.contains("gemini-2.0") || m.contains("1.5-flash") || m.contains("antigravity") {
             1_048_576
         } else if m.contains("claude-3-7") || m.contains("claude-3-5") || m.contains("claude-3-opus") {
             200_000
@@ -69,7 +69,12 @@ impl ProviderDefinition {
 
     pub fn is_reasoning_capable(&self, model: &str) -> bool {
         let m = model.to_lowercase();
-        m.contains("gpt-6")
+        m.contains("gemini-4")
+            || m.contains("argon")
+            || m.contains("gemini-3")
+            || m.contains("deep-research")
+            || m.contains("antigravity")
+            || m.contains("gpt-6")
             || m.contains("gpt-5")
             || m.contains("o4")
             || m.contains("o3")
@@ -1441,10 +1446,26 @@ impl ProviderRegistry {
             || lower.contains("similarity")
             || lower.contains("image")
             || lower.contains("sora")
+            || lower.contains("lyria")
+            || lower.contains("clip")
         {
             return -100;
         }
 
+        // Frontier Google Gemini Architecture
+        if lower.contains("4-argon") || lower.contains("gemini-4") { return 130; }
+        if lower.contains("gemini-3.8") { return 128; }
+        if lower.contains("gemini-3.7") { return 127; }
+        if lower.contains("gemini-3.6") { return 126; }
+        if lower.contains("gemini-3.5") { return 125; }
+        if lower.contains("gemini-3.1-pro") { return 123; }
+        if lower.contains("gemini-3.1-flash") { return 122; }
+        if lower.contains("gemini-3.1") { return 121; }
+        if lower.contains("gemini-3") { return 120; }
+        if lower.contains("antigravity") { return 118; }
+        if lower.contains("deep-research") { return 117; }
+
+        // Frontier OpenAI Architecture
         if lower.starts_with("gpt-6") || lower.contains("gpt-6") { return 115; }
         if lower.starts_with("gpt-5") || lower.contains("gpt-5") { return 110; }
         if lower.starts_with("o4") || lower.contains("o4-") { return 105; }
@@ -1452,18 +1473,28 @@ impl ProviderRegistry {
         if lower == "gpt-4o" { return 100; }
         if lower == "gpt-4o-mini" { return 99; }
         if lower == "o1" || lower.starts_with("o1-20") { return 97; }
+
+        // Anthropic Claude Architecture
         if lower.contains("3-7-sonnet") { return 96; }
-        if lower.contains("gemini-2.5") { return 95; }
-        if lower.contains("gemini-2.0") { return 94; }
-        if lower == "deepseek-chat" || lower == "deepseek-v3" { return 93; }
-        if lower == "deepseek-reasoner" || lower == "deepseek-r1" { return 92; }
-        if lower.contains("3-5-sonnet") { return 91; }
-        if lower.contains("hermes-3-llama-3.1-405b") { return 90; }
-        if lower.contains("llama-3.3-70b") || lower.contains("llama3.3:70b") { return 89; }
-        if lower.contains("qwen-max") || lower.contains("qwen-plus") { return 88; }
-        if lower == "chatgpt-4o-latest" { return 87; }
-        if lower == "o1-mini" { return 86; }
-        if lower == "o1-preview" { return 85; }
+
+        // Gemini 2.x Architecture
+        if lower.contains("gemini-2.5-pro") || lower == "gemini-2.5-pro" { return 95; }
+        if lower.contains("gemini-2.5-flash") || lower == "gemini-2.5-flash" { return 94; }
+        if lower.contains("gemini-2.5") { return 93; }
+        if lower.contains("gemini-2.0-flash") || lower == "gemini-2.0-flash" || lower.contains("gemini-2.0") { return 92; }
+
+        // DeepSeek Architecture
+        if lower == "deepseek-chat" || lower == "deepseek-v3" { return 91; }
+        if lower == "deepseek-reasoner" || lower == "deepseek-r1" { return 90; }
+
+        // Flagship Open & Commercial
+        if lower.contains("3-5-sonnet") { return 89; }
+        if lower.contains("hermes-3-llama-3.1-405b") { return 88; }
+        if lower.contains("llama-3.3-70b") || lower.contains("llama3.3:70b") { return 87; }
+        if lower.contains("qwen-max") || lower.contains("qwen-plus") { return 86; }
+        if lower == "chatgpt-4o-latest" { return 85; }
+        if lower == "o1-mini" { return 84; }
+        if lower == "o1-preview" { return 83; }
         if lower.contains("gpt-4-turbo") || lower == "gpt-4" { return 80; }
         if lower.contains("claude-3-5-haiku") { return 78; }
         if lower.contains("sonar-pro") { return 76; }
@@ -1532,27 +1563,26 @@ impl ProviderRegistry {
             }
 
             if let Some(models) = val.pointer("/models").and_then(|v| v.as_array()) {
-                let mut list = Vec::new();
-                for m in models {
-                    if let Some(methods) = m.get("supportedGenerationMethods").and_then(|v| v.as_array()) {
-                        let has_gen = methods.iter().any(|method| method.as_str() == Some("generateContent"));
-                        if has_gen {
-                            if let Some(name) = m.get("name").and_then(|v| v.as_str()) {
-                                let clean = name.strip_prefix("models/").unwrap_or(name);
-                                list.push(clean.to_string());
-                            }
+                let mut list: Vec<String> = models.iter()
+                    .filter_map(|m| {
+                        let methods = m.get("supportedGenerationMethods")?.as_array()?;
+                        if !methods.iter().any(|method| method.as_str() == Some("generateContent")) {
+                            return None;
                         }
-                    }
-                }
+                        let name = m.get("name")?.as_str()?;
+                        let clean = name.strip_prefix("models/").unwrap_or(name);
+                        if Self::score_chat_model_relevance(clean) > 0 {
+                            Some(clean.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
                 if !list.is_empty() {
                     list.sort_by(|a, b| {
-                        let score = |s: &str| {
-                            if s.contains("2.5") { 3 }
-                            else if s.contains("2.0") { 2 }
-                            else if s.contains("1.5") { 1 }
-                            else { 0 }
-                        };
-                        score(b).cmp(&score(a))
+                        let sa = Self::score_chat_model_relevance(a);
+                        let sb = Self::score_chat_model_relevance(b);
+                        sb.cmp(&sa).then_with(|| a.cmp(b))
                     });
                     return Ok(list);
                 }
@@ -2580,10 +2610,25 @@ impl ProviderRegistry {
 
             let default_model = if !discovered_models.is_empty() {
                 println!("✓ Connected! Found {} models from endpoint:", discovered_models.len());
-                for (idx, m) in discovered_models.iter().take(8).enumerate() {
-                    println!("   [{}] {}", idx + 1, m);
+                if discovered_models.len() > 16 {
+                    let half = (discovered_models.len() + 1) / 2;
+                    for i in 0..half {
+                        let m1 = &discovered_models[i];
+                        let left = format!("[{:>2}] {:<32}", i + 1, m1);
+                        if i + half < discovered_models.len() {
+                            let m2 = &discovered_models[i + half];
+                            let right = format!("[{:>2}] {:<32}", i + half + 1, m2);
+                            println!("   {} │ {}", left, right);
+                        } else {
+                            println!("   {}", left);
+                        }
+                    }
+                } else {
+                    for (idx, m) in discovered_models.iter().enumerate() {
+                        println!("   [{:>2}] {}", idx + 1, m);
+                    }
                 }
-                print!("Select default model [1-{} or enter model name | Enter for '{}']: ", discovered_models.len().min(8), discovered_models[0]);
+                print!("Select default model [1-{} or enter model name | Enter for '{}']: ", discovered_models.len(), discovered_models[0]);
                 let _ = std::io::stdout().flush();
                 let mut m_in = String::new();
                 std::io::stdin().read_line(&mut m_in).map_err(|e| e.to_string())?;
@@ -2595,7 +2640,13 @@ impl ProviderRegistry {
                         discovered_models[0].clone()
                     }
                 } else if !m_choice.is_empty() {
-                    m_choice.to_string()
+                    if let Some(matched) = discovered_models.iter().find(|m| m.eq_ignore_ascii_case(m_choice)) {
+                        matched.clone()
+                    } else if let Some(matched) = discovered_models.iter().find(|m| m.to_lowercase().contains(&m_choice.to_lowercase())) {
+                        matched.clone()
+                    } else {
+                        m_choice.to_string()
+                    }
                 } else {
                     discovered_models[0].clone()
                 }
@@ -2983,14 +3034,30 @@ impl ProviderRegistry {
         match Self::fetch_remote_models_with_key(&provider.id, Some(&api_key), None) {
             Ok(models) if !models.is_empty() => {
                 println!("✓ Connected! Found {} models from {} API:", models.len(), provider.name);
-                let max_disp = models.len().min(14);
-                for (idx, m) in models.iter().take(max_disp).enumerate() {
-                    let is_cur = m == &provider.default_model;
-                    let mark = if is_cur { " * (current default)" } else { "" };
-                    println!("   [{:>2}] {:<36}{}", idx + 1, m, mark);
+                if models.len() > 16 {
+                    let half = (models.len() + 1) / 2;
+                    for i in 0..half {
+                        let m1 = &models[i];
+                        let is_cur1 = if m1 == &provider.default_model { "*" } else { " " };
+                        let left = format!("[{:>2}] {} {:<32}", i + 1, is_cur1, m1);
+                        if i + half < models.len() {
+                            let m2 = &models[i + half];
+                            let is_cur2 = if m2 == &provider.default_model { "*" } else { " " };
+                            let right = format!("[{:>2}] {} {:<32}", i + half + 1, is_cur2, m2);
+                            println!("   {} │ {}", left, right);
+                        } else {
+                            println!("   {}", left);
+                        }
+                    }
+                } else {
+                    for (idx, m) in models.iter().enumerate() {
+                        let is_cur = m == &provider.default_model;
+                        let mark = if is_cur { " * (current default)" } else { "" };
+                        println!("   [{:>2}] {:<36}{}", idx + 1, m, mark);
+                    }
                 }
                 println!("   [ c] Enter custom model name manually");
-                print!("Select default model [1-{} or 'c' | Enter to keep '{}']: ", max_disp, provider.default_model);
+                print!("Select default model [1-{} or type model name | Enter to keep '{}']: ", models.len(), provider.default_model);
                 let _ = std::io::stdout().flush();
                 let mut m_in = String::new();
                 if std::io::stdin().read_line(&mut m_in).is_ok() {
@@ -3013,8 +3080,16 @@ impl ProviderRegistry {
                             println!("✓ Default model set to: {}", chosen);
                         }
                     } else if !trimmed.is_empty() {
-                        let _ = Self::set_model(&provider.id, trimmed);
-                        println!("✓ Default model set to: {}", trimmed);
+                        if let Some(matched) = models.iter().find(|m| m.eq_ignore_ascii_case(trimmed)) {
+                            let _ = Self::set_model(&provider.id, matched);
+                            println!("✓ Default model set to: {}", matched);
+                        } else if let Some(matched) = models.iter().find(|m| m.to_lowercase().contains(&trimmed.to_lowercase())) {
+                            let _ = Self::set_model(&provider.id, matched);
+                            println!("✓ Matched '{}' -> Default model set to: {}", trimmed, matched);
+                        } else {
+                            let _ = Self::set_model(&provider.id, trimmed);
+                            println!("✓ Default model set to: {}", trimmed);
+                        }
                     }
                 }
             }

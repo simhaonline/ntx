@@ -1630,12 +1630,34 @@ impl InteractiveShell {
         match ProviderRegistry::fetch_remote_models_with_key(&p.id, Some(&key), None) {
             Ok(models) if !models.is_empty() => {
                 println!("{}✓ Successfully connected! Retrieved {} live models from {} API:{}", theme.success, models.len(), p.name, theme.reset);
-                for (idx, m) in models.iter().take(8).enumerate() {
-                    let is_active = m == &p.default_model;
-                    let mark = if is_active { format!("{}* (current default){}", theme.success, theme.reset) } else { "".to_string() };
-                    println!("   [{}] {:<34} {}", idx + 1, m, mark);
+                let cols = terminal_cols().clamp(80, 240);
+                let inner_width = cols.saturating_sub(2);
+                if models.len() > 16 && inner_width >= 90 {
+                    let half = (models.len() + 1) / 2;
+                    let col_w = (inner_width.saturating_sub(6)) / 2;
+                    for i in 0..half {
+                        let m1 = &models[i];
+                        let is_act1 = m1 == &p.default_model;
+                        let mark1 = if is_act1 { "*" } else { " " };
+                        let left = format!("[{:>2}] {} {:<w$}", i + 1, mark1, m1, w = col_w.saturating_sub(7));
+                        if i + half < models.len() {
+                            let m2 = &models[i + half];
+                            let is_act2 = m2 == &p.default_model;
+                            let mark2 = if is_act2 { "*" } else { " " };
+                            let right = format!("[{:>2}] {} {:<w$}", i + half + 1, mark2, m2, w = col_w.saturating_sub(7));
+                            println!("   {} │ {}", left, right);
+                        } else {
+                            println!("   {}", left);
+                        }
+                    }
+                } else {
+                    for (idx, m) in models.iter().enumerate() {
+                        let is_active = m == &p.default_model;
+                        let mark = if is_active { format!("{}* (current default){}", theme.success, theme.reset) } else { "".to_string() };
+                        println!("   [{:>2}] {:<34} {}", idx + 1, m, mark);
+                    }
                 }
-                print!("Switch default model to one of the above [1-{} or Enter to keep '{}']: ", models.len().min(8), p.default_model);
+                print!("Switch default model [1-{} or type model name | Enter to keep '{}']: ", models.len(), p.default_model);
                 let _ = io::stdout().flush();
                 let mut choice = String::new();
                 let _ = io::stdin().read_line(&mut choice);
@@ -1645,6 +1667,17 @@ impl InteractiveShell {
                         let chosen = &models[idx - 1];
                         let _ = ProviderRegistry::set_model(&p.id, chosen);
                         println!("{}✓ Default model set to: {}{}", theme.success, chosen, theme.reset);
+                    }
+                } else if !trimmed.is_empty() {
+                    if let Some(matched) = models.iter().find(|m| m.eq_ignore_ascii_case(trimmed)) {
+                        let _ = ProviderRegistry::set_model(&p.id, matched);
+                        println!("{}✓ Default model set to: {}{}", theme.success, matched, theme.reset);
+                    } else if let Some(matched) = models.iter().find(|m| m.to_lowercase().contains(&trimmed.to_lowercase())) {
+                        let _ = ProviderRegistry::set_model(&p.id, matched);
+                        println!("{}✓ Matched '{}' -> Default model set to: {}{}", theme.success, trimmed, matched, theme.reset);
+                    } else {
+                        let _ = ProviderRegistry::set_model(&p.id, trimmed);
+                        println!("{}✓ Custom model set to: {}{}", theme.success, trimmed, theme.reset);
                     }
                 }
             }
@@ -1790,25 +1823,50 @@ impl InteractiveShell {
             theme.reset,
         );
 
-        let max_models = models.len().min(14);
-        for (i, m) in models.iter().take(max_models).enumerate() {
-            let is_active = m == &active.default_model;
-            let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
-            let ctx = active.context_window_for_model(m);
-            let reasoning_tag = if active.is_reasoning_capable(m) {
-                format!(" {}[Reasoning Capable]{}", theme.accent, theme.reset)
-            } else {
-                "".to_string()
-            };
-            let row = format!("  [{:2}] {} {:<32} - Max Context: {:>10} tokens ({}){}",
-                i + 1, mark, m, format_num_commas(ctx), format_tokens_short(ctx), reasoning_tag);
-            print_box_line(theme.accent, &row, inner_width, theme.reset);
+        if models.len() > 16 && inner_width >= 90 {
+            let half = (models.len() + 1) / 2;
+            let col_w = (inner_width.saturating_sub(6)) / 2;
+            for i in 0..half {
+                let m1 = &models[i];
+                let is_act1 = m1 == &active.default_model;
+                let mark1 = if is_act1 { "* " } else { "  " };
+                let ctx1 = format_tokens_short(active.context_window_for_model(m1));
+                let left_content = format!("[{:>2}] {}{:<w$} ({})", i + 1, mark1, m1, ctx1, w = col_w.saturating_sub(14));
+                let left_col = format!("{:<w$}", left_content, w = col_w);
+                if i + half < models.len() {
+                    let m2 = &models[i + half];
+                    let is_act2 = m2 == &active.default_model;
+                    let mark2 = if is_act2 { "* " } else { "  " };
+                    let ctx2 = format_tokens_short(active.context_window_for_model(m2));
+                    let right_content = format!("[{:>2}] {}{:<w$} ({})", i + half + 1, mark2, m2, ctx2, w = col_w.saturating_sub(14));
+                    let right_col = format!("{:<w$}", right_content, w = col_w);
+                    let row = format!("  {} │ {}", left_col, right_col);
+                    print_box_line(theme.accent, &row, inner_width, theme.reset);
+                } else {
+                    let row = format!("  {}", left_col);
+                    print_box_line(theme.accent, &row, inner_width, theme.reset);
+                }
+            }
+        } else {
+            for (i, m) in models.iter().enumerate() {
+                let is_active = m == &active.default_model;
+                let mark = if is_active { format!("{}* (active){}", theme.success, theme.reset) } else { "          ".to_string() };
+                let ctx = active.context_window_for_model(m);
+                let reasoning_tag = if active.is_reasoning_capable(m) {
+                    format!(" {}[Reasoning Capable]{}", theme.accent, theme.reset)
+                } else {
+                    "".to_string()
+                };
+                let row = format!("  [{:>2}] {} {:<32} - Max Context: {:>10} tokens ({}){}",
+                    i + 1, mark, m, format_num_commas(ctx), format_tokens_short(ctx), reasoning_tag);
+                print_box_line(theme.accent, &row, inner_width, theme.reset);
+            }
         }
         let custom_row = format!("  [ c] {}Enter custom model name manually{}", theme.accent, theme.reset);
         print_box_line(theme.accent, &custom_row, inner_width, theme.reset);
         print_box_bottom(theme.accent, inner_width, theme.reset);
 
-        print!("Select model [1-{} or 'c' | Enter for '{}']: ", max_models, active.default_model);
+        print!("Select model [1-{} or type model name | Enter for '{}']: ", models.len(), active.default_model);
         let _ = io::stdout().flush();
         let mut model_choice = String::new();
         let _ = io::stdin().read_line(&mut model_choice);
@@ -1821,15 +1879,28 @@ impl InteractiveShell {
                 let cm = custom_m.trim();
                 if !cm.is_empty() {
                     let _ = ProviderRegistry::set_model(&active.id, cm);
+                    println!("{}✓ Default model updated to: {}{}", theme.success, cm, theme.reset);
                 }
             }
         } else if let Ok(idx) = trimmed_m.parse::<usize>() {
             if idx >= 1 && idx <= models.len() {
                 let chosen = &models[idx - 1];
                 let _ = ProviderRegistry::set_model(&active.id, chosen);
+                println!("{}✓ Default model updated to: {}{}", theme.success, chosen, theme.reset);
+            } else {
+                println!("{}Invalid selection number [1-{}]. Kept '{}'.{}", theme.warning, models.len(), active.default_model, theme.reset);
             }
         } else if !trimmed_m.is_empty() {
-            let _ = ProviderRegistry::set_model(&active.id, trimmed_m);
+            if let Some(matched) = models.iter().find(|m| m.eq_ignore_ascii_case(trimmed_m)) {
+                let _ = ProviderRegistry::set_model(&active.id, matched);
+                println!("{}✓ Default model updated to: {}{}", theme.success, matched, theme.reset);
+            } else if let Some(matched) = models.iter().find(|m| m.to_lowercase().contains(&trimmed_m.to_lowercase())) {
+                let _ = ProviderRegistry::set_model(&active.id, matched);
+                println!("{}✓ Matched '{}' -> Updated default model to: {}{}", theme.success, trimmed_m, matched, theme.reset);
+            } else {
+                let _ = ProviderRegistry::set_model(&active.id, trimmed_m);
+                println!("{}✓ Custom model set to: {}{}", theme.success, trimmed_m, theme.reset);
+            }
         }
 
         // Configure Reasoning Effort
