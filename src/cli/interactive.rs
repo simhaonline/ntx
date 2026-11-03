@@ -738,7 +738,7 @@ impl InteractiveShell {
         println!(" {c_glyph_cyan}┃{rst} {c_silver}• Zero-Cost Router:{rst} Auto load-balances free tiers (Gemini free quota, Ollama, LM Studio, GitHub Models).");
         println!(" {c_glyph_cyan}┃{rst} {c_silver}• RTK Compressor  :{rst} Real-time prompt whitespace & delimiter optimization (15–35% token savings).");
         println!(" {c_glyph_cyan}┃{rst} {c_silver}• Circuit Breakers:{rst} Active across all 39 endpoints (automatic 60s cooldown on rate limits / spikes).");
-        println!(" {c_glyph_cyan}┃{rst} {c_silver}• Web Control UI  :{rst} {c_glyph_cyan}http://127.0.0.1:8080/app{rst} {c_dim}(Enterprise developer portal & drop-in OpenAI API){rst}");
+        println!(" {c_glyph_cyan}┃{rst} {c_silver}• Web Control UI  :{rst} {c_glyph_cyan}http://46.62.188.249:8080{rst} {c_dim}(Enterprise developer portal & drop-in OpenAI API){rst}");
         println!(" {c_glyph_cyan}┃{rst} {c_dim}Type {c_white}?{c_dim} or {c_white}/help{c_dim} for command manual · {c_white}/provider{c_dim} to switch backends · {c_white}exit{c_dim} to quit{rst}");
 
         println!("{c_rule}{sep}{rst}");

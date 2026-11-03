@@ -508,7 +508,7 @@ pub const EMBEDDED_WEBUI_HTML: &str = r##"<!DOCTYPE html>
 
     <div class="status-bar-box">
       <div class="status-dot"></div>
-      <span>Gateway Online · Port 8080</span>
+      <span id="gateway-status-badge">Gateway Online · 46.62.188.249:8080</span>
     </div>
 
     <ul class="nav-list">
@@ -1569,6 +1569,18 @@ print(response.choices[0].message.content)</pre>
 
     // --- Initialize ---
     window.addEventListener('DOMContentLoaded', () => {
+      const origin = window.location.origin || 'http://46.62.188.249:8080';
+      const host = window.location.host || '46.62.188.249:8080';
+
+      const badge = document.getElementById('gateway-status-badge');
+      if (badge) badge.textContent = `Gateway Online · ${host}`;
+
+      document.querySelectorAll('code, pre').forEach(el => {
+        if (el.textContent.includes('http://localhost:8080')) {
+          el.textContent = el.textContent.replaceAll('http://localhost:8080', origin);
+        }
+      });
+
       loadProviders();
       refreshRouterState();
       setInterval(refreshRouterState, 10000);

@@ -29,7 +29,7 @@ impl HttpServer {
     pub fn start(&self) -> std::io::Result<()> {
         let addr = format!("0.0.0.0:{}", self.port);
         let listener = TcpListener::bind(&addr)?;
-        println!("Nityaksha Pure Rust WebUI & REST API running on http://{}", addr);
+        println!("Nityaksha Pure Rust WebUI & REST API running on http://46.62.188.249:{} (and http://{})", self.port, addr);
 
         for stream in listener.incoming() {
             if let Ok(stream) = stream {
@@ -67,6 +67,11 @@ fn handle_connection(
     let method = parts[0];
     let uri = parts[1];
 
+    let req_host = request.lines()
+        .find(|l| l.to_lowercase().starts_with("host:"))
+        .map(|l| l[5..].trim())
+        .unwrap_or("46.62.188.249:8080");
+
     // Find body if any
     let body = if let Some(idx) = request.find("\r\n\r\n") {
         &request[idx + 4..]
@@ -80,8 +85,8 @@ fn handle_connection(
         return Ok(());
     }
 
-    if (method == "GET" || method == "HEAD") && (uri == "/" || uri == "/index.html") {
-        let html = include_str!("../../index.html");
+    if (method == "GET" || method == "HEAD") && (uri == "/" || uri == "/index.html" || uri == "/app" || uri == "/dashboard") {
+        let html = webui::EMBEDDED_WEBUI_HTML;
         let resp = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
             html.len()
@@ -93,8 +98,8 @@ fn handle_connection(
         return Ok(());
     }
 
-    if (method == "GET" || method == "HEAD") && (uri == "/app" || uri == "/dashboard") {
-        let html = webui::EMBEDDED_WEBUI_HTML;
+    if (method == "GET" || method == "HEAD") && (uri == "/landing" || uri == "/welcome" || uri == "/marketing") {
+        let html = include_str!("../../index.html");
         let resp = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: *\r\n\r\n",
             html.len()
@@ -899,8 +904,8 @@ fn handle_connection(
 
     if method == "GET" && uri.starts_with("/api/auth/google/url") {
         let client_id = GoogleOAuthEngine::get_client_id(None);
-        let redirect_uri = "http://127.0.0.1:8080/api/auth/google/callback";
-        let auth_url = GoogleOAuthEngine::build_authorization_url(&client_id, redirect_uri);
+        let redirect_uri = format!("http://{}/api/auth/google/callback", req_host);
+        let auth_url = GoogleOAuthEngine::build_authorization_url(&client_id, &redirect_uri);
         let payload = serde_json::json!({
             "url": auth_url,
             "client_id": client_id,
@@ -921,9 +926,9 @@ fn handle_connection(
         if let Some(code) = code_opt {
             let client_id = GoogleOAuthEngine::get_client_id(None);
             let client_secret = GoogleOAuthEngine::get_client_secret(None);
-            let redirect_uri = "http://127.0.0.1:8080/api/auth/google/callback";
+            let redirect_uri = format!("http://{}/api/auth/google/callback", req_host);
 
-            match GoogleOAuthEngine::exchange_authorization_code(&code, &client_id, &client_secret, redirect_uri) {
+            match GoogleOAuthEngine::exchange_authorization_code(&code, &client_id, &client_secret, &redirect_uri) {
                 Ok(creds) => {
                     let _ = ProviderRegistry::set_active("gemini");
                     let email = creds.email.unwrap_or_else(|| "Google User".to_string());
