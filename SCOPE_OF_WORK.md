@@ -4,6 +4,7 @@
 **Live Workstation Gateway:** `http://46.62.188.249:8080`  
 **Total Codebase Footprint:** `~19,850 LOC` across `42` core modules  
 **Compiled Binary Targets:** Linux `x86_64` (`ntx`) & Windows `x86_64` (`ntx.exe`)  
+**Operations Guide:** [`ADMIN_AND_USER_OPERATIONS_GUIDE.md`](./ADMIN_AND_USER_OPERATIONS_GUIDE.md)  
 **Status:** **100% Complete — All 5 Enterprise SOW v2 Tiers (`WP-01..30`), `SEC-001..010` Hardening Gates, and `S-001..018` Security Acceptance Suite Verified**
 
 ---

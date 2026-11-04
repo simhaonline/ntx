@@ -7,6 +7,7 @@ Engineered for high-velocity, deterministic multi-agent orchestration.
 **Architecture:** Zero-Dependency Compiled Binary (Zero Python Runtime Dependency)  
 **Security Model:** ContainerOS-Grade POSIX Sandboxing & Invariant Enforcement  
 **Official Domain:** [`simhaonline.ai`](https://simhaonline.ai)  
+**Operations Handbook:** [`ADMIN_AND_USER_OPERATIONS_GUIDE.md`](./ADMIN_AND_USER_OPERATIONS_GUIDE.md) | [`SCOPE_OF_WORK.md`](./SCOPE_OF_WORK.md)  
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/simhaonline/ntx)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows%20%7C%20macos%20%7C%20ios-green.svg)](https://github.com/simhaonline/ntx)
