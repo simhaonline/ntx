@@ -1,12 +1,12 @@
-# Nityaksha AI Concierge Platform v1.0.0 (Pure Rust Native)
+# Nityaksha AI Concierge Platform v1.0.0
 
-Engineered for high-velocity, deterministic AI in pure native Rust with ContainerOS-grade POSIX isolation, zero-dependency embedded database memory stack, and multi-model autonomous agency.
+Engineered for high-velocity, deterministic AI in native compiled code with ContainerOS-grade POSIX isolation, zero-dependency embedded database memory stack, and multi-model autonomous agency.
 
 ---
 
 ## 🚀 Key Highlights & Architectural Invariants
 
-- **100% Native Pure Rust**: Zero Python runtime, zero Node.js daemon. Built from scratch with sub-5ms cold startup and sub-5MB baseline memory footprint.
+- **Zero External Runtime Dependencies**: Zero Python runtime, zero Node.js daemon. Built from scratch with sub-5ms cold startup and sub-5MB baseline memory footprint.
 - **Universal AI Provider Gateway (21 Backends)**:
   - **Google Gemini**: Dual-mode authentication via **Google OAuth 2.0 PKCE** (`https://www.googleapis.com/auth/cloud-platform`, OpenID, email, profile) and **AI Studio API Keys**, with automatic background token refresh and `gcloud` ADC fallback.
   - **Anthropic Claude**: Guided onboarding with console API key validation (`console.anthropic.com`).
