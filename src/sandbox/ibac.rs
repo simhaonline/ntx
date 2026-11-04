@@ -57,18 +57,21 @@ impl IbacGate {
             };
         }
 
-        // 4. Unauthorized Live Trading Order Execution Gating
+        // 4. Unauthorized Live Trading Order Execution & Production Git Push Gating (SEC-005)
         if (cmd_lower.contains("place_order")
             || cmd_lower.contains("broker.execute")
             || cmd_lower.contains("order_type: market")
-            || cmd_lower.contains("submit_order"))
+            || cmd_lower.contains("submit_order")
+            || cmd_lower.contains("git push --force")
+            || cmd_lower.contains("git push origin main")
+            || cmd_lower.contains("git push origin master"))
             && !cmd_lower.contains("dry_run")
             && !cmd_lower.contains("paper_trade")
         {
             return GateEvaluation {
                 decision: GateDecision::RequireHumanApproval,
-                rule_matched: Some("LIVE_BROKER_MUTATION_GATE".into()),
-                reason: "Live capital broker order mutation detected. Explicit human authorization required.".into(),
+                rule_matched: Some("HITL_IRREVERSIBLE_MUTATION_GATE".into()),
+                reason: "Irreversible external mutation or live broker order detected. Explicit human authorization required.".into(),
             };
         }
 
@@ -78,6 +81,28 @@ impl IbacGate {
                 decision: GateDecision::Block,
                 rule_matched: Some("KERNEL_MEMORY_ACCESS".into()),
                 reason: "Direct physical memory or kernel core probing is prohibited.".into(),
+            };
+        }
+
+        // 6. Obfuscated Subshell, Pipe-to-Shell & Credential Access Guard (SEC-005, S-006)
+        if cmd_lower.contains("| sh")
+            || cmd_lower.contains("| bash")
+            || cmd_lower.contains("|sh")
+            || cmd_lower.contains("|bash")
+            || cmd_lower.contains("base64 -d")
+            || cmd_lower.contains("base64 --decode")
+            || cmd_lower.contains("/etc/shadow")
+            || cmd_lower.contains("/etc/sudoers")
+            || cmd_lower.contains(".ssh/id_rsa")
+            || cmd_lower.contains(".ssh/id_ed25519")
+            || cmd_lower.contains("os.system(")
+            || cmd_lower.contains("subprocess.popen(")
+            || (cmd_lower.contains("$(") && (cmd_lower.contains("rm ") || cmd_lower.contains("curl ") || cmd_lower.contains("wget ") || cmd_lower.contains("base64")))
+        {
+            return GateEvaluation {
+                decision: GateDecision::Block,
+                rule_matched: Some("OBFUSCATED_SHELL_OR_CREDENTIAL_ESCAPE".into()),
+                reason: "Obfuscated subshell execution, pipe-to-shell, or host credential access is blocked (S-006).".into(),
             };
         }
 

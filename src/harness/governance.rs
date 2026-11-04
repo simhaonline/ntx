@@ -30,10 +30,80 @@ impl GovernanceManager {
         if let Some(parent) = p.parent() {
             fs::create_dir_all(parent)?;
         }
+        let mut last_hash = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        if p.exists() {
+            if let Ok(content) = fs::read_to_string(&p) {
+                for line in content.lines().rev() {
+                    if let Some(h_idx) = line.find(" | HASH:") {
+                        let after = &line[h_idx + 8..];
+                        if let Some(end_idx) = after.find(" | PREV:") {
+                            last_hash = after[..end_idx].trim().to_string();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         Ok(Self {
             audit_log_path: p,
-            last_audit_hash: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            last_audit_hash: last_hash,
         })
+    }
+
+    /// Independently verify the entire cryptographic hash chain across restarts/rotations (SEC-009, S-014)
+    pub fn verify_audit_chain(&self) -> Result<(usize, String), String> {
+        if !self.audit_log_path.exists() {
+            return Ok((0, self.last_audit_hash.clone()));
+        }
+        let content = fs::read_to_string(&self.audit_log_path)
+            .map_err(|e| format!("Failed to read audit log: {}", e))?;
+
+        let mut expected_prev = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        let mut count = 0usize;
+
+        for (line_no, line) in content.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let h_pos = trimmed
+                .find(" | HASH:")
+                .ok_or_else(|| format!("Audit Tamper Detected (S-014): malformed entry at line {}", line_no + 1))?;
+            let p_pos = trimmed
+                .find(" | PREV:")
+                .ok_or_else(|| format!("Audit Tamper Detected (S-014): missing PREV tag at line {}", line_no + 1))?;
+
+            let payload = &trimmed[..h_pos];
+            let recorded_hash = trimmed[h_pos + 8..p_pos].trim();
+            let recorded_prev = trimmed[p_pos + 8..].trim();
+
+            if recorded_prev != expected_prev {
+                return Err(format!(
+                    "Audit Chain Continuity Broken (S-014) at line {}: expected PREV '{}', found '{}'",
+                    line_no + 1,
+                    expected_prev,
+                    recorded_prev
+                ));
+            }
+
+            let mut hasher = Sha256::new();
+            hasher.update(payload.as_bytes());
+            let computed_hash = crate::db::multimodal::to_hex(&hasher.finalize());
+
+            if computed_hash != recorded_hash {
+                return Err(format!(
+                    "Audit Payload Tamper Detected (S-014) at line {}: computed hash '{}' != recorded '{}'",
+                    line_no + 1,
+                    computed_hash,
+                    recorded_hash
+                ));
+            }
+
+            expected_prev = recorded_hash.to_string();
+            count += 1;
+        }
+
+        Ok((count, expected_prev))
     }
 
     /// Strip sensitive credentials and answers from environment variables before model exposure

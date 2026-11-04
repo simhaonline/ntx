@@ -138,11 +138,15 @@ flowchart TD
 - **Columnar Analytical Store**: Columnar layout for high-throughput aggregation of tool-call durations, token consumption, and model benchmarks.
 - **Relational Tables with WAL**: ACID storage for capabilities, agent sessions, swarms, trajectories, and spatial memory.
 
-### 5.4 ContainerOS POSIX Sandboxing & Security Gates (`src/sandbox/`)
-- **Linux Namespace Confinement**: Mount, UTS, IPC, PID, and Network namespaces (network loopback-only by default).
-- **Cgroups v2 Resource Governance**: Enforces hard memory limits (`memory.max`), process caps (`pids.max`), and CPU quotas (`cpu.max`).
-- **Host Docker Socket Blocking**: Traps and forbids access to `/var/run/docker.sock`.
-- **IBAC Gating**: Blocks destructive operations (`rm -rf /`, `mkfs`, raw block devices) and protects host infrastructure.
+### 5.4 ContainerOS POSIX Sandboxing, Central `ToolBroker` & Enterprise Security Gates (`src/sandbox/`, `src/toolbroker/`, `src/registry/`, `src/swarm_engine/`, `src/plugin/`)
+- **Central `ToolBroker` & RBAC/ABAC Policy (`src/toolbroker/mod.rs`)**: Enforces authenticated `PrincipalContext`, 7 RBAC roles (`Owner`, `Admin`, `Operator`, `Developer`, `Approver`, `Auditor`, `Viewer`), and 8 permission classes (`Read`, `Write`, `Process`, `Network`, `Identity`, `Secret`, `ExternalEffect`, `Irreversible`).
+- **Action-Bound Single-Use HITL Approval Tokens**: Approval tokens are cryptographically bound to `SHA-256(tenant_id | workspace_id | tool_name | canonical_target | args_json)` with single-use replay prevention, TTL expiration, and separation-of-duties (`requestor_id != approver_id`).
+- **Secret Vault & Automatic Redaction**: Resolves `secret://<namespace>/<name>` handles for authorized principals and masks raw credentials across logs and JSON API responses.
+- **Fail-Closed Sandbox & Confinement Attestation**: Linux namespace isolation (`Mount`, `UTS`, `IPC`, `PID`, `Net`), cgroups v2 quotas, 1 MiB stdout/stderr ceiling, obfuscated shell/subshell/pipe-to-shell blocking, and JSON attestation (`ntx sandbox attest`, `GET /v1/sandboxes/attest`).
+- **Zero-Clone Capability Registry & SSRF Guard (`src/registry/mod.rs`)**: Blocks cloud metadata/loopback/RFC1918 SSRF targets, scans untrusted instructions for prompt-injection/escalation directives, and enforces `Quarantined -> Reviewed -> Approved -> Installed -> Revoked` lifecycle with SHA-256 package signatures.
+- **Multi-Agent Swarm Coordination & Job Scheduler (`src/swarm_engine/mod.rs`)**: Causal-sequence shared blackboard, monotonic `fence_token` resource leases, weighted quorum consensus, and scheduled job queue with Dead-Letter Queue (`DLQ`) escalation.
+- **MCP `2025-11-25` Streamable HTTP & External Vector Adapters**: Supports both `stdio` and `POST /mcp` Streamable HTTP transport with strict version negotiation (`2025-11-25`, `2024-11-05`), pre-retrieval tenant isolation, Reciprocal Rank Fusion (`search_rrf`), and ChromaDB/Qdrant/`pgvector` query adapters.
+- **Sandboxed Plugin Lifecycle Hooks & Worktree Patch Backups (`src/plugin/mod.rs`)**: Enforces cross-tenant/secret/host-FS isolation on plugins (`BeforePrompt`, `AfterResponse`, `BeforeTool`, `AfterTool`, `BeforeMemoryWrite`, `BeforePublish`, `OnError`, `OnShutdown`) and creates reversible SHA-256 file backups before workspace edits.
 
 ---
 

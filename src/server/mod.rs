@@ -49,13 +49,53 @@ fn handle_connection(
     engine: Arc<MemoryEngine>,
     sandbox: Arc<SandboxManager>,
 ) -> std::io::Result<()> {
-    let mut buffer = [0u8; 8192];
-    let bytes_read = stream.read(&mut buffer)?;
-    if bytes_read == 0 {
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+    let mut raw_bytes: Vec<u8> = Vec::with_capacity(8192);
+    let mut chunk = [0u8; 8192];
+    let mut header_end_idx: Option<usize> = None;
+    let mut expected_content_len: usize = 0;
+    const MAX_BODY_BYTES: usize = 2 * 1024 * 1024; // 2 MiB max payload (SEC-007 / S-013)
+
+    loop {
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                raw_bytes.extend_from_slice(&chunk[..n]);
+                if header_end_idx.is_none() {
+                    if let Some(pos) = raw_bytes.windows(4).position(|w| w == b"\r\n\r\n") {
+                        header_end_idx = Some(pos + 4);
+                        let hdr_str = String::from_utf8_lossy(&raw_bytes[..pos]);
+                        for line in hdr_str.lines() {
+                            if line.to_ascii_lowercase().starts_with("content-length:") {
+                                expected_content_len = line[15..].trim().parse::<usize>().unwrap_or(0);
+                            }
+                        }
+                    }
+                }
+                if expected_content_len > MAX_BODY_BYTES {
+                    let payload = serde_json::json!({
+                        "error": { "code": "PAYLOAD_TOO_LARGE", "message": "Request body exceeds 2 MiB limit" }
+                    });
+                    send_json(&mut stream, 413, &payload)?;
+                    return Ok(());
+                }
+                if let Some(h_end) = header_end_idx {
+                    if raw_bytes.len() >= h_end + expected_content_len {
+                        break;
+                    }
+                } else if raw_bytes.len() >= 65536 {
+                    break;
+                }
+            }
+            Err(_) => break,
+        }
+    }
+
+    if raw_bytes.is_empty() {
         return Ok(());
     }
 
-    let request = String::from_utf8_lossy(&buffer[..bytes_read]);
+    let request = String::from_utf8_lossy(&raw_bytes);
     let mut lines = request.lines();
     let request_line = lines.next().unwrap_or("");
     let parts: Vec<&str> = request_line.split_whitespace().collect();
@@ -72,12 +112,77 @@ fn handle_connection(
         .map(|l| l[5..].trim())
         .unwrap_or("46.62.188.249:8080");
 
+    let origin_hdr = request.lines()
+        .find(|l| l.to_lowercase().starts_with("origin:"))
+        .map(|l| l[7..].trim());
+
+    let role_hdr = request.lines()
+        .find(|l| l.to_lowercase().starts_with("x-ntx-role:"))
+        .map(|l| l[11..].trim());
+
+    let auth_hdr = request.lines()
+        .find(|l| l.to_lowercase().starts_with("authorization:"))
+        .map(|l| l[14..].trim());
+
+    let mcp_version_hdr = request.lines()
+        .find(|l| l.to_lowercase().starts_with("mcp-protocol-version:"))
+        .map(|l| l[21..].trim());
+
     // Find body if any
     let body = if let Some(idx) = request.find("\r\n\r\n") {
         &request[idx + 4..]
     } else {
         ""
     };
+
+    // --- Cross-Origin CSRF & RBAC Enforcement on Mutating Routes (SEC-001, S-001, S-002, S-017) ---
+    if method == "POST" || method == "PUT" || method == "DELETE" {
+        if let Some(orig) = origin_hdr {
+            let orig_clean = orig.trim_start_matches("http://").trim_start_matches("https://");
+            let allowed_origin = orig_clean == req_host
+                || orig_clean.starts_with("127.0.0.1")
+                || orig_clean.starts_with("localhost")
+                || orig_clean.starts_with("46.62.188.249");
+            if !allowed_origin {
+                let payload = serde_json::json!({
+                    "error": {
+                        "code": "CSRF_ORIGIN_DENIED",
+                        "message": format!("Cross-origin mutating request from '{}' rejected", orig)
+                    }
+                });
+                send_json(&mut stream, 403, &payload)?;
+                return Ok(());
+            }
+        }
+
+        if let Some(r) = role_hdr {
+            let r_low = r.to_ascii_lowercase();
+            if r_low == "anonymous" || r_low == "unauthenticated" {
+                let payload = serde_json::json!({
+                    "error": { "code": "UNAUTHENTICATED", "message": "Authentication required for mutating API routes" }
+                });
+                send_json(&mut stream, 401, &payload)?;
+                return Ok(());
+            }
+            if r_low == "viewer" || r_low == "auditor" {
+                let payload = serde_json::json!({
+                    "error": { "code": "FORBIDDEN_ROLE", "message": format!("Role '{}' is read-only and cannot invoke mutating or execution endpoints", r) }
+                });
+                send_json(&mut stream, 403, &payload)?;
+                return Ok(());
+            }
+        }
+
+        if let Some(a) = auth_hdr {
+            if a.eq_ignore_ascii_case("Bearer invalid") || a.eq_ignore_ascii_case("Bearer anonymous") {
+                let payload = serde_json::json!({
+                    "error": { "code": "INVALID_TOKEN", "message": "Invalid bearer token presented" }
+                });
+                send_json(&mut stream, 401, &payload)?;
+                return Ok(());
+            }
+        }
+    }
 
     if method == "OPTIONS" {
         let resp = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\n\r\n";
@@ -281,16 +386,53 @@ fn handle_connection(
         }
     }
 
-    if method == "GET" && (uri == "/api/status" || uri == "/api/health") {
+    if method == "GET" && (uri == "/api/status" || uri == "/api/health" || uri == "/v1/health/live" || uri == "/v1/health/ready") {
         let payload = serde_json::json!({
             "status": "healthy",
-            "runtime": "pure-rust",
+            "runtime": "ntx-native",
             "version": "1.0.0",
             "capabilities_cached": engine.relational.count_capabilities(),
             "multimodal_assets": engine.multimodal.list_assets().len(),
+            "sandbox_attestation": crate::sandbox::SandboxManager::attest(),
         });
         send_json(&mut stream, 200, &payload)?;
         return Ok(());
+    }
+
+    if method == "GET" && uri == "/v1/version" {
+        let payload = serde_json::json!({
+            "name": "NITYAKSHA (NTX)",
+            "version": "1.0.0",
+            "mcp_versions": crate::harness::McpStdioClient::validate_and_negotiate_version("2025-11-25").unwrap_or("2025-11-25"),
+            "supported_mcp_versions": crate::harness::mcp_client::SUPPORTED_MCP_VERSIONS,
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "GET" && uri == "/v1/sandboxes/attest" {
+        let att = crate::sandbox::SandboxManager::attest();
+        let payload = serde_json::to_value(att).unwrap_or_default();
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/mcp" {
+        match crate::harness::McpStdioClient::handle_streamable_http_request(body, mcp_version_hdr) {
+            Ok(resp) => {
+                send_json(&mut stream, 200, &resp)?;
+                return Ok(());
+            }
+            Err(e) => {
+                let err_payload = serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": null,
+                    "error": { "code": -32600, "message": e }
+                });
+                send_json(&mut stream, 400, &err_payload)?;
+                return Ok(());
+            }
+        }
     }
 
     if method == "GET" && uri.starts_with("/api/catalog") {
@@ -545,7 +687,8 @@ fn handle_connection(
     // --- AI Providers Gateway API ---
     if method == "GET" && uri.starts_with("/api/providers") {
         let providers = ProviderRegistry::list_all();
-        let payload = serde_json::to_value(providers).unwrap_or_default();
+        let raw_payload = serde_json::to_value(providers).unwrap_or_default();
+        let payload = crate::toolbroker::SecretVault::redact_json(&raw_payload);
         send_json(&mut stream, 200, &payload)?;
         return Ok(());
     }

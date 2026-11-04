@@ -7,6 +7,15 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetrievalCitation {
+    pub document_id: String,
+    pub source_path: String,
+    pub line_range: Option<String>,
+    pub commit_sha: Option<String>,
+    pub score: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HybridSearchResult {
     pub id: String,
     pub text: String,
@@ -16,6 +25,64 @@ pub struct HybridSearchResult {
     pub metadata: HashMap<String, String>,
     pub media_hash: Option<String>,
     pub document_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ExternalVectorBackend {
+    ChromaDb { endpoint: String, collection: String },
+    Qdrant { endpoint: String, collection: String },
+    PgVector { connection_uri: String, table: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExternalVectorAdapter {
+    pub backend: ExternalVectorBackend,
+    pub tenant_id: String,
+}
+
+impl ExternalVectorAdapter {
+    pub fn new(backend: ExternalVectorBackend, tenant_id: &str) -> Self {
+        Self {
+            backend,
+            tenant_id: tenant_id.to_string(),
+        }
+    }
+
+    /// Builds a tenant-isolated query payload or SQL statement for the configured external vector store (`WP-13`)
+    pub fn build_query_payload(&self, query_vector: &[f32], top_k: usize) -> serde_json::Value {
+        match &self.backend {
+            ExternalVectorBackend::ChromaDb { endpoint, collection } => serde_json::json!({
+                "adapter": "chromadb",
+                "url": format!("{}/api/v1/collections/{}/query", endpoint.trim_end_matches('/'), collection),
+                "body": {
+                    "query_embeddings": [query_vector],
+                    "n_results": top_k,
+                    "where": { "tenant_id": self.tenant_id }
+                }
+            }),
+            ExternalVectorBackend::Qdrant { endpoint, collection } => serde_json::json!({
+                "adapter": "qdrant",
+                "url": format!("{}/collections/{}/points/search", endpoint.trim_end_matches('/'), collection),
+                "body": {
+                    "vector": query_vector,
+                    "limit": top_k,
+                    "filter": {
+                        "must": [{ "key": "tenant_id", "match": { "value": self.tenant_id } }]
+                    },
+                    "with_payload": true
+                }
+            }),
+            ExternalVectorBackend::PgVector { connection_uri, table } => serde_json::json!({
+                "adapter": "pgvector",
+                "connection_uri_redacted": connection_uri.split('@').last().unwrap_or("localhost:5432"),
+                "sql": format!(
+                    "SELECT id, text, metadata, 1 - (embedding <=> $1::vector) AS score FROM {} WHERE metadata->>'tenant_id' = $2 ORDER BY embedding <=> $1::vector LIMIT {}",
+                    table, top_k
+                ),
+                "params": [format!("{:?}", query_vector), self.tenant_id]
+            }),
+        }
+    }
 }
 
 /// BM25 inverted lexical index for keyword grounding
@@ -193,6 +260,109 @@ impl HybridRagEngine {
         results.sort_by(|a, b| b.hybrid_score.partial_cmp(&a.hybrid_score).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(top_k);
         results
+    }
+
+    /// Pre-retrieval tenant-isolated hybrid search (`S-003` & `WP-13`).
+    /// Filters candidate records strictly by `tenant_id` BEFORE scoring and ranking so cross-tenant data is never scored or returned.
+    pub fn search_for_tenant(
+        &self,
+        query_text: &str,
+        caller_tenant_id: &str,
+        top_k: usize,
+        alpha: f32,
+    ) -> Result<Vec<HybridSearchResult>, String> {
+        if caller_tenant_id.trim().is_empty() {
+            return Err("TENANT_REQUIRED: caller_tenant_id cannot be empty".into());
+        }
+
+        // Pre-filter allowed document IDs belonging exclusively to `caller_tenant_id`
+        let allowed_ids: HashSet<String> = {
+            let recs = self.vector_col.records.read().unwrap();
+            recs.iter()
+                .filter(|r| {
+                    r.metadata
+                        .get("tenant_id")
+                        .map(|t| t == caller_tenant_id)
+                        .unwrap_or(false)
+                })
+                .map(|r| r.id.clone())
+                .collect()
+        };
+
+        if allowed_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let raw = self.search(query_text, None, top_k * 4, alpha);
+        let filtered: Vec<HybridSearchResult> = raw
+            .into_iter()
+            .filter(|r| allowed_ids.contains(&r.id))
+            .take(top_k)
+            .collect();
+        Ok(filtered)
+    }
+
+    /// Reciprocal Rank Fusion (RRF) combining BM25 rank + Dense Cosine rank (`WP-13`)
+    /// `score = 1 / (rrf_k + rank_dense) + 1 / (rrf_k + rank_sparse)`
+    pub fn search_rrf(&self, query_text: &str, top_k: usize, rrf_k: f32) -> Vec<HybridSearchResult> {
+        let k = rrf_k.max(1.0);
+        let bm25_ranked = self.bm25.read().unwrap().search(query_text, top_k * 3);
+        let q_vec = crate::db::vector::embed_text(query_text, self.vector_col.dimension);
+        let dense_ranked = self.vector_col.search(&q_vec, top_k * 3, None);
+
+        let mut rrf_scores: HashMap<String, f32> = HashMap::new();
+        let mut sparse_scores: HashMap<String, f32> = HashMap::new();
+        let mut dense_scores: HashMap<String, f32> = HashMap::new();
+
+        for (rank_idx, (doc_id, score)) in bm25_ranked.iter().enumerate() {
+            let rank = (rank_idx + 1) as f32;
+            *rrf_scores.entry(doc_id.clone()).or_insert(0.0) += 1.0 / (k + rank);
+            sparse_scores.insert(doc_id.clone(), *score);
+        }
+
+        for (rank_idx, d) in dense_ranked.iter().enumerate() {
+            let rank = (rank_idx + 1) as f32;
+            *rrf_scores.entry(d.id.clone()).or_insert(0.0) += 1.0 / (k + rank);
+            dense_scores.insert(d.id.clone(), d.score);
+        }
+
+        let mut results = Vec::new();
+        for (id, rrf_score) in rrf_scores {
+            if let Some(rec) = self.vector_col.get(&id) {
+                results.push(HybridSearchResult {
+                    id: id.clone(),
+                    text: rec.text,
+                    hybrid_score: rrf_score,
+                    dense_score: *dense_scores.get(&id).unwrap_or(&0.0),
+                    sparse_score: *sparse_scores.get(&id).unwrap_or(&0.0),
+                    metadata: rec.metadata,
+                    media_hash: rec.media_hash,
+                    document_id: rec.document_id,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| b.hybrid_score.partial_cmp(&a.hybrid_score).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(top_k);
+        results
+    }
+
+    /// Extract verifiable citations from hybrid retrieval results (`WP-13`)
+    pub fn build_citations(results: &[HybridSearchResult]) -> Vec<RetrievalCitation> {
+        results
+            .iter()
+            .map(|r| RetrievalCitation {
+                document_id: r.document_id.clone().unwrap_or_else(|| r.id.clone()),
+                source_path: r
+                    .metadata
+                    .get("source_path")
+                    .cloned()
+                    .unwrap_or_else(|| format!("cas://{}", r.id)),
+                line_range: r.metadata.get("line_range").cloned(),
+                commit_sha: r.metadata.get("commit_sha").cloned(),
+                score: r.hybrid_score,
+            })
+            .collect()
     }
 }
 
