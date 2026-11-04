@@ -1120,36 +1120,70 @@ print(response.choices[0].message.content)</pre>
         </div>
       </section>
 
-      <!-- ==================== 7. BOTS & DAG WORKFLOWS ==================== -->
+      <!-- ==================== 7. BOTS, DAG WORKFLOWS & AI JUDGE ==================== -->
       <section id="view-bots" class="section-view">
         <div class="view-title-block">
-          <h1>Autonomous Bot Catalog & Multi-Agent DAGs</h1>
-          <p>Preconfigured specialized agent personas and Directed Acyclic Graph (DAG) pipelines.</p>
+          <h1>Autonomous Bot App Store, DAG Workflows & Dual-Path AI Judge</h1>
+          <p>Launch specialized domain personas, execute Kahn's algorithm DAG pipelines with HITL merge gates, and run G-Eval code verification.</p>
         </div>
 
+        <!-- 1. Bot App Store -->
         <div class="card">
-          <div class="card-title"><span>Specialized Autonomous Bots (7)</span></div>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
-            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
-              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">👑 Concierge Prime</div>
-              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Master router & intent synthesis agent with full access to memory.</div>
-              <span class="badge badge-green">ACTIVE</span>
+          <div class="card-title">
+            <span>🤖 Specialized Autonomous Bots (7 Pre-Configured Personas)</span>
+            <button class="btn-outline btn-sm" onclick="loadBotsAndWorkflows()">Refresh Catalog</button>
+          </div>
+          <div id="bots-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+            <div style="padding:1rem; color:var(--text-dim);">Loading bots catalog...</div>
+          </div>
+        </div>
+
+        <!-- 2. DAG Workflows & HITL Merge Gates -->
+        <div class="card">
+          <div class="card-title">
+            <span>⛓️ Multi-Agent DAG Workflows & HITL Merge Gate Runner</span>
+            <span class="badge badge-blue">Kahn's Topological Sort · 0 Cycles</span>
+          </div>
+          <div id="workflows-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1rem; margin-bottom:1rem;">
+            <div style="padding:1rem; color:var(--text-dim);">Loading DAG workflows...</div>
+          </div>
+          <div id="workflow-exec-panel" style="display:none; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-top:0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+              <strong id="wf-exec-title" style="color:var(--text-heading);">DAG Execution Trace</strong>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <span id="wf-exec-status" class="badge badge-orange">RUNNING</span>
+                <button id="wf-hitl-btn" class="btn-brand btn-sm" style="display:none;" onclick="approveWorkflowHitl()">✓ Approve HITL Gate (NTX-APPROVE-PROD)</button>
+              </div>
             </div>
-            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
-              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">⚙️ Code Architect</div>
-              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">AST pruner, cargo compiler, and unit test synthesizer.</div>
-              <span class="badge badge-blue">READY</span>
+            <pre id="wf-exec-logs" style="font-family:var(--font-mono); font-size:0.78rem; color:var(--text-body); white-space:pre-wrap; max-height:220px; overflow-y:auto; margin:0;"></pre>
+          </div>
+        </div>
+
+        <!-- 3. Dual-Path AI Judge Verifier -->
+        <div class="card">
+          <div class="card-title">
+            <span>⚖️ Dual-Path AI Judge (Deterministic Syntax Gate + G-Eval Semantic Rubric)</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:0.75rem;">
+            <div class="field-group">
+              <label class="field-label">Verification Goal</label>
+              <input type="text" id="judge-goal" value="Verify memory-safe zero-copy implementation" style="width:100%;">
             </div>
-            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
-              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">📊 Quant Risk Specialist</div>
-              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Pine Script v6 verification, killzones, and cumulative volume profile.</div>
-              <span class="badge badge-orange">READY</span>
+            <div class="field-group">
+              <label class="field-label">Test Suite Output</label>
+              <input type="text" id="judge-tests" value="test result: ok. 12 passed; 0 failed" style="width:100%;">
             </div>
-            <div style="background:var(--bg-canvas); padding:1.25rem; border-radius:10px; border:1px solid var(--border-subtle);">
-              <div style="font-size:1.05rem; font-weight:700; color:var(--text-heading); margin-bottom:0.35rem;">🛡️ Security RedTeam</div>
-              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">POSIX cgroups v2 quotas and container namespace jail.</div>
-              <span class="badge badge-amber">ARMED</span>
-            </div>
+          </div>
+          <div class="field-group" style="margin-bottom:0.75rem;">
+            <label class="field-label">Candidate Code / Diff</label>
+            <textarea id="judge-code" rows="4" style="width:100%; font-family:var(--font-mono); font-size:0.8rem;">pub fn parse_frame(buf: &[u8]) -> Result<&[u8], &'static str> {
+    if buf.len() < 4 { return Err("short frame"); }
+    Ok(&buf[4..])
+}</textarea>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+            <button class="btn-brand" onclick="runAiJudgeEval()">⚖️ Evaluate with AI Judge</button>
+            <div id="judge-result-box" style="font-family:var(--font-mono); font-size:0.82rem; color:var(--text-heading);"></div>
           </div>
         </div>
       </section>
@@ -1718,6 +1752,138 @@ print(response.choices[0].message.content)</pre>
       return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // --- Bots, DAG Workflows & AI Judge ---
+    let activeWfExecId = null;
+
+    function loadBotsAndWorkflows() {
+      fetch('/api/bots')
+        .then(r => r.json())
+        .then(data => {
+          const bots = Array.isArray(data) ? data : (data.bots || []);
+          const grid = document.getElementById('bots-grid');
+          if (!grid || !bots.length) return;
+          grid.innerHTML = bots.map(b => `
+            <div style="background:var(--bg-canvas); padding:1.15rem; border-radius:10px; border:1px solid var(--border-subtle); display:flex; flex-direction:column; justify-content:space-between; gap:0.75rem;">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                  <span style="font-size:1rem; font-weight:700; color:var(--text-heading);">${escapeHtml(b.avatar)} ${escapeHtml(b.name)}</span>
+                  <span class="badge badge-blue">${escapeHtml(b.model_tier)}</span>
+                </div>
+                <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem;">${escapeHtml(b.description)}</div>
+                <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-dim);">Tools: ${(b.allowed_tools || []).join(', ')} · Sandbox: ${escapeHtml(b.sandbox_policy)}</div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <code style="font-size:0.7rem;">${escapeHtml(b.id)}</code>
+                <button class="btn-outline btn-sm" onclick="activateBotInPlayground('${escapeHtml(b.name)}', '${escapeHtml((b.starter_prompts && b.starter_prompts[0]) || '')}')">Launch in Playground →</button>
+              </div>
+            </div>
+          `).join('');
+        })
+        .catch(() => {});
+
+      fetch('/api/workflows')
+        .then(r => r.json())
+        .then(data => {
+          const workflows = Array.isArray(data) ? data : (data.workflows || []);
+          const grid = document.getElementById('workflows-grid');
+          if (!grid || !workflows.length) return;
+          grid.innerHTML = workflows.map(w => `
+            <div style="background:var(--bg-canvas); padding:1.15rem; border-radius:10px; border:1px solid var(--border-subtle); display:flex; flex-direction:column; justify-content:space-between; gap:0.75rem;">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                  <span style="font-size:0.95rem; font-weight:700; color:var(--text-heading);">${escapeHtml(w.name)}</span>
+                  <span class="badge badge-orange">${(w.nodes || []).length} DAG Nodes</span>
+                </div>
+                <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem;">${escapeHtml(w.description)}</div>
+                <div style="font-family:var(--font-mono); font-size:0.7rem; color:var(--text-dim);">Pipeline: ${(w.nodes || []).map(n => n.id).join(' → ')}</div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <code style="font-size:0.7rem;">${escapeHtml(w.id)}</code>
+                <button class="btn-brand btn-sm" onclick="runWorkflowDag('${escapeHtml(w.id)}')">▶ Execute DAG</button>
+              </div>
+            </div>
+          `).join('');
+        })
+        .catch(() => {});
+    }
+
+    function activateBotInPlayground(botName, starterPrompt) {
+      document.getElementById('play-sys').value = `You are ${botName}. Maintain Objective Technical Execution Mode with zero fluff.`;
+      if (starterPrompt) {
+        document.getElementById('play-prompt').value = starterPrompt;
+      }
+      switchNav('playground');
+    }
+
+    function runWorkflowDag(wfId) {
+      const panel = document.getElementById('workflow-exec-panel');
+      const logsEl = document.getElementById('wf-exec-logs');
+      const statusEl = document.getElementById('wf-exec-status');
+      const hitlBtn = document.getElementById('wf-hitl-btn');
+      panel.style.display = 'block';
+      logsEl.textContent = `Initializing DAG execution for '${wfId}'...`;
+
+      fetch('/api/workflows/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: wfId, inputs: {} })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.execution) {
+          const ex = data.execution;
+          activeWfExecId = ex.id;
+          document.getElementById('wf-exec-title').textContent = `${ex.workflow_name} (${ex.id})`;
+          statusEl.textContent = ex.status;
+          statusEl.className = ex.status === 'Completed' ? 'badge badge-green' : 'badge badge-amber';
+          hitlBtn.style.display = ex.status === 'SuspendedWaitingHitl' ? 'inline-flex' : 'none';
+          logsEl.textContent = (ex.logs || []).join('\n');
+        } else {
+          logsEl.textContent = 'Error: ' + (data.error || 'Unknown error');
+        }
+      });
+    }
+
+    function approveWorkflowHitl() {
+      if (!activeWfExecId) return;
+      fetch('/api/workflows/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ execution_id: activeWfExecId, token: 'NTX-APPROVE-PROD' })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.execution) {
+          const ex = data.execution;
+          document.getElementById('wf-exec-status').textContent = ex.status;
+          document.getElementById('wf-exec-status').className = 'badge badge-green';
+          document.getElementById('wf-hitl-btn').style.display = 'none';
+          document.getElementById('wf-exec-logs').textContent = (ex.logs || []).join('\n');
+        }
+      });
+    }
+
+    function runAiJudgeEval() {
+      const goal = document.getElementById('judge-goal').value;
+      const code = document.getElementById('judge-code').value;
+      const tests = document.getElementById('judge-tests').value;
+      const box = document.getElementById('judge-result-box');
+      box.textContent = 'Evaluating...';
+
+      fetch('/api/judge/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: goal, code_diff: code, test_results: tests })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.evaluation) {
+          const ev = data.evaluation;
+          box.innerHTML = `<span class="badge ${ev.overall_verdict === 'APPROVED' ? 'badge-green' : 'badge-red'}">${ev.overall_verdict}</span> · Correctness: <strong>${ev.score_correctness.toFixed(1)}/10</strong> · Safety: <strong>${ev.score_safety.toFixed(1)}/10</strong> · Efficiency: <strong>${ev.score_efficiency.toFixed(1)}/10</strong> · Tier: <code>${data.routed_tier}</code>`;
+        }
+      });
+    }
+
     // --- Initialize ---
     window.addEventListener('DOMContentLoaded', () => {
       // Initialize theme state (Default Light Mode / LocalStorage)
@@ -1738,6 +1904,7 @@ print(response.choices[0].message.content)</pre>
 
       loadProviders();
       refreshRouterState();
+      loadBotsAndWorkflows();
       setInterval(refreshRouterState, 10000);
     });
   </script>

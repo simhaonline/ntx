@@ -28,6 +28,85 @@ impl ScraperEngine {
         }
     }
 
+    /// Fetch a remote HTTP/HTTPS URL or read local file and convert HTML/Markdown into ScrapedKnowledge
+    pub fn fetch_and_parse(&self, target: &str) -> io::Result<ScrapedKnowledge> {
+        let raw_content = if target.starts_with("http://") || target.starts_with("https://") {
+            let out = std::process::Command::new("curl")
+                .args(["-fsSL", "-L", "--max-time", "15", "-A", "Nityaksha-Scraper/1.0", target])
+                .output()?;
+            if !out.status.success() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("HTTP fetch failed for {}: {}", target, String::from_utf8_lossy(&out.stderr)),
+                ));
+            }
+            let body = String::from_utf8_lossy(&out.stdout).to_string();
+            if body.contains("<html") || body.contains("<body") || body.contains("<h1") || body.contains("<p>") {
+                Self::html_to_markdown(&body)
+            } else {
+                body
+            }
+        } else {
+            fs::read_to_string(target)?
+        };
+
+        Ok(self.parse_documentation(&raw_content, target))
+    }
+
+    /// Convert raw HTML DOM into clean structured Markdown for skill synthesis
+    pub fn html_to_markdown(html: &str) -> String {
+        let mut s = html.to_string();
+        // Strip <script> and <style> blocks
+        for tag in ["script", "style", "nav", "footer", "svg"] {
+            let open_pat = format!("<{}", tag);
+            let close_pat = format!("</{}>", tag);
+            while let Some(start) = s.to_lowercase().find(&open_pat) {
+                if let Some(end_rel) = s[start..].to_lowercase().find(&close_pat) {
+                    let end = start + end_rel + close_pat.len();
+                    s.replace_range(start..end, "");
+                } else {
+                    break;
+                }
+            }
+        }
+        // Convert structural tags to markdown markers
+        s = s
+            .replace("<h1>", "\n# ")
+            .replace("</h1>", "\n")
+            .replace("<h2>", "\n## ")
+            .replace("</h2>", "\n")
+            .replace("<h3>", "\n### ")
+            .replace("</h3>", "\n")
+            .replace("<li>", "\n- ")
+            .replace("</li>", "\n")
+            .replace("<pre>", "\n```\n")
+            .replace("</pre>", "\n```\n")
+            .replace("<code>", "`")
+            .replace("</code>", "`")
+            .replace("<p>", "\n")
+            .replace("</p>", "\n")
+            .replace("<br>", "\n")
+            .replace("<br/>", "\n")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"");
+
+        // Strip remaining inline HTML tags
+        let mut out = String::with_capacity(s.len());
+        let mut in_tag = false;
+        for ch in s.chars() {
+            if ch == '<' {
+                in_tag = true;
+            } else if ch == '>' {
+                in_tag = false;
+            } else if !in_tag {
+                out.push(ch);
+            }
+        }
+        out
+    }
+
     /// Extract text and headings from markdown or HTML content
     pub fn parse_documentation(&self, raw_content: &str, source_url: &str) -> ScrapedKnowledge {
         let mut title = String::new();

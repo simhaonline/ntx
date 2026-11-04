@@ -2190,6 +2190,292 @@ impl ProviderRegistry {
             .map(|r| r.text)
     }
 
+    /// True Token-by-Token SSE Streaming (`stream: true`) with live callback per token chunk
+    pub fn dispatch_prompt_streaming<F>(
+        prompt: &str,
+        system_prompt: Option<&str>,
+        temperature: f32,
+        history: &[(String, String)],
+        mut on_token: F,
+    ) -> Result<PromptExecutionResult, String>
+    where
+        F: FnMut(&str),
+    {
+        use std::io::{BufRead, BufReader};
+        let start = Instant::now();
+        let active = Self::active();
+        if active.id == "unconfigured" || (!active.is_configured && active.auth_type != "none") {
+            return Err("No AI provider configured. Run '/provider add' to configure an AI provider.".to_string());
+        }
+
+        let sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
+        let model = active.default_model.clone();
+        let context_limit = active.context_window_for_model(&model);
+        let key_opt = Self::resolve_raw_key(&active);
+
+        // Stream via SSE for OpenAI-compatible & Ollama endpoints
+        if active.api_format == "openai" || active.api_format == "ollama" {
+            let base = active.base_url.trim_end_matches('/');
+            let endpoint = if base.ends_with("/chat/completions") {
+                base.to_string()
+            } else if base.ends_with("/v1") {
+                format!("{}/chat/completions", base)
+            } else {
+                format!("{}/v1/chat/completions", base)
+            };
+
+            let mut messages = Vec::new();
+            if !sys.is_empty() {
+                messages.push(serde_json::json!({ "role": "system", "content": sys }));
+            }
+            for (u, a) in history {
+                messages.push(serde_json::json!({ "role": "user", "content": u }));
+                messages.push(serde_json::json!({ "role": "assistant", "content": a }));
+            }
+            messages.push(serde_json::json!({ "role": "user", "content": prompt }));
+
+            let payload = serde_json::json!({
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": 4096,
+                "stream": true
+            });
+
+            let mut cmd = Command::new("curl");
+            cmd.args(["-sS", "-N", "--max-time", "90", "-X", "POST", &endpoint, "-H", "Content-Type: application/json"]);
+            if let Some(ref k) = key_opt {
+                if !k.is_empty() {
+                    cmd.arg("-H").arg(format!("Authorization: Bearer {}", k));
+                }
+            }
+            cmd.arg("-d")
+                .arg("@-")
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null());
+
+            if let Ok(mut child) = cmd.spawn() {
+                if let Some(mut sin) = child.stdin.take() {
+                    let _ = sin.write_all(payload.to_string().as_bytes());
+                }
+                if let Some(sout) = child.stdout.take() {
+                    let reader = BufReader::new(sout);
+                    let mut full_text = String::new();
+                    let mut raw_fallback = String::new();
+
+                    for line in reader.lines().flatten() {
+                        let trimmed = line.trim();
+                        if trimmed.is_empty() {
+                            continue;
+                        }
+                        if let Some(data_str) = trimmed.strip_prefix("data:") {
+                            let data_trim = data_str.trim();
+                            if data_trim == "[DONE]" {
+                                break;
+                            }
+                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(data_trim) {
+                                if let Some(tok) = val.pointer("/choices/0/delta/content").and_then(|v| v.as_str()) {
+                                    if !tok.is_empty() {
+                                        on_token(tok);
+                                        full_text.push_str(tok);
+                                    }
+                                }
+                            }
+                        } else {
+                            raw_fallback.push_str(trimmed);
+                        }
+                    }
+                    let _ = child.wait();
+                    if !full_text.is_empty() {
+                        let in_tok = (sys.len() + prompt.len()) / 4;
+                        let out_tok = (full_text.len() / 4).max(1);
+                        return Ok(PromptExecutionResult {
+                            text: AntiSlopFilter::filter(&full_text),
+                            input_tokens: in_tok,
+                            output_tokens: out_tok,
+                            total_tokens: in_tok + out_tok,
+                            context_limit,
+                            duration_ms: start.elapsed().as_millis(),
+                            model,
+                            provider: active.name,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Fallback to standard dispatch and emit text via callback
+        let res = Self::dispatch_prompt_detailed(prompt, system_prompt, temperature, history)?;
+        on_token(&res.text);
+        Ok(res)
+    }
+
+    /// Multi-Step Autonomous Agentic Tool-Calling ReAct Loop (read_file, write_file, edit_file, bash_sandbox, grep_search, ast_prune)
+    pub fn dispatch_agentic_loop(
+        prompt: &str,
+        system_prompt: Option<&str>,
+        temperature: f32,
+        history: &[(String, String)],
+        workspace_trusted: bool,
+        max_steps: usize,
+    ) -> Result<PromptExecutionResult, String> {
+        let base_sys = system_prompt.unwrap_or("Objective Technical Execution Mode.");
+        let tool_protocol = r#"
+[AUTONOMOUS TOOL EXECUTION PROTOCOL]
+When you need to inspect files, search code, modify files, or run commands to fulfill the user's request, emit a tool call block in this exact format:
+<tool_call>{"name": "<tool_name>", "arguments": {<json_args>}}</tool_call>
+
+Available tools:
+- `read_file`: {"path": "<file_path>"}
+- `write_file`: {"path": "<file_path>", "content": "<full_content>"}
+- `edit_file`: {"path": "<file_path>", "target": "<exact_old_text>", "replacement": "<new_text>"}
+- `grep_search`: {"pattern": "<regex_or_text>", "path": "<dir_or_file>"}
+- `ast_prune`: {"intent": "<query_keywords>", "path": "<repo_dir>"}
+- `bash_sandbox`: {"command": "<shell_command>"}
+
+Only emit a `<tool_call>...</tool_call>` block when you actually need to execute a tool before answering. Once tool outputs are provided, synthesize the final technical answer directly without further `<tool_call>` tags."#;
+
+        let augmented_sys = format!("{}\n{}", base_sys, tool_protocol);
+        let mut working_history: Vec<(String, String)> = history.to_vec();
+        let mut current_prompt = prompt.to_string();
+
+        let mut total_in = 0usize;
+        let mut total_out = 0usize;
+        let mut total_ms = 0u128;
+        let mut last_res: Option<PromptExecutionResult> = None;
+
+        let steps_limit = max_steps.clamp(1, 8);
+        for step in 1..=steps_limit {
+            let res = Self::dispatch_prompt_detailed(&current_prompt, Some(&augmented_sys), temperature, &working_history)?;
+            total_in += res.input_tokens;
+            total_out += res.output_tokens;
+            total_ms += res.duration_ms;
+
+            // Check if the model emitted a <tool_call>{...}</tool_call> block
+            if let (Some(start_idx), Some(end_idx)) = (res.text.find("<tool_call>"), res.text.find("</tool_call>")) {
+                if start_idx + 11 < end_idx && step < steps_limit {
+                    let json_raw = res.text[start_idx + 11..end_idx].trim();
+                    if let Ok(call_val) = serde_json::from_str::<serde_json::Value>(json_raw) {
+                        let tool_name = call_val.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                        let args = call_val.get("arguments").cloned().unwrap_or(serde_json::json!({}));
+
+                        println!("  \x1b[38;2;56;189;248m⚡ [AGENT TOOL #{}] {}({})\x1b[0m", step, tool_name, args);
+                        let tool_output = Self::execute_agent_tool(tool_name, &args, workspace_trusted);
+
+                        working_history.push((current_prompt.clone(), res.text.clone()));
+                        current_prompt = format!(
+                            "[TOOL EXECUTION RESULT for `{}`]:\n{}\n\nProceed with the next step or provide the final response.",
+                            tool_name, tool_output
+                        );
+                        last_res = Some(res);
+                        continue;
+                    }
+                }
+            }
+
+            return Ok(PromptExecutionResult {
+                text: res.text,
+                input_tokens: total_in,
+                output_tokens: total_out,
+                total_tokens: total_in + total_out,
+                context_limit: res.context_limit,
+                duration_ms: total_ms,
+                model: res.model,
+                provider: res.provider,
+            });
+        }
+
+        last_res.ok_or_else(|| "Agentic loop terminated without result".to_string())
+    }
+
+    /// Execute an autonomous agent tool inside workspace trust & IBAC sandbox boundaries
+    fn execute_agent_tool(tool_name: &str, args: &serde_json::Value, workspace_trusted: bool) -> String {
+        match tool_name {
+            "read_file" => {
+                let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                match fs::read_to_string(path) {
+                    Ok(content) => {
+                        if content.len() > 16_000 {
+                            format!("{}...\n[Truncated at 16,000 bytes]", &content[..16_000])
+                        } else {
+                            content
+                        }
+                    }
+                    Err(e) => format!("Error reading '{}': {}", path, e),
+                }
+            }
+            "write_file" => {
+                if !workspace_trusted {
+                    return "Blocked: Workspace directory is not trusted. Run '/trust' first.".into();
+                }
+                let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                match fs::write(path, content) {
+                    Ok(()) => format!("Successfully wrote {} bytes to '{}'", content.len(), path),
+                    Err(e) => format!("Error writing '{}': {}", path, e),
+                }
+            }
+            "edit_file" => {
+                if !workspace_trusted {
+                    return "Blocked: Workspace directory is not trusted. Run '/trust' first.".into();
+                }
+                let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                let target = args.get("target").and_then(|v| v.as_str()).unwrap_or("");
+                let replacement = args.get("replacement").and_then(|v| v.as_str()).unwrap_or("");
+                match fs::read_to_string(path) {
+                    Ok(existing) => {
+                        if !existing.contains(target) {
+                            return format!("Error: target snippet not found in '{}'", path);
+                        }
+                        let updated = existing.replace(target, replacement);
+                        match fs::write(path, &updated) {
+                            Ok(()) => format!("Successfully edited '{}'", path),
+                            Err(e) => format!("Error writing edited file '{}': {}", path, e),
+                        }
+                    }
+                    Err(e) => format!("Error reading '{}': {}", path, e),
+                }
+            }
+            "grep_search" => {
+                let pattern = args.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
+                let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+                match Command::new("grep").args(["-rnI", "--max-count=30", pattern, path]).output() {
+                    Ok(out) => {
+                        let s = String::from_utf8_lossy(&out.stdout).to_string();
+                        if s.is_empty() { "No matches found.".into() } else { s }
+                    }
+                    Err(e) => format!("grep error: {}", e),
+                }
+            }
+            "ast_prune" => {
+                let intent = args.get("intent").and_then(|v| v.as_str()).unwrap_or("");
+                let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+                let snippets = crate::harness::AstPruner::prune_context_for_intent(std::path::Path::new(path), intent);
+                serde_json::to_string_pretty(&snippets).unwrap_or_else(|_| "[]".into())
+            }
+            "bash_sandbox" => {
+                if !workspace_trusted {
+                    return "Blocked: Workspace directory is not trusted. Run '/trust' first.".into();
+                }
+                let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                let ibac = crate::sandbox::ibac::IbacGate::evaluate(command);
+                if ibac.decision != crate::sandbox::ibac::GateDecision::Allow {
+                    return format!("IBAC Security Gate Blocked Command: {}", ibac.reason);
+                }
+                match Command::new("sh").arg("-c").arg(command).output() {
+                    Ok(out) => {
+                        let stdout = String::from_utf8_lossy(&out.stdout);
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        format!("Exit Code: {}\nSTDOUT:\n{}\nSTDERR:\n{}", out.status.code().unwrap_or(-1), stdout, stderr)
+                    }
+                    Err(e) => format!("Failed to execute command: {}", e),
+                }
+            }
+            _ => format!("Unknown tool '{}'", tool_name),
+        }
+    }
+
     fn call_gemini(
         prompt: &str,
         system_prompt: &str,

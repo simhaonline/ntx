@@ -969,6 +969,107 @@ fn handle_connection(
         }
     }
 
+    // --- Autonomous Bots, DAG Workflows & AI Judge REST APIs ---
+    if method == "GET" && uri == "/api/bots" {
+        let bots = crate::bot::BotRegistry::default_bots();
+        let payload = serde_json::json!({ "bots": bots });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "GET" && uri == "/api/workflows" {
+        let workflows = crate::workflow::WorkflowRegistry::default_workflows();
+        let executions = engine.relational.list_executions();
+        let payload = serde_json::json!({
+            "workflows": workflows,
+            "executions": executions
+        });
+        send_json(&mut stream, 200, &payload)?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/workflows/run" {
+        if let Ok(req_val) = serde_json::from_str::<serde_json::Value>(body) {
+            let wf_id = req_val["workflow_id"].as_str().unwrap_or("wf-code-security-pipeline");
+            let workflows = crate::workflow::WorkflowRegistry::default_workflows();
+            if let Some(wf) = workflows.into_iter().find(|w| w.id == wf_id) {
+                let mut inputs = std::collections::HashMap::new();
+                if let Some(obj) = req_val["inputs"].as_object() {
+                    for (k, v) in obj {
+                        if let Some(s) = v.as_str() {
+                            inputs.insert(k.clone(), s.to_string());
+                        }
+                    }
+                }
+                match crate::workflow::GraphRunner::init_execution(&wf, inputs) {
+                    Ok(mut exec) => {
+                        for _ in 0..16 {
+                            if !crate::workflow::GraphRunner::step(&mut exec, &wf, &engine, &sandbox) {
+                                break;
+                            }
+                        }
+                        let _ = engine.relational.save_execution(exec.clone());
+                        send_json(&mut stream, 200, &serde_json::json!({ "ok": true, "execution": exec }))?;
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        send_json(&mut stream, 400, &serde_json::json!({ "ok": false, "error": e }))?;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        send_json(&mut stream, 400, &serde_json::json!({ "ok": false, "error": "Invalid workflow_id" }))?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/workflows/approve" {
+        if let Ok(req_val) = serde_json::from_str::<serde_json::Value>(body) {
+            let exec_id = req_val["execution_id"].as_str().unwrap_or("");
+            let token = req_val["token"].as_str().unwrap_or("NTX-APPROVE-PROD");
+            if let Some(mut exec) = engine.relational.get_execution(exec_id) {
+                let workflows = crate::workflow::WorkflowRegistry::default_workflows();
+                if let Some(wf) = workflows.into_iter().find(|w| w.id == exec.workflow_id) {
+                    match crate::workflow::GraphRunner::approve_hitl(&mut exec, token) {
+                        Ok(_) => {
+                            for _ in 0..16 {
+                                if !crate::workflow::GraphRunner::step(&mut exec, &wf, &engine, &sandbox) {
+                                    break;
+                                }
+                            }
+                            let _ = engine.relational.save_execution(exec.clone());
+                            send_json(&mut stream, 200, &serde_json::json!({ "ok": true, "execution": exec }))?;
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            send_json(&mut stream, 400, &serde_json::json!({ "ok": false, "error": e }))?;
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+        send_json(&mut stream, 400, &serde_json::json!({ "ok": false, "error": "Execution not found or invalid token" }))?;
+        return Ok(());
+    }
+
+    if method == "POST" && uri == "/api/judge/evaluate" {
+        if let Ok(req_val) = serde_json::from_str::<serde_json::Value>(body) {
+            let goal = req_val["goal"].as_str().unwrap_or("Verify production safety and correctness");
+            let code_diff = req_val["code_diff"].as_str().unwrap_or("");
+            let test_results = req_val["test_results"].as_str().unwrap_or("ok");
+            let tier = crate::harness::PromptLoopEngine::classify_intent(goal);
+            let eval = crate::harness::EvalJudgeEngine::evaluate_production_trajectory(goal, code_diff, test_results);
+            let payload = serde_json::json!({
+                "ok": true,
+                "routed_tier": format!("{:?}", tier),
+                "evaluation": eval
+            });
+            send_json(&mut stream, 200, &payload)?;
+            return Ok(());
+        }
+    }
+
     // 404 Fallback
     let not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nNot Found";
     stream.write_all(not_found.as_bytes())?;

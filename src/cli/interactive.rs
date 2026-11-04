@@ -2019,11 +2019,14 @@ impl InteractiveShell {
             "Objective Technical Execution Mode.".to_string()
         };
 
-        match ProviderRegistry::dispatch_prompt_detailed(
+        let is_trusted = self.is_current_dir_trusted();
+        match ProviderRegistry::dispatch_agentic_loop(
             prompt,
             Some(&system_prompt),
             0.7,
             &self.conversation_history,
+            is_trusted,
+            6,
         ) {
             Ok(result) => {
                 // Update session and turn telemetry

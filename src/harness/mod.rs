@@ -8,6 +8,7 @@ pub mod ast_pruner;
 pub mod eval_judge;
 pub mod prompt_loop;
 pub mod adapter;
+pub mod mcp_client;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -19,6 +20,7 @@ pub use ast_pruner::{AstPruner, CodeSymbol, PrunedContextSnippet};
 pub use eval_judge::{DeterministicCheckResult, EvalJudgeEngine, JudgeEvaluation};
 pub use prompt_loop::{ModelTier, PromptLoopEngine};
 pub use adapter::{ProviderType, SharedAdapter, StandardLlmRequest, StandardLlmResponse};
+pub use mcp_client::{McpHandshakeReport, McpStdioClient, McpToolSchema};
 
 /// Central Nityaksha Autonomous AI Harness
 pub struct AiHarness {

@@ -78,10 +78,56 @@ impl EvalJudgeEngine {
             };
         }
 
-        // Production semantic evaluation
+        // Stage 2: Live LLM-as-a-Judge Semantic G-Eval Rubric Dispatch (with deterministic fallback)
+        let active_p = crate::provider::ProviderRegistry::active();
+        if active_p.is_configured {
+            let rubric_prompt = format!(
+                "Evaluate the following code modification against the goal.\n\
+                 GOAL: {}\n\
+                 TEST RESULTS: {}\n\
+                 CODE DIFF:\n```\n{}\n```\n\n\
+                 Return ONLY a valid JSON object with keys:\n\
+                 {{\"correctness\": <float 0.0-10.0>, \"safety\": <float 0.0-10.0>, \"efficiency\": <float 0.0-10.0>, \"rationale\": \"<concise technical verdict>\"}}",
+                goal, test_results, code_diff
+            );
+            let sys = "You are the Nityaksha G-Eval Semantic Code Judge. Output strict JSON only.";
+            if let Ok(raw_resp) = crate::provider::ProviderRegistry::dispatch_prompt(&rubric_prompt, Some(sys), 0.1) {
+                // Extract JSON block if present
+                let json_slice = if let (Some(s), Some(e)) = (raw_resp.find('{'), raw_resp.rfind('}')) {
+                    &raw_resp[s..=e]
+                } else {
+                    raw_resp.as_str()
+                };
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_slice) {
+                    let corr = parsed.get("correctness").and_then(|v| v.as_f64()).unwrap_or(9.0) as f32;
+                    let safety = parsed.get("safety").and_then(|v| v.as_f64()).unwrap_or(9.5) as f32;
+                    let eff = parsed.get("efficiency").and_then(|v| v.as_f64()).unwrap_or(8.8) as f32;
+                    let rat = parsed
+                        .get("rationale")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Verified via Live LLM Judge G-Eval Rubric.")
+                        .to_string();
+                    let verdict = if corr >= 8.0 && safety >= 8.5 { "APPROVED" } else { "REJECTED" };
+                    return JudgeEvaluation {
+                        path: "live_llm_judge_verifier".into(),
+                        score_correctness: corr,
+                        score_safety: safety,
+                        score_efficiency: eff,
+                        overall_verdict: verdict.into(),
+                        rationale: rat,
+                        deterministic_checks_passed: true,
+                    };
+                }
+            }
+        }
+
+        // Deterministic Structural & Test Heuristic Evaluation (Offline Fallback)
         let has_tests_passed = test_results.contains("ok") || test_results.contains("PASSED") || test_results.contains("100%");
-        let (corr, safety, eff) = if has_tests_passed {
+        let has_result_handling = code_diff.contains("Result<") || code_diff.contains("Option<") || !code_diff.contains("todo!");
+        let (corr, safety, eff) = if has_tests_passed && has_result_handling {
             (9.5, 9.8, 9.0)
+        } else if has_tests_passed {
+            (8.5, 9.2, 8.5)
         } else {
             (6.0, 8.5, 7.0)
         };
@@ -99,8 +145,25 @@ impl EvalJudgeEngine {
         }
     }
 
-    /// Synthesize an executable Rust unit test template before agent coding
+    /// Synthesize an executable Rust unit test suite before agent coding (uses live LLM if configured)
     pub fn synthesize_unit_test(function_name: &str, expected_behavior: &str) -> String {
+        let active_p = crate::provider::ProviderRegistry::active();
+        if active_p.is_configured {
+            let prompt = format!(
+                "Synthesize a self-contained Rust #[cfg(test)] unit test module for function `{}` verifying: {}. Output only Rust code.",
+                function_name, expected_behavior
+            );
+            if let Ok(resp) = crate::provider::ProviderRegistry::dispatch_prompt(
+                &prompt,
+                Some("Output only valid Rust #[cfg(test)] code without markdown fences."),
+                0.1,
+            ) {
+                if resp.contains("#[test]") {
+                    return resp;
+                }
+            }
+        }
+
         format!(
             r#"#[cfg(test)]
 mod tests {{

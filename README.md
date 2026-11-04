@@ -113,15 +113,22 @@ flowchart TD
   - *Negative Reinforcement Cache*: Active register of known anti-patterns and compiler failures ("What Not To Do") injected into system prompts.
 - **Dual-Path AI Judge (LLM-as-a-Judge)**:
   - *Layered Deterministic Checks*: Programmatic syntax balance and prohibited keyword scanning executed before LLM evaluation.
-  - *Dual-Path Scoring*: Live Production Verifier and CI/CD Regression Guard scoring correctness, security, and efficiency.
-  - *Automated Unit Test Synthesis*: Generates executable test assertions before code modification begins.
-- **Standardized Hot-Swappable Provider Adapters**: Universal interface normalizing requests and streaming tool calls across OpenAI, Anthropic, Google Gemini, DeepSeek, and Ollama.
+  - *Live G-Eval Semantic Rubric*: Queries the active AI provider for structured JSON evaluation scores (`correctness`, `safety`, `efficiency`, `rationale`) with deterministic fallback.
+  - *Automated Unit Test Synthesis*: Synthesizes executable `#[cfg(test)]` assertions via live LLM or deterministic template before code modification begins.
+- **Autonomous ReAct Tool-Calling Loop & SSE Streaming**:
+  - *Multi-Step Agentic Loop (`dispatch_agentic_loop`)*: Executes `read_file`, `write_file`, `edit_file`, `grep_search`, `ast_prune`, and `bash_sandbox` inside IBAC & workspace trust boundaries across up to 8 autonomous reasoning steps per turn.
+  - *Real-Time Token Streaming (`dispatch_prompt_streaming`)*: Incremental Server-Sent Events (`SSE` / `stream-json`) chunk parser streaming tokens live as they arrive.
+- **Live MCP JSON-RPC 2.0 Stdio Client & Server (`src/harness/mcp_client.rs`)**:
+  - *Protocol Handshake*: Spawns MCP servers over `stdin`/`stdout`, executes JSON-RPC 2.0 `initialize`, `notifications/initialized`, `tools/list`, and `tools/call`.
+  - *Embedded MCP Server*: Includes `ntx mcp serve` exposing `sandbox_read_file`, `hybrid_memory_search`, and `ast_symbol_inspect` over JSON-RPC 2.0 stdio.
+- **Standardized Hot-Swappable Provider Adapters**: Universal interface normalizing requests and streaming tool calls across 36+ backends (OpenAI, Anthropic, Google Gemini, OpenRouter, DeepSeek, Kimi, GLM, MiniMax, Qwen, Groq, Cerebras, Ollama, and custom endpoints).
 
 ### 5.2 Native Documentation Scraper & Capability Synthesizer (`src/scraper/`)
-- Native crawler that extracts headings, code snippets, and execution rules from technical documentation or local runbooks.
+- Live HTTP/HTTPS crawler (`fetch_and_parse`) with automatic HTML DOM-to-Markdown conversion (`<script>`/`<style>` stripping, heading/code/list extraction) plus local runbook parser.
 - Synthesizes 100% proprietary first-party skill directories (`.agents/skills/<name>/SKILL.md`) and database manifests (`/opt/nityaksha/catalog/skills/<name>.yaml`) without cloning external repositories.
 
 ### 5.3 Agent Memory Stack & Vector DB Engine (`src/db/`)
+- **Hybrid Neural + Sub-Word Semantic Embedder**: Supports live neural embeddings (`text-embedding-3-small` on OpenAI, `text-embedding-004` on Gemini, `nomic-embed-text` on Ollama when `NTX_NEURAL_EMBED=1`) with automatic fallback to stem + character 3-gram + word bigram semantic projection.
 - **Dense Vector Engine**: Arbitrary vector dimensions (e.g., 384, 768, 1536) with SIMD-accelerated Cosine, Dot Product, and Euclidean distance.
 - **Disk-Cached Vector Pages**: Disk-backed memory-mapped page store supporting millions of vectors on edge hardware with minimal RAM consumption.
 - **Hybrid RAG Retrieval**: Joint semantic and lexical ranking combining dense vectors with sparse BM25 / TF-IDF:
@@ -479,6 +486,11 @@ Nityaksha includes a self-contained, responsive single-page landing page (`index
 | `POST` | `/api/memory/query` | Executes hybrid RAG retrieval over dense vectors and BM25 |
 | `POST` | `/api/sandbox/run` | Executes command inside confined POSIX sandbox with cgroup quotas |
 | `POST` | `/api/filter/slop` | Sanitizes text through the streaming Anti-Slop filter |
+| `GET` | `/api/bots` | Lists all 7 specialized autonomous bots and tool permissions |
+| `GET` | `/api/workflows` | Lists all 4 enterprise DAG workflows and execution history |
+| `POST` | `/api/workflows/run` | Initializes and steps a DAG workflow through Kahn's topological runner |
+| `POST` | `/api/workflows/approve` | Submits cryptographic HITL approval token (`NTX-APPROVE-PROD`) to resume suspended DAG |
+| `POST` | `/api/judge/evaluate` | Executes Dual-Path AI Judge (Deterministic Syntax Gate + G-Eval Rubric) |
 
 ---
 
