@@ -617,7 +617,7 @@ impl InteractiveShell {
     }
 
     // ==============================================================================
-    // 6. COCKPIT VIEW RENDERERS (Nityaksha Pure Rust TUI)
+    // 6. COCKPIT VIEW RENDERERS (Nityaksha TUI)
     // ==============================================================================
 
     pub fn render_active_view(&self) {

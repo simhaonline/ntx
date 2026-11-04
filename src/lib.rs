@@ -1,5 +1,5 @@
-//! Nityaksha Pure Rust AI Agent Control Plane Engine
-//! Zero-clone capability harvesting, pure Rust Agent Memory Stack & Vector DB, POSIX sandbox, and WebUI.
+//! Nityaksha AI Agent Control Plane Engine
+//! Zero-clone capability harvesting, Agent Memory Stack & Vector DB, POSIX sandbox, and WebUI.
 
 pub mod ring_buffer;
 pub mod anti_slop;

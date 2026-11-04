@@ -1,13 +1,13 @@
 # NITYAKSHA — Brand Identity & Style Guidelines
 
 > **Tagline:** An AI Concierge Platform  
-> **Sub-tagline:** Engineered for high-velocity, deterministic AI in pure Rust.
+> **Sub-tagline:** Engineered for high-velocity, deterministic multi-agent orchestration.
 
 ---
 
 ## 1. Brand Essence & Vision
 
-**Nityaksha** combines timeless stability with forward-moving intelligence. Built in pure Rust, the platform stands for determinism, sub-millisecond execution, and continuous, refined guidance.
+**Nityaksha** combines timeless stability with forward-moving intelligence. The platform stands for determinism, sub-millisecond execution, and continuous, refined guidance.
 
 * **Core Attributes:** High-velocity, Deterministic, Resilient, Sophisticated, Ambient.
 * **Tone of Voice:** Authoritative, direct, technical yet welcoming, and noise-free.
@@ -101,7 +101,7 @@ The logo mark is an abstract orbital system constructed on golden-ratio arcs:
 
 ## 5. UI Elements & Components
 
-### 5.1 "Engineered in Pure Rust" Badge
+### 5.1 Platform Status Badge
 * **Background:** Transparent with `1px` border of `#C05A28` OR solid fill `#C05A28` with `#FFFFFF` text.
 * **Border Radius:** Pill shape (`9999px`).
 * **Padding:** `4px 12px`.

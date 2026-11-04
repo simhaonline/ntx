@@ -11,7 +11,7 @@ set -e
 printf "\033[0;36m"
 printf "================================================================================\n"
 printf "                   NITYAKSHA - An AI Concierge Platform                         \n"
-printf "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  \n"
+printf "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform.  \n"
 printf "================================================================================\n"
 printf "\033[0m"
 

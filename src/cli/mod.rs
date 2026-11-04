@@ -1,5 +1,5 @@
 //! NITYAKSHA - An AI Concierge Platform CLI Dispatcher
-//! Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.
+//! Engineered for high-velocity, deterministic multi-agent orchestration.
 //! Comprehensive options, execution modes, sessions, daemon, and AI Harness lifecycle.
 
 pub mod interactive;
@@ -562,7 +562,7 @@ impl CliHandler {
     pub fn cmd_status(&self) {
         println!("================================================================================");
         println!("                   NITYAKSHA - An AI Concierge Platform                         ");
-        println!("  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  ");
+        println!("      Engineered for high-velocity, deterministic multi-agent orchestration.    ");
         println!("================================================================================");
         self.cmd_doctor();
         println!();
@@ -570,7 +570,7 @@ impl CliHandler {
     }
 
     pub fn cmd_doctor(&self) {
-        println!("Nityaksha Doctor (Framework Health & Governance Audit v1.0.0 - Pure Rust):");
+        println!("Nityaksha Doctor (Framework Health & Governance Audit v1.0.0):");
         println!("--------------------------------------------------------------------------------");
         #[cfg(target_os = "linux")]
         let service_user_ok = nix::unistd::User::from_name("nityaksha").map_or(false, |u| u.is_some());
@@ -1085,7 +1085,7 @@ complete -F _ntx_completions ntx"#);
                 let mut results = self.engine.relational.search_capabilities(query, None);
                 results.sort_by(|a, b| a.kind.cmp(&b.kind).then(a.name.cmp(&b.name)));
                 println!("=================================================================================================================");
-                println!("         Capability Catalog Search for '{}' ({} matches in Pure Rust SoT)          ", query, results.len());
+                println!("         Capability Catalog Search for '{}' ({} matches in Catalog SoT)            ", query, results.len());
                 println!("=================================================================================================================");
                 println!("  [{:<7}] {:<30} {:<8} {:<10} {}", "KIND", "CAPABILITY NAME", "VERSION", "TIER", "DESCRIPTION");
                 println!("-----------------------------------------------------------------------------------------------------------------");
@@ -1128,7 +1128,7 @@ complete -F _ntx_completions ntx"#);
             }
             "stats" => {
                 let counts = self.engine.relational.count_capabilities();
-                println!("Catalog Statistics (Database-backed SoT - Pure Rust):");
+                println!("Catalog Statistics (Database-backed SoT):");
                 let mut sorted_kinds: Vec<(&String, &usize)> = counts.iter().collect();
                 sorted_kinds.sort_by_key(|k| k.0);
                 for (k, cnt) in sorted_kinds {
@@ -1138,7 +1138,7 @@ complete -F _ntx_completions ntx"#);
                 println!("  - Media Assets: {} multimodal blobs in CAS", self.engine.multimodal.list_assets().len());
             }
             "sync" => {
-                println!("Syncing catalog from /opt/nityaksha/catalog into pure Rust memory engine...");
+                println!("Syncing catalog from /opt/nityaksha/catalog into memory engine...");
                 let _ = self.engine.sync_filesystem_catalog(Path::new("/opt/nityaksha/catalog"));
                 println!("Catalog Sync Completed.");
                 self.cmd_catalog(&["stats".to_string()]);
@@ -1258,7 +1258,7 @@ complete -F _ntx_completions ntx"#);
                 }
                 let target = &args[1];
                 if let Some(r) = self.engine.relational.find_capability(Some("mcp"), target) {
-                    println!("[PASS] MCP Server Test: {} on pure Rust engine", r.name);
+                    println!("[PASS] MCP Server Test: {} on Nityaksha engine", r.name);
                     println!("       Origin Repo: {}", r.origin_repo);
                     println!("       Transport  : stdio | Permissions: Read-only (mutation blocked)");
                 } else {
@@ -1633,7 +1633,7 @@ complete -F _ntx_completions ntx"#);
                 }
             }
             "stats" => {
-                println!("Nityaksha Agent Memory Stack Overview (Pure Rust Engine):");
+                println!("Nityaksha Agent Memory Stack Overview:");
                 println!("--------------------------------------------------------------------------------");
                 println!("  Vectors Cached   : {} dense float vectors", self.engine.vector.count());
                 println!("  Multimodal Media : {} binary assets in CAS", self.engine.multimodal.list_assets().len());
@@ -2522,7 +2522,7 @@ complete -F _ntx_completions ntx"#);
         println!("Commands:");
         println!("  tui | cockpit [VIEW]            Launch full-screen interactive TUI cockpit");
         println!("  swarm                           Open Autonomous Multi-Agent Swarm cockpit directly");
-        println!("  repl                            Start interactive pure Rust REPL shell with cockpit tabs");
+        println!("  repl                            Start interactive REPL shell with cockpit tabs");
         println!();
         println!("AI Provider & API Key Management:");
         println!("  provider [list]                 List all 36+ native & custom providers (OpenRouter, Gemini, Kimi, GLM, Alibaba...)");

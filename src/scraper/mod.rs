@@ -1,4 +1,4 @@
-//! Nityaksha Native Pure Rust Scraper & Capability Synthesizer
+//! Nityaksha Native Scraper & Capability Synthesizer
 //! Scrapes technical documentation and dynamically synthesizes original, clean, proprietary Nityaksha skills and runbooks.
 
 use serde::{Deserialize, Serialize};

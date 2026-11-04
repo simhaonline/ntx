@@ -1,6 +1,6 @@
 # ==============================================================================
 #  NITYAKSHA — An AI Concierge Platform Windows Installer (ntx.exe)
-#  Engineered for high-velocity, deterministic AI in pure Rust.
+#  Engineered for high-velocity, deterministic AI.
 #  Usage:  irm https://simhaonline.ai/install.ps1 | iex
 # ==============================================================================
 
@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host "                   NITYAKSHA - An AI Concierge Platform                         " -ForegroundColor Cyan
-Write-Host "         Engineered for high-velocity, deterministic AI in pure Rust.           " -ForegroundColor Cyan
+Write-Host "         Engineered for high-velocity, deterministic AI.           " -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
 
 $InstallDir = Join-Path $env:USERPROFILE ".nityaksha\bin"

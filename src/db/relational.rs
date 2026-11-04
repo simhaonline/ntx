@@ -1,4 +1,4 @@
-//! Nityaksha Relational Agent Memory Stack (Pure Rust ACID Engine)
+//! Nityaksha Relational Agent Memory Stack (ACID Engine)
 //! In-memory and disk-directory relational tables with WAL, atomic snapshots, and multi-agent indexing.
 
 use crate::bot::{BotDefinition, BotRegistry};
@@ -202,7 +202,7 @@ impl RelationalStore {
                 wing: "architecture".into(),
                 room: "storage".into(),
                 drawer: "sqlite_wal".into(),
-                content: "Pure Rust memory engine with atomic WAL and JSON/Binary state snapshots".into(),
+                content: "Native memory engine with atomic WAL and JSON/Binary state snapshots".into(),
                 tags: "rust,storage,wal,atomic".into(),
                 updated_at: now.clone(),
             },

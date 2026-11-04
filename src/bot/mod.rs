@@ -1,5 +1,5 @@
 //! NITYAKSHA - Pre-Configured Bots & App Store Registry
-//! Engineered for high-velocity, deterministic AI in pure Rust.
+//! Engineered for high-velocity, deterministic AI orchestration.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -94,12 +94,12 @@ impl BotRegistry {
             },
             BotDefinition {
                 id: "ntx-bot-code-architect".into(),
-                name: "Pure Rust Code Architect".into(),
+                name: "Systems Code Architect".into(),
                 category: "Engineering".into(),
                 version: "1.0.0".into(),
                 avatar: "🦀".into(),
-                description: "Deep codebase discovery, AST dependency pruning, memory safety invariants, and high-velocity Rust systems engineering.".into(),
-                system_prompt_template: "You are the Pure Rust Code Architect. Analyze AST trees in {{workspace_root}} without wasteful file dumping. Enforce zero unwrap(), zero unsafe leaks, and sub-millisecond execution.".into(),
+                description: "Deep codebase discovery, AST dependency pruning, memory safety invariants, and high-velocity systems engineering.".into(),
+                system_prompt_template: "You are the Systems Code Architect. Analyze AST trees in {{workspace_root}} without wasteful file dumping. Enforce zero unwrap(), zero unsafe leaks, and sub-millisecond execution.".into(),
                 model_tier: "DeepReasoning".into(),
                 temperature: 0.1,
                 allowed_tools: vec!["Read".into(), "Edit".into(), "Bash".into(), "ASTInspect".into(), "GitDiff".into()],

@@ -1,4 +1,4 @@
-//! Nityaksha Pure Rust Vector Database Engine
+//! Nityaksha Vector Database Engine
 //! Dense vector similarity search, SIMD/Vectorized Cosine/Dot/L2, and disk-cached page storage for edge scale.
 
 use serde::{Deserialize, Serialize};

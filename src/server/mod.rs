@@ -1,4 +1,4 @@
-//! Nityaksha Pure Rust Multi-Threaded HTTP & REST API Server
+//! Nityaksha Multi-Threaded HTTP & REST API Server
 //! Serves the embedded workstation WebUI and provides REST endpoints for memory, sandbox, and catalog.
 
 pub mod webui;

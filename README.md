@@ -1,15 +1,14 @@
 # `ntx` — NITYAKSHA - An AI Concierge Platform
 
-Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.
+Engineered for high-velocity, deterministic multi-agent orchestration.
 
 **Version:** `v1.0.0`  
 **Author:** Simha (`simhaonline`)  
-**Architecture:** Pure Native Rust (100% Rust, Zero Python Runtime Dependency)  
+**Architecture:** Zero-Dependency Compiled Binary (Zero Python Runtime Dependency)  
 **Security Model:** ContainerOS-Grade POSIX Sandboxing & Invariant Enforcement  
 **Official Domain:** [`simhaonline.ai`](https://simhaonline.ai)  
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/simhaonline/ntx)
-[![Language](https://img.shields.io/badge/language-pure%20rust-orange.svg)](https://github.com/simhaonline/ntx)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows%20%7C%20macos%20%7C%20ios-green.svg)](https://github.com/simhaonline/ntx)
 [![Architecture](https://img.shields.io/badge/architecture-zero--clone%20%7C%20agent--memory--stack-success.svg)](https://github.com/simhaonline/ntx)
 [![Security](https://img.shields.io/badge/security-ContainerOS%20sandboxed-green.svg)](https://github.com/simhaonline/ntx)
@@ -61,7 +60,7 @@ curl -fsSL https://simhaonline.ai/install-ios.sh | sh
 
 ## 3. Executive Summary
 
-**`ntx`** (Nityaksha Control Plane) is an ultra-lightweight, high-efficiency autonomous multi-agent infrastructure control plane, sandboxing kernel, and reasoning engine CLI **built 100% from scratch in pure Rust**. Engineered to eliminate the latency, resource bloat, and instability of interpreted agent runtimes, `ntx` provides **sub-5ms execution overhead**, **ContainerOS-grade kernel isolation**, a **proprietary native vector database & memory stack**, an **autonomous AI execution harness**, and a **native documentation scraper and capability synthesizer**.
+**`ntx`** (Nityaksha Control Plane) is an ultra-lightweight, high-efficiency autonomous multi-agent infrastructure control plane, sandboxing kernel, and reasoning engine CLI **built 100% from scratch**. Engineered to eliminate the latency, resource bloat, and instability of interpreted agent runtimes, `ntx` provides **sub-5ms execution overhead**, **ContainerOS-grade kernel isolation**, a **proprietary native vector database & memory stack**, an **autonomous AI execution harness**, and a **native documentation scraper and capability synthesizer**.
 
 Every capability in the system—including skills, agent personas, MCP servers, plugins, and prompt templates—is **100% first-party and proprietary**, built natively under `[nityaksha/core]`.
 
@@ -71,7 +70,7 @@ Every capability in the system—including skills, agent personas, MCP servers, 
 
 ```mermaid
 flowchart TD
-    CLI["ntx CLI / REPL (v1.0.0 Pure Rust Native)"] --> Harness["Autonomous AI Harness"]
+    CLI["ntx CLI / REPL (v1.0.0)"] --> Harness["Autonomous AI Harness"]
     CLI --> Scraper["Native Documentation Scraper & Synthesizer"]
     CLI --> WebUI["Embedded Workstation WebUI (:8080)"]
     
@@ -99,7 +98,7 @@ flowchart TD
 - **Deterministic Hard Exits & Loop Breakers**: A physical iteration counter forcefully terminates runaway loops. A file mutation tracker detects oscillation thrashing (e.g., repeatedly rewriting the same file) and triggers a deterministic hard stop.
 - **Multi-Tier Memory & Context State**:
   - *Short-Term Sliding Context*: Ring buffer maintaining active conversation turns with token truncation.
-  - *Episodic Memory*: Pure Rust vector database retrieving relevant multi-step interactions via hybrid search.
+  - *Episodic Memory*: Native vector database retrieving relevant multi-step interactions via hybrid search.
   - *Long-Term Persistence*: Loads North Star guidelines, corporate coding standards, and configuration files (`NITYAKSHA.md`, `AGENTS.md`).
   - *Continuous State Persistence*: Checkpoints task progress continuously to disk, allowing long-running tasks to resume at the exact point of interruption without starting over.
 - **Granular Governance & Security Invariants**:
@@ -119,10 +118,10 @@ flowchart TD
 - **Standardized Hot-Swappable Provider Adapters**: Universal interface normalizing requests and streaming tool calls across OpenAI, Anthropic, Google Gemini, DeepSeek, and Ollama.
 
 ### 5.2 Native Documentation Scraper & Capability Synthesizer (`src/scraper/`)
-- Pure Rust crawler that extracts headings, code snippets, and execution rules from technical documentation or local runbooks.
+- Native crawler that extracts headings, code snippets, and execution rules from technical documentation or local runbooks.
 - Synthesizes 100% proprietary first-party skill directories (`.agents/skills/<name>/SKILL.md`) and database manifests (`/opt/nityaksha/catalog/skills/<name>.yaml`) without cloning external repositories.
 
-### 5.3 Pure Rust Agent Memory Stack & Vector DB Engine (`src/db/`)
+### 5.3 Agent Memory Stack & Vector DB Engine (`src/db/`)
 - **Dense Vector Engine**: Arbitrary vector dimensions (e.g., 384, 768, 1536) with SIMD-accelerated Cosine, Dot Product, and Euclidean distance.
 - **Disk-Cached Vector Pages**: Disk-backed memory-mapped page store supporting millions of vectors on edge hardware with minimal RAM consumption.
 - **Hybrid RAG Retrieval**: Joint semantic and lexical ranking combining dense vectors with sparse BM25 / TF-IDF:
@@ -331,7 +330,7 @@ ntx agent run ntx-code-architect --dry-run
 ntx mcp test ntx-mcp-fs-sandbox
 ```
 
-### 8.5 Pure Rust Memory Stack
+### 8.5 Agent Memory Stack
 ```bash
 # Execute hybrid RAG search (Dense Vector Cosine + Sparse BM25 Keyword)
 ntx memory query "sandbox isolation cgroups"
@@ -485,7 +484,7 @@ Nityaksha includes a self-contained, responsive single-page landing page (`index
 
 ## 10. Performance & Resource Footprint
 
-| Metric | Python Runtime Baseline | `ntx` Pure Rust Native | Optimization Factor |
+| Metric | Python Runtime Baseline | `ntx` v1.0.0 | Optimization Factor |
 | :--- | :--- | :--- | :--- |
 | **Binary Size** | ~140 MB (Interpreter + venv) | **949 KB** (Single Static ELF) | **~150x smaller** |
 | **Idle Memory (RAM)** | ~38 MB | **1.7 MB** | **~22x lighter** |
@@ -498,4 +497,4 @@ Nityaksha includes a self-contained, responsive single-page landing page (`index
 ## 11. Author & Maintainer
 
 **Simha** ([@simhaonline](https://github.com/simhaonline))  
-*Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.*
+*Engineered for high-velocity, deterministic multi-agent orchestration.*

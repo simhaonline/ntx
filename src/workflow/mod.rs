@@ -1,4 +1,4 @@
-//! NITYAKSHA - Pure Rust Workflow Graph Engine
+//! NITYAKSHA - Workflow Graph Engine
 //! Directed Acyclic Graph (DAG) orchestration, Kahn's cycle detection, multi-model gateway, and HITL gates.
 
 use serde::{Deserialize, Serialize};
@@ -240,7 +240,7 @@ impl MultiModelGateway {
             }
         }
 
-        // Pure Rust Deterministic Model Dispatch
+        // Deterministic Model Dispatch
         match tier {
             "FastFlash" => {
                 format!(
@@ -605,8 +605,8 @@ impl WorkflowRegistry {
                         name: "High-Velocity Rust Code Synthesis".into(),
                         kind: NodeKind::LlmTask {
                             model_tier: "DeepReasoning".into(),
-                            prompt_template: "Synthesize pure Rust implementation for {{patch_intent}}. Enforce zero unwrap(), Result<T, E> error handling, and memory safety.".into(),
-                            system_prompt: Some("You are Pure Rust Code Architect. Emit clean, deterministic code.".into()),
+                            prompt_template: "Synthesize clean systems implementation for {{patch_intent}}. Enforce zero unwrap(), Result<T, E> error handling, and memory safety.".into(),
+                            system_prompt: Some("You are Systems Code Architect. Emit clean, deterministic code.".into()),
                             temperature: 0.1,
                         },
                         dependencies: vec!["step-2-redteam-audit".into()],

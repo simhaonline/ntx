@@ -1,4 +1,4 @@
-//! Nityaksha Pure Rust Complete Agent Memory Stack & Vector DB Engine
+//! Nityaksha Complete Agent Memory Stack & Vector DB Engine
 //! Relational + Hybrid Vectors, Columnar + Multimodal, In-Memory or Disk Directory, Automatic Version Tracking.
 
 pub mod vector;

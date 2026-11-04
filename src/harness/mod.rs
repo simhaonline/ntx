@@ -1,4 +1,4 @@
-//! Nityaksha Pure Rust AI Harness Architecture
+//! Nityaksha AI Harness Architecture
 //! Master controller uniting Multi-Tier Memory, Container Isolation, Invariant Gating, AST Pruning, and AI Judge.
 
 pub mod budget;

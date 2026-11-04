@@ -18,7 +18,7 @@ NC='\033[0m' # No Color
 echo -e "${CYAN}${BOLD}"
 echo "================================================================================"
 echo "                   NITYAKSHA - An AI Concierge Platform                         "
-echo "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform in pure Rust.  "
+echo "  Engineered for high-velocity, deterministic, and NITYAKSHA - An AI Concierge Platform.  "
 echo "================================================================================"
 echo -e "${NC}"
 
@@ -71,7 +71,7 @@ BIN_PATH="$INSTALL_DIR/ntx"
 RELEASE_URL="https://github.com/simhaonline/ntx/releases/latest/download/ntx"
 RAW_URL="https://raw.githubusercontent.com/simhaonline/ntx/main/ntx"
 
-echo -e "${CYAN}[1/4] Fetching native 'ntx' pure Rust binary...${NC}"
+echo -e "${CYAN}[1/4] Fetching native 'ntx' binary...${NC}"
 
 # Prevent 'Text file busy' by stopping active daemon and terminating old processes
 if command -v systemctl >/dev/null 2>&1; then
@@ -128,7 +128,7 @@ if [ "$(id -u)" -eq 0 ]; then
         useradd -r -s /usr/sbin/nologin -d /var/lib/nityaksha nityaksha 2>/dev/null || true
     fi
 
-    # Write pure Rust native policy without PostgreSQL / pgvector
+    # Write native policy without PostgreSQL / pgvector
     cat > /etc/nityaksha/policy.yaml <<'EOF_POLICY'
 apiVersion: nityaksha.simha/v1
 kind: SecurityPolicy
@@ -162,7 +162,7 @@ EOF_POLICY
 
     # Write native Rust Agent Memory Stack DDL (WAL, Vectors, BM25, CAS)
     cat > /etc/nityaksha/schema.sql <<'EOF_SCHEMA'
--- NITYAKSHA - An AI Concierge Platform (Native Pure Rust Agent Memory Stack)
+-- NITYAKSHA - An AI Concierge Platform (Native Agent Memory Stack)
 -- Relational WAL + Dense SIMD Vectors + Sparse BM25 + Multimodal CAS + MVCC Versioning
 CREATE TABLE IF NOT EXISTS capabilities (
   id TEXT PRIMARY KEY,
